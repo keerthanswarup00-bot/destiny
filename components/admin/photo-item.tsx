@@ -1,16 +1,20 @@
 "use client";
 
 import { useRef } from "react";
-import { deletePhoto } from "@/app/admin/crud-actions";
+import { deletePhoto, movePhotoToFolder } from "@/app/admin/crud-actions";
 
 export function PhotoItem({
   photo,
   galleryId,
   folderName,
+  folderId,
+  folders,
 }: {
   photo: { id: string; filename: string; bytes: number; previewUrl: string | null };
   galleryId: string;
   folderName: string;
+  folderId: string;
+  folders: { id: string; name: string }[];
 }) {
   const deleteDialog = useRef<HTMLDialogElement>(null);
   const size = photo.bytes >= 1024 * 1024 ? `${(photo.bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(photo.bytes / 1024))} KB`;
@@ -19,12 +23,22 @@ export function PhotoItem({
     <article className="photo-card">
       {photo.previewUrl ? (
         // Signed admin-only URL; next/image is a poor fit for short-lived tokens.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img alt="" src={photo.previewUrl} />
+        <a href={photo.previewUrl} rel="noreferrer" target="_blank">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img alt="" src={photo.previewUrl} />
+        </a>
       ) : <div className="photo-card-fallback">Preview unavailable</div>}
       <div className="photo-card-meta">
         <strong>{photo.filename}</strong>
         <span>{folderName} · {size}</span>
+        <form action={movePhotoToFolder} className="photo-move-form">
+          <input name="id" type="hidden" value={photo.id} />
+          <input name="gallery_id" type="hidden" value={galleryId} />
+          <select aria-label="Move photo to set" defaultValue={folderId} name="folder_id">
+            {folders.map(folder => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
+          </select>
+          <button aria-label={`Move ${photo.filename} to chosen set`} type="submit">Move</button>
+        </form>
         <button onClick={() => deleteDialog.current?.showModal()} type="button">Delete</button>
       </div>
       <dialog className="admin-dialog" ref={deleteDialog}>

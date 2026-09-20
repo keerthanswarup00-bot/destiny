@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
-function accessSecret() {
+export function accessSecret() {
   const secret = process.env.GALLERY_ACCESS_SECRET;
   if (!secret) throw new Error("Missing GALLERY_ACCESS_SECRET.");
   return secret;

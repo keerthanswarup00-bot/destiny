@@ -7,6 +7,7 @@ import { hashIp } from "@/lib/gallery-cookie";
 import { galleryDb } from "@/lib/gallery-db";
 import { ensureViewerKeyHash, grantGalleryAccess, requireGalleryAccess } from "@/lib/gallery-access";
 import { verifyGalleryPassword } from "@/lib/gallery-password";
+import { downloadFilename } from "@/lib/client-media";
 import { ensurePhotoShareToken, photoFromShareToken, signedDownloadUrl } from "@/lib/photo-share";
 
 export type PasswordState = { error: string | null };
@@ -83,17 +84,65 @@ export async function togglePhotoSelection(form: FormData) {
   return { ok: true as const, error: null, selected: !existing, count: nextCount ?? 0, submitted: false };
 }
 
-export async function downloadGalleryPhoto(form: FormData) {
+type DownloadResult = { url: string | null; filename: string | null; error: string | null };
+
+/**
+ * Resolve the visible download name for a photo: GALLERY-SET-NNN.ext.
+ * The number is the photo's 1-based position within its OWN Set; the name is
+ * generated server-side and never taken from the browser.
+ */
+async function photoDownloadInfo(galleryId: string, photoId: string) {
+  const db = galleryDb();
+  const { data: photo } = await db.from("photos").select("id,folder_id,filename,sort_order,thumbnail_path,preview_path,original_path").eq("id", photoId).eq("gallery_id", galleryId).maybeSingle();
+  if (!photo) return null;
+  const [{ data: folder }, { data: gallery }, { data: folderPhotos }] = await Promise.all([
+    db.from("folders").select("name").eq("id", photo.folder_id).eq("gallery_id", galleryId).maybeSingle(),
+    db.from("galleries").select("title").eq("id", galleryId).maybeSingle(),
+    db.from("photos").select("id,sort_order").eq("gallery_id", galleryId).eq("folder_id", photo.folder_id).order("sort_order").order("id"),
+  ]);
+  const index = (folderPhotos ?? []).findIndex(row => row.id === photo.id) + 1;
+  const filename = downloadFilename({
+    galleryTitle: gallery?.title || galleryId,
+    folderName: folder?.name || "Gallery",
+    index,
+    photo,
+  });
+  return { photo, filename };
+}
+
+export async function downloadGalleryPhoto(form: FormData): Promise<DownloadResult> {
   const slug = String(form.get("slug") ?? "").trim();
   const photoId = String(form.get("photo_id") ?? "").trim();
   try {
     const gallery = await requireGalleryAccess(slug);
-    const { data: photo } = await galleryDb().from("photos").select("filename,thumbnail_path,preview_path,original_path").eq("id", photoId).eq("gallery_id", gallery.id).maybeSingle();
-    if (!photo) return { url: null, error: "That photograph is unavailable." };
-    const url = await signedDownloadUrl(photo.filename, photo);
-    return url ? { url, error: null } : { url: null, error: "Download is unavailable right now." };
+    const info = await photoDownloadInfo(gallery.id, photoId);
+    if (!info) return { url: null, filename: null, error: "That photograph is unavailable." };
+    const url = await signedDownloadUrl(info.filename, info.photo);
+    return url ? { url, filename: info.filename, error: null } : { url: null, filename: info.filename, error: "Download is unavailable right now." };
   } catch {
-    return { url: null, error: "Download is unavailable right now." };
+    return { url: null, filename: null, error: "Download is unavailable right now." };
+  }
+}
+
+export async function downloadGalleryPhotos(form: FormData): Promise<{ items: DownloadResult[]; error: string | null }> {
+  const slug = String(form.get("slug") ?? "").trim();
+  const photoIds = form.getAll("photo_id").map(String).filter(Boolean);
+  if (!photoIds.length) return { items: [], error: "Select at least one photograph first." };
+  try {
+    const gallery = await requireGalleryAccess(slug);
+    const items: DownloadResult[] = [];
+    for (const photoId of photoIds) {
+      const info = await photoDownloadInfo(gallery.id, photoId);
+      if (!info) {
+        items.push({ url: null, filename: null, error: "That photograph is unavailable." });
+        continue;
+      }
+      const url = await signedDownloadUrl(info.filename, info.photo);
+      items.push(url ? { url, filename: info.filename, error: null } : { url: null, filename: info.filename, error: "Download is unavailable right now." });
+    }
+    return { items, error: null };
+  } catch {
+    return { items: [], error: "The download could not be started. Try again." };
   }
 }
 
@@ -115,12 +164,32 @@ export async function shareGalleryPhoto(form: FormData) {
   }
 }
 
-export async function downloadSharedPhoto(form: FormData) {
+export async function downloadSharedPhoto(form: FormData): Promise<DownloadResult> {
   const token = String(form.get("token") ?? "").trim();
   const shared = await photoFromShareToken(token);
-  if (!shared) return { url: null, error: "That photograph is unavailable." };
-  const url = await signedDownloadUrl(shared.photo.filename, shared.photo);
-  return url ? { url, error: null } : { url: null, error: "Download is unavailable right now." };
+  if (!shared) return { url: null, filename: null, error: "That photograph is unavailable." };
+  const info = await photoDownloadInfo(shared.galleryId, shared.photo.id);
+  if (!info) return { url: null, filename: null, error: "That photograph is unavailable." };
+  const url = await signedDownloadUrl(info.filename, info.photo);
+  return url ? { url, filename: info.filename, error: null } : { url: null, filename: info.filename, error: "Download is unavailable right now." };
+}
+
+export async function clearPhotoSelection(form: FormData) {
+  const slug = String(form.get("slug") ?? "").trim();
+  const folder = String(form.get("folder") ?? "").trim();
+  try {
+    const gallery = await requireGalleryAccess(slug);
+    const db = galleryDb();
+    const viewerHash = await ensureViewerKeyHash();
+    const { data: submitted } = await db.from("selection_submissions").select("id").eq("gallery_id", gallery.id).eq("selection_session_hash", viewerHash).maybeSingle();
+    if (submitted) return { ok: false as const, error: "The selection has already been sent and cannot be changed." };
+    await db.from("selections").delete().eq("gallery_id", gallery.id).eq("viewer_key_hash", viewerHash);
+    revalidatePath(`/gallery/${gallery.slug}`);
+    if (/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(folder)) revalidatePath(`/gallery/${gallery.slug}/${folder}`);
+    return { ok: true as const, error: null };
+  } catch {
+    return { ok: false as const, error: "The selection could not be cleared. Try again." };
+  }
 }
 
 export async function submitPhotoSelection(form: FormData) {

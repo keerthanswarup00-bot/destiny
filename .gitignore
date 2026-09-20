@@ -6,3 +6,8 @@ node_modules
 .env.example.*
 *.log
 tsconfig.tsbuildinfo
+.vercel
+.env*
+supabase/.temp/
+
+*.bak

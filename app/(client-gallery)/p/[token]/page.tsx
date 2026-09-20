@@ -21,6 +21,8 @@ export default async function SharedPhotoPage({ params }: { params: Promise<{ to
       <div className="shared-photo-shell">
         <p className="client-gallery-brand">DESTINY<span>SHARED PHOTO</span></p>
         <SharedPhoto
+          galleryPublished={shared.galleryPublished}
+          gallerySlug={shared.gallerySlug}
           galleryTitle={shared.galleryTitle}
           src={src}
           photo={{ filename: shared.photo.filename, height: shared.photo.height, width: shared.photo.width }}

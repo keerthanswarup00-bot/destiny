@@ -1,3 +1,4 @@
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-export async function adminDb() { return createSupabaseServerClient(); }
+export async function adminDb() { return process.env.SUPABASE_SERVICE_ROLE_KEY ? createSupabaseAdminClient() : createSupabaseServerClient(); }
 export async function dashboardCounts() { const db = await adminDb(); const [clients, galleries, photos, selections] = await Promise.all([db.from("clients").select("id", { count: "exact", head: true }), db.from("galleries").select("id", { count: "exact", head: true }).eq("status", "published"), db.from("photos").select("id", { count: "exact", head: true }), db.from("selections").select("id", { count: "exact", head: true })]); return [clients.count ?? 0, galleries.count ?? 0, photos.count ?? 0, selections.count ?? 0]; }

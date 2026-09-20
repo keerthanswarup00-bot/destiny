@@ -11,6 +11,10 @@ export function HomeSelectionBar({ slug, count, submitted }: { slug: string; cou
     <SelectionBar
       count={count}
       error={null}
+      onCleared={() => {
+        setDone(false);
+        router.refresh();
+      }}
       onSubmitted={() => {
         setDone(true);
         router.refresh();

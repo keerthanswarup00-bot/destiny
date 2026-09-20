@@ -16,3 +16,33 @@ export function safeDownloadName(filename: string, fallback = "photograph.jpg") 
   const cleaned = base.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^[.-]+/, "").slice(0, 180);
   return cleaned.includes(".") ? cleaned : fallback;
 }
+
+/** Turn a name into a filesystem-safe segment: "Aryan & Priya" → "Aryan-Priya". */
+export function sanitizeFilenameSegment(value: string): string {
+  return value
+    .normalize("NFKC")
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-_]+|[-_]+$/g, "");
+}
+
+function originalExtension(photo: { original_path: string; filename: string }): string {
+  const tail = (photo.original_path || photo.filename || "")
+    .replaceAll("\\", "/")
+    .split("/")
+    .pop()
+    ?.split("?")[0] ?? "";
+  const match = tail.match(/\.([A-Za-z0-9]{2,8})$/);
+  return match ? `.${match[1].toLowerCase()}` : ".jpg";
+}
+
+/**
+ * The visible download name: GALLERY-SET-NNN.ext, e.g. "Aryan-Wedding-Wedding-001.jpg".
+ * The number is the photo's 1-based position inside its own Set.
+ */
+export function downloadFilename(input: { galleryTitle: string; folderName: string; index: number; photo: { original_path: string; filename: string } }) {
+  const segments = [sanitizeFilenameSegment(input.galleryTitle), sanitizeFilenameSegment(input.folderName)].filter(Boolean);
+  const base = segments.length ? segments.join("-") : "photograph";
+  const ordinal = String(Math.max(1, Math.floor(input.index))).padStart(3, "0");
+  return `${base}-${ordinal}${originalExtension(input.photo)}`;
+}

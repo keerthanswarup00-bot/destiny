@@ -1,6 +1,60 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import { signOut } from "@/app/admin/actions";
+import { usePathname } from "next/navigation";
+import { PanelLeft, PanelLeftClose, ExternalLink } from "lucide-react";
+import { AdminNav, AdminBottomNav } from "@/components/admin/admin-nav";
 
-const links = [["Overview", "/admin"], ["Clients", "/admin/clients"], ["Galleries", "/admin/galleries"], ["Settings", "/admin/settings"]];
-
-export function AdminShell({ children }: { children: React.ReactNode }) { return <div className="admin-shell"><aside className="admin-sidebar"><Link href="/admin" className="brand">DESTINY<span>STUDIO ADMIN</span></Link><nav>{links.map(([label, href]) => <Link href={href} key={href}>{label}</Link>)}</nav><div className="admin-bottom"><button>Account</button><form action={signOut}><button>Log out</button></form></div></aside><main className="admin-main"><header className="admin-header"><span>STUDIO MANAGEMENT</span><Link href="/" target="_blank">View site ↗</Link></header>{children}</main></div>; }
+export function AdminShell({ children }: { children: React.ReactNode }) {
+  const path = usePathname();
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return localStorage.getItem("admin-shell-collapsed") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggle = () =>
+    setCollapsed((c) => {
+      const next = !c;
+      try {
+        localStorage.setItem("admin-shell-collapsed", next ? "1" : "0");
+      } catch {
+        /* noop */
+      }
+      return next;
+    });
+  const isEditor = /^\/admin\/galleries\/[^/]+(?:\/)?$/.test(path);
+  return (
+    <div className={`admin-shell${collapsed ? " is-collapsed" : ""}`}>
+      <aside className="admin-sidebar">
+        <Link className="brand" href="/admin">
+          DESTINY<span>STUDIO ADMIN</span>
+        </Link>
+        <button
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-pressed={collapsed}
+          className="collapse-toggle"
+          onClick={toggle}
+        >
+          {collapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
+        </button>
+        <AdminNav collapsed={collapsed} />
+        <AdminBottomNav collapsed={collapsed} />
+      </aside>
+      <main className="admin-main">
+        {!isEditor ? (
+          <header className="admin-header">
+            <span>STUDIO MANAGEMENT</span>
+            <Link href="/" target="_blank">
+              View site <ExternalLink size={13} strokeWidth={1.8} />
+            </Link>
+          </header>
+        ) : null}
+        {children}
+      </main>
+    </div>
+  );
+}

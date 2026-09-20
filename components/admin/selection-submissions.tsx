@@ -32,9 +32,11 @@ export function SelectionSubmissions({ submissions }: { submissions: AdminSubmis
               {submission.photos.map(photo => (
                 <figure key={photo.id} className="selection-submission-photo" title={photo.filename}>
                   {photo.previewUrl ? (
-                    // Signed admin-only URL; next/image is a poor fit for short-lived tokens.
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img alt="" src={photo.previewUrl} />
+                    // Signed admin-only URL; click to open the full photograph.
+                    <a href={photo.previewUrl} rel="noreferrer" target="_blank">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img alt="" src={photo.previewUrl} />
+                    </a>
                   ) : (
                     <span className="photo-card-fallback">Preview unavailable</span>
                   )}

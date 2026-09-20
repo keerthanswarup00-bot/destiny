@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import Lightbox from "yet-another-react-lightbox";
-import Counter from "yet-another-react-lightbox/plugins/counter";
-import Fullscreen from "yet-another-react-lightbox/plugins/fullscreen";
+import Slideshow from "yet-another-react-lightbox/plugins/slideshow";
+import { Download, Heart, Share2 } from "lucide-react";
 import { downloadGalleryPhoto, shareGalleryPhoto } from "@/app/(client-gallery)/gallery/actions";
+import { JustifiedPhotoGrid, type JustifiedPhoto } from "@/components/gallery/justified-photo-grid";
 import type { WorkspacePhoto } from "@/components/client-gallery/gallery-workspace";
 
 export function ClientPhotoGrid({
@@ -72,51 +73,51 @@ export function ClientPhotoGrid({
     form.set("slug", slug);
     form.set("photo_id", current.id);
     const result = await downloadGalleryPhoto(form);
-    if (!result.url) {
+    if (!result.url || !result.filename) {
       showNotice(result.error ?? "Download is unavailable right now.");
       return;
     }
+    const url = result.url;
+    const filename = result.filename;
     showNotice("Starting download…");
-    fetch(result.url).then(res => res.blob()).then(blob => {
+    fetch(url).then(res => res.blob()).then(blob => {
       const href = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = href;
-      anchor.download = "";
+      anchor.download = filename;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
       URL.revokeObjectURL(href);
     }).catch(() => {
-      window.open(result.url, "_blank", "noopener");
+      window.open(url, "_blank", "noopener");
     });
   }
 
+  const renderOverlay = (photo: JustifiedPhoto) => {
+    const item = photos.find(p => p.id === photo.id);
+    if (!item) return null;
+    const busy = busyId === item.id;
+    return (
+      <button
+        aria-label={item.selected ? "Remove from selection" : "Add to selection"}
+        aria-pressed={item.selected}
+        className={`client-heart${item.selected ? " is-selected" : ""}`}
+        disabled={disabled || busy}
+        onClick={() => onToggle(item.id)}
+        title={item.selected ? "Remove from selection" : "Add to selection"}
+        type="button"
+      >
+        {item.selected ? <Heart fill="currentColor" size={16} strokeWidth={1.6} /> : <Heart size={16} strokeWidth={1.6} />}
+      </button>
+    );
+  };
+
   return (
     <>
-      <div className="client-photo-grid">
-        {photos.map((photo, i) => {
-          const ratio = photo.width && photo.height ? `${photo.width} / ${photo.height}` : "3 / 4";
-          const busy = busyId === photo.id;
-          return (
-            <figure className="client-photo" key={photo.id} style={{ aspectRatio: ratio }}>
-              <button aria-label="View photo" className="client-photo-open" onClick={() => setIndex(i)} type="button">
-                {/* Signed preview URL; next/image is a poor fit for short-lived tokens. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img alt="" height={photo.height ?? undefined} loading="lazy" src={photo.src} width={photo.width ?? undefined} />
-              </button>
-              <button
-                aria-label={photo.selected ? "Remove from selection" : "Add to selection"}
-                aria-pressed={photo.selected}
-                className={`client-heart${photo.selected ? " is-selected" : ""}`}
-                disabled={disabled || busy}
-                onClick={() => onToggle(photo.id)}
-                type="button"
-              >♥</button>
-            </figure>
-          );
-        })}
-      </div>
+      <JustifiedPhotoGrid onPhotoClick={setIndex} overlay={renderOverlay} photos={photos} />
       <Lightbox
+        className="gallery-lightbox"
         close={() => setIndex(-1)}
         index={index}
         labels={{
@@ -126,16 +127,18 @@ export function ClientPhotoGrid({
           "Photo gallery": "Photo gallery",
           "{index} of {total}": "{index} of {total}",
         }}
-        counter={{ separator: " / " }}
         on={{ view: ({ index: nextIndex }) => setIndex(nextIndex) }}
         open={index >= 0}
-        plugins={[Counter, Fullscreen]}
+        plugins={[Slideshow]}
         render={{
           controls: () => (notice ? <span aria-live="polite" className="client-lightbox-notice" role="status">{notice}</span> : null),
         }}
+        slideshow={{ autoplay: true, delay: 3500 }}
         slides={slides}
         toolbar={{
           buttons: [
+            <span className="client-lightbox-counter" key="counter">{index >= 0 ? index + 1 : 0} / {photos.length}</span>,
+            <span className="client-lightbox-spacer" key="spacer" />,
             <button
               aria-label={current?.selected ? "Remove from selection" : "Add to selection"}
               aria-pressed={current?.selected}
@@ -143,10 +146,14 @@ export function ClientPhotoGrid({
               disabled={disabled || Boolean(current && busyId === current.id)}
               key="select"
               onClick={() => { if (current) onToggle(current.id); }}
+              title={current?.selected ? "Remove from selection" : "Add to selection"}
               type="button"
-            >♥</button>,
-            <button aria-label="Share photo" className="client-lightbox-action yarl__button" disabled={!current} key="share" onClick={() => void shareCurrent()} type="button">↗</button>,
-            <button aria-label="Download photo" className="client-lightbox-action yarl__button" disabled={!current} key="download" onClick={() => void downloadCurrent()} type="button">↓</button>,
+            >
+              {current?.selected ? <Heart fill="currentColor" size={18} strokeWidth={1.6} /> : <Heart size={18} strokeWidth={1.6} />}
+            </button>,
+            <button aria-label="Download photo" className="client-lightbox-action yarl__button" disabled={!current} key="download" onClick={() => void downloadCurrent()} title="Download photo" type="button"><Download size={17} strokeWidth={1.6} /></button>,
+            <button aria-label="Share photo" className="client-lightbox-action yarl__button" disabled={!current} key="share" onClick={() => void shareCurrent()} title="Share photo" type="button"><Share2 size={17} strokeWidth={1.6} /></button>,
+            "slideshow",
             "close",
           ],
         }}

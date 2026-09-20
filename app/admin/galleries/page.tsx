@@ -1,50 +1,78 @@
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { GalleryForm } from "@/components/admin/gallery-form";
+import { GalleriesView } from "@/components/admin/galleries-view";
 import { adminDb } from "@/lib/admin-data";
 import { adminError } from "@/lib/admin-validation";
+import { galleryOverviews } from "@/lib/gallery-data";
 
-export default async function Galleries({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const { error } = await searchParams;
+const FILTERS = ["all", "draft", "published", "archived"] as const;
+type Filter = (typeof FILTERS)[number];
+
+export default async function Galleries({ searchParams }: { searchParams: Promise<{ error?: string; status?: string }> }) {
+  const { error, status } = await searchParams;
+  const filter: Filter | null = (FILTERS as readonly string[]).includes(status ?? "") ? (status as Filter) : null;
   const db = await adminDb();
-  const [{ data: galleries }, { data: clients }] = await Promise.all([
-    db.from("galleries").select("id,title,status,client_id,created_at").order("created_at", { ascending: false }),
+
+  let query = db.from("galleries").select("id,title,status,client_id,created_at,password_hash").order("created_at", { ascending: false });
+  if (filter && filter !== "all") query = query.eq("status", filter);
+  const { data: galleries } = await query;
+
+  const [{ data: clients }, overviews] = await Promise.all([
     db.from("clients").select("id,name").order("name"),
+    galleryOverviews(galleries?.map(gallery => gallery.id) ?? []),
   ]);
   const clientNames = new Map((clients ?? []).map(client => [client.id, client.name]));
+
+  const items = (galleries ?? []).map(gallery => {
+    const overview = overviews.get(gallery.id);
+    return {
+      id: gallery.id,
+      title: gallery.title,
+      status: gallery.status,
+      clientName: clientNames.get(gallery.client_id) ?? null,
+      createdAt: gallery.created_at,
+      setCount: overview?.setCount ?? 0,
+      photoCount: overview?.photoCount ?? 0,
+      coverUrl: overview?.coverUrl ?? null,
+      hasPassword: Boolean(gallery.password_hash),
+    };
+  });
 
   return (
     <section className="admin-content">
       <div className="admin-title">
         <div>
-          <p className="eyebrow">GALLERIES</p>
-          <h1>Galleries</h1>
+          <p className="eyebrow">COLLECTIONS</p>
+          <h1>Collections</h1>
         </div>
-        <a className="admin-button" href="#gallery-form">Create gallery</a>
+        <div className="collections-actions">
+          <Link className="admin-button is-secondary" href="/admin/clients#client-form">New Folder</Link>
+          <a className="admin-button" href="#gallery-form">
+            <Plus size={16} strokeWidth={2} /> New Collection
+          </a>
+        </div>
       </div>
       {clients?.length ? (
         <GalleryForm clients={clients} error={adminError(error)} from="galleries" />
       ) : (
         <div className="admin-panel settings-card">
-          <h2>Create gallery</h2>
-          <p className="empty">Create a client before adding a gallery.</p>
-          <Link className="admin-button" href="/admin/clients">Add client</Link>
+          <h2>New collection</h2>
+          <p className="empty">Create a folder first — every collection lives inside a folder.</p>
+          <Link className="admin-button" href="/admin/clients#client-form">New Folder</Link>
         </div>
       )}
-      <div className="admin-panel table-panel">
-        <div className="table">
-          <div className="table-row table-head"><span>Gallery</span><span>Client</span><span>Status</span><span>Created</span><span /></div>
-          {(galleries ?? []).map(gallery => (
-            <div className="table-row" key={gallery.id}>
-              <Link href={`/admin/galleries/${gallery.id}`}><strong>{gallery.title}</strong></Link>
-              <span>{clientNames.get(gallery.client_id) ?? "—"}</span>
-              <span>{gallery.status}</span>
-              <span>{new Date(gallery.created_at).toLocaleDateString()}</span>
-              <Link href={`/admin/galleries/${gallery.id}`}>Open →</Link>
-            </div>
-          ))}
-        </div>
-        {!galleries?.length ? <p className="empty">No galleries yet. Create a gallery to start adding folders.</p> : null}
+      <div className="admin-tabs">
+        {FILTERS.map(tab => {
+          const active = tab === "all" ? !filter || filter === "all" : filter === tab;
+          return (
+            <Link aria-current={active ? "page" : undefined} className={active ? "active" : undefined} href={tab === "all" ? "/admin/galleries" : `/admin/galleries?status=${tab}`} key={tab}>
+              {tab}
+            </Link>
+          );
+        })}
       </div>
+      <GalleriesView items={items} />
     </section>
   );
 }

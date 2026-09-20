@@ -1,2 +1,225 @@
+type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+
 type Table<Row, Insert = Partial<Row>, Update = Partial<Insert>> = { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
-export type Database = { public: { Tables: { admin_users: Table<{ id: string; created_at: string }, { id: string; created_at?: string }>; clients: Table<{ id: string; name: string; email: string | null; phone: string | null; notes: string | null; created_by: string; created_at: string; updated_at: string }>; galleries: Table<{ id: string; client_id: string; title: string; slug: string; description: string | null; event_date: string | null; status: "draft" | "published" | "archived"; password_hash: string | null; created_by: string; created_at: string; updated_at: string }>; folders: Table<{ id: string; gallery_id: string; parent_folder_id: string | null; name: string; slug: string; sort_order: number; created_at: string; updated_at: string }>; photos: Table<{ id: string; gallery_id: string; folder_id: string; filename: string; original_path: string; preview_path: string | null; thumbnail_path: string | null; mime_type: string; bytes: number; width: number | null; height: number | null; sort_order: number; created_at: string; updated_at: string }>; selections: Table<{ id: string; gallery_id: string; photo_id: string; viewer_name: string; viewer_key_hash: string; created_at: string; updated_at: string }>; photo_shares: Table<{ id: string; gallery_id: string; photo_id: string; token_hash: string; expires_at: string | null; revoked_at: string | null; created_by: string | null; created_at: string }>; selection_submissions: Table<{ id: string; gallery_id: string; selection_session_hash: string; photo_count: number; status: "submitted"; submitted_at: string }>; access_attempts: Table<{ id: string; gallery_id: string; succeeded: boolean; attempted_at: string; ip_hash: string | null; user_agent: string | null; failure_reason: string | null }>; }; Views: Record<string, never>; Functions: { is_admin: { Args: Record<string, never>; Returns: boolean } }; Enums: Record<string, never>; CompositeTypes: Record<string, never> } };
+
+export type Database = {
+  public: {
+    Tables: {
+      admin_users: Table<{ id: string; created_at: string }, { id: string; created_at?: string }>;
+      clients: Table<{
+        id: string;
+        name: string;
+        event_date: string | null;
+        phone: string | null;
+        notes: string | null;
+        created_by: string | null;
+        created_at: string;
+        updated_at: string;
+      }, {
+        id?: string;
+        name: string;
+        event_date?: string | null;
+        phone?: string | null;
+        notes?: string | null;
+        created_by?: string | null;
+        created_at?: string;
+        updated_at?: string;
+      }>;
+      galleries: Table<{
+        id: string;
+        client_id: string;
+        title: string;
+        slug: string;
+        description: string | null;
+        event_date: string | null;
+        status: "draft" | "published" | "archived";
+        password_hash: string | null;
+        created_by: string | null;
+        created_at: string;
+        updated_at: string;
+      }, {
+        id?: string;
+        client_id: string;
+        title: string;
+        slug: string;
+        description?: string | null;
+        event_date?: string | null;
+        status?: "draft" | "published" | "archived";
+        password_hash?: string | null;
+        created_by?: string | null;
+        created_at?: string;
+        updated_at?: string;
+      }>;
+      folders: Table<{
+        id: string;
+        gallery_id: string;
+        parent_folder_id: string | null;
+        name: string;
+        slug: string;
+        description: string | null;
+        sort_order: number;
+        published: boolean;
+        cover_photo_id: string | null;
+        created_at: string;
+        updated_at: string;
+      }, {
+        id?: string;
+        gallery_id: string;
+        parent_folder_id?: string | null;
+        name: string;
+        slug: string;
+        description?: string | null;
+        sort_order?: number;
+        published?: boolean;
+        cover_photo_id?: string | null;
+        created_at?: string;
+        updated_at?: string;
+      }>;
+      photos: Table<{
+        id: string;
+        gallery_id: string;
+        folder_id: string;
+        filename: string;
+        original_path: string;
+        preview_path: string | null;
+        thumbnail_path: string | null;
+        mime_type: string;
+        bytes: number;
+        width: number | null;
+        height: number | null;
+        sort_order: number;
+        created_at: string;
+        updated_at: string;
+      }, {
+        id?: string;
+        gallery_id: string;
+        folder_id: string;
+        filename: string;
+        original_path: string;
+        preview_path?: string | null;
+        thumbnail_path?: string | null;
+        mime_type: string;
+        bytes: number;
+        width?: number | null;
+        height?: number | null;
+        sort_order?: number;
+        created_at?: string;
+        updated_at?: string;
+      }>;
+      selections: Table<{
+        id: string;
+        gallery_id: string;
+        photo_id: string;
+        viewer_name: string;
+        viewer_key_hash: string;
+        created_at: string;
+        updated_at: string;
+      }, {
+        id?: string;
+        gallery_id: string;
+        photo_id: string;
+        viewer_name?: string;
+        viewer_key_hash: string;
+        created_at?: string;
+        updated_at?: string;
+      }>;
+      photo_shares: Table<{
+        id: string;
+        gallery_id: string;
+        photo_id: string;
+        token_hash: string;
+        expires_at: string | null;
+        revoked_at: string | null;
+        created_by: string | null;
+        created_at: string;
+      }, {
+        id?: string;
+        gallery_id: string;
+        photo_id: string;
+        token_hash: string;
+        expires_at?: string | null;
+        revoked_at?: string | null;
+        created_by?: string | null;
+        created_at?: string;
+      }>;
+      selection_submissions: Table<{
+        id: string;
+        gallery_id: string;
+        selection_session_hash: string;
+        photo_count: number;
+        status: "submitted";
+        submitted_at: string;
+      }, {
+        id?: string;
+        gallery_id: string;
+        selection_session_hash: string;
+        photo_count: number;
+        status?: "submitted";
+        submitted_at?: string;
+      }>;
+      access_attempts: Table<{
+        id: string;
+        gallery_id: string;
+        succeeded: boolean;
+        attempted_at: string;
+        ip_hash: string | null;
+        user_agent: string | null;
+        failure_reason: string | null;
+      }, {
+        id?: string;
+        gallery_id: string;
+        succeeded: boolean;
+        attempted_at?: string;
+        ip_hash?: string | null;
+        user_agent?: string | null;
+        failure_reason?: string | null;
+      }>;
+      website_home_items: Table<{
+        id: string;
+        section: "hero" | "selected_work" | "studio" | "cta";
+        title: string | null;
+        category: string | null;
+        href: string | null;
+        asset_path: string | null;
+        asset_mime: string | null;
+        asset_bytes: number | null;
+        sort_order: number;
+        published: boolean;
+        created_at: string;
+        updated_at: string;
+      }>;
+      website_portfolio_projects: Table<{
+        id: string;
+        title: string;
+        slug: string;
+        category: string | null;
+        description: string | null;
+        cover_path: string | null;
+        cover_mime: string | null;
+        cover_width: number | null;
+        cover_height: number | null;
+        sort_order: number;
+        published: boolean;
+        created_at: string;
+        updated_at: string;
+      }>;
+      website_portfolio_photos: Table<{
+        id: string;
+        project_id: string;
+        asset_path: string;
+        asset_mime: string;
+        asset_bytes: number;
+        width: number | null;
+        height: number | null;
+        sort_order: number;
+        created_at: string;
+      }>;
+    };
+    Views: Record<string, never>;
+    Functions: {
+      is_admin: { Args: Record<string, never>; Returns: boolean };
+    };
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
+  };
+} & { _json: Json };

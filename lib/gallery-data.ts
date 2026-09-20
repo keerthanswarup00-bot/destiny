@@ -1,7 +1,31 @@
 import "server-only";
+import sharp from "sharp";
 import { CLIENT_SIGNED_URL_SECONDS, clientFacingObjectPath } from "@/lib/client-media";
 import { GALLERY_ASSET_BUCKET } from "@/lib/admin-validation";
 import { galleryDb } from "@/lib/gallery-db";
+
+type PhotoWithPaths = { width: number | null; height: number | null; thumbnail_path: string | null; preview_path: string | null; original_path: string };
+
+const dimensionCache = new Map<string, { width: number; height: number }>();
+
+/** Resolve intrinsic dimensions for photos whose rows predate width/height capture. Reads are cached per object. */
+async function resolvePhotoDimensions(photo: PhotoWithPaths): Promise<{ width: number | null; height: number | null }> {
+  if (photo.width && photo.height) return { width: photo.width, height: photo.height };
+  const objectPath = photo.thumbnail_path ?? photo.preview_path ?? photo.original_path;
+  if (!objectPath) return { width: null, height: null };
+  const cached = dimensionCache.get(objectPath);
+  if (cached) return cached;
+  try {
+    const { data, error } = await galleryDb().storage.from(GALLERY_ASSET_BUCKET).download(objectPath);
+    if (error || !data) return { width: null, height: null };
+    const metadata = await sharp(Buffer.from(await data.arrayBuffer())).metadata();
+    const size = { width: metadata.width ?? null, height: metadata.height ?? null };
+    if (size.width && size.height) dimensionCache.set(objectPath, size as { width: number; height: number });
+    return size;
+  } catch {
+    return { width: null, height: null };
+  }
+}
 
 export async function signedClientUrls(paths: string[]) {
   if (!paths.length) return new Map<string, string>();
@@ -10,18 +34,33 @@ export async function signedClientUrls(paths: string[]) {
   return new Map((data ?? []).filter(item => item.signedUrl).map(item => [item.path, item.signedUrl]));
 }
 
-export async function galleryFolders(galleryId: string) {
+export type GalleryFolderCard = {
+  id: string;
+  name: string;
+  slug: string;
+  photoCount: number;
+  coverUrl: string | null;
+  coverWidth: number | null;
+  coverHeight: number | null;
+};
+
+export async function galleryFolders(galleryId: string): Promise<GalleryFolderCard[]> {
   const db = galleryDb();
   const [{ data: folders }, { data: photos }] = await Promise.all([
-    db.from("folders").select("id,name,slug,sort_order").eq("gallery_id", galleryId).order("sort_order").order("id"),
+    db.from("folders").select("id,name,slug,sort_order,published,cover_photo_id").eq("gallery_id", galleryId).eq("published", true).order("sort_order").order("id"),
     db.from("photos").select("id,folder_id,sort_order,thumbnail_path,preview_path,original_path,width,height").eq("gallery_id", galleryId).order("sort_order").order("id"),
   ]);
   const counts = new Map<string, number>();
   const covers = new Map<string, { path: string; width: number | null; height: number | null }>();
-  for (const photo of photos ?? []) {
-    counts.set(photo.folder_id, (counts.get(photo.folder_id) ?? 0) + 1);
-    if (!covers.has(photo.folder_id)) {
-      covers.set(photo.folder_id, { path: clientFacingObjectPath(photo, "grid"), width: photo.width, height: photo.height });
+  for (const folder of folders ?? []) {
+    const folderPhotos = (photos ?? []).filter(photo => photo.folder_id === folder.id).sort((a, b) => a.sort_order - b.sort_order || 0);
+    counts.set(folder.id, folderPhotos.length);
+    // Cover: explicit cover_photo_id if it belongs to THIS set; otherwise the
+    // first photo of THIS set only. Never another Set, never a gallery-wide image.
+    const chosen = folderPhotos.find(photo => photo.id === folder.cover_photo_id) ?? folderPhotos[0];
+    if (chosen) {
+      const dims = await resolvePhotoDimensions(chosen);
+      covers.set(folder.id, { path: clientFacingObjectPath(chosen, "grid"), width: dims.width, height: dims.height });
     }
   }
   const urls = await signedClientUrls([...covers.values()].map(cover => cover.path));
@@ -39,17 +78,82 @@ export async function galleryFolders(galleryId: string) {
   });
 }
 
-export async function galleryFolder(galleryId: string, folderSlug: string) {
+export type GalleryOverview = {
+  coverUrl: string | null;
+  coverWidth: number | null;
+  coverHeight: number | null;
+  setCount: number;
+  photoCount: number;
+};
+
+export async function galleryOverviews(galleryIds: string[]): Promise<Map<string, GalleryOverview>> {
+  if (!galleryIds.length) return new Map();
   const db = galleryDb();
-  const { data: folder } = await db.from("folders").select("id,name,slug").eq("gallery_id", galleryId).eq("slug", folderSlug).maybeSingle();
+  const unique = [...new Set(galleryIds)];
+  const [foldersResult, photosResult] = await Promise.all([
+    db.from("folders").select("gallery_id,id,sort_order,published,cover_photo_id").in("gallery_id", unique).order("sort_order").order("id"),
+    db.from("photos").select("id,gallery_id,folder_id,width,height,thumbnail_path,preview_path,original_path").in("gallery_id", unique),
+  ]);
+  const photosByGallery = new Map<string, { id: string; gallery_id: string; folder_id: string; width: number | null; height: number | null; thumbnail_path: string | null; preview_path: string | null; original_path: string }[]>();
+  for (const photo of photosResult.data ?? []) {
+    const list = photosByGallery.get(photo.gallery_id) ?? [];
+    list.push(photo);
+    photosByGallery.set(photo.gallery_id, list);
+  }
+  const covers = new Map<string, { path: string; width: number | null; height: number | null }>();
+  const out = new Map<string, GalleryOverview>();
+  for (const id of unique) {
+    const folders = (foldersResult.data ?? []).filter(folder => folder.gallery_id === id);
+    const photos = photosByGallery.get(id) ?? [];
+    const setCount = folders.length;
+    const photoCount = photos.length;
+    const firstPublished = folders.find(folder => folder.published);
+    let coverUrl: string | null = null;
+    let coverWidth: number | null = null;
+    let coverHeight: number | null = null;
+    if (firstPublished) {
+      const folderPhotos = photos.filter(photo => photo.folder_id === firstPublished.id);
+      const chosen = folderPhotos.find(photo => photo.id === firstPublished.cover_photo_id) ?? folderPhotos[0];
+      if (chosen) {
+        const dims = await resolvePhotoDimensions(chosen);
+        covers.set(id, { path: clientFacingObjectPath(chosen, "grid"), width: dims.width, height: dims.height });
+      }
+    }
+    out.set(id, { coverUrl, coverWidth, coverHeight, setCount, photoCount });
+  }
+  const urls = await signedClientUrls([...covers.values()].map(cover => cover.path));
+  for (const [id, cover] of covers) {
+    const entry = out.get(id);
+    if (entry) entry.coverUrl = urls.get(cover.path) ?? null;
+  }
+  return out;
+}
+
+export type GalleryFolderPhotoCard = {
+  id: string;
+  width: number | null;
+  height: number | null;
+  src: string;
+  fullSrc: string;
+};
+
+export type GalleryFolderDetail = {
+  folder: { id: string; name: string; slug: string; description: string | null };
+  photos: GalleryFolderPhotoCard[];
+} | null;
+
+export async function galleryFolder(galleryId: string, folderSlug: string): Promise<GalleryFolderDetail> {
+  const db = galleryDb();
+  const { data: folder } = await db.from("folders").select("id,name,slug,description").eq("gallery_id", galleryId).eq("slug", folderSlug).maybeSingle();
   if (!folder) return null;
   const { data: photos } = await db.from("photos").select("id,width,height,sort_order,thumbnail_path,preview_path,original_path").eq("gallery_id", galleryId).eq("folder_id", folder.id).order("sort_order").order("id");
-  const gridPaths = (photos ?? []).map(photo => clientFacingObjectPath(photo, "grid"));
-  const fullPaths = (photos ?? []).map(photo => clientFacingObjectPath(photo, "full"));
+  const photosWithDimensions = await Promise.all((photos ?? []).map(async photo => ({ ...photo, ...(await resolvePhotoDimensions(photo)) })));
+  const gridPaths = photosWithDimensions.map(photo => clientFacingObjectPath(photo, "grid"));
+  const fullPaths = photosWithDimensions.map(photo => clientFacingObjectPath(photo, "full"));
   const [urls, fullUrls] = await Promise.all([signedClientUrls(gridPaths), signedClientUrls(fullPaths)]);
   return {
     folder,
-    photos: (photos ?? []).map(photo => {
+    photos: photosWithDimensions.map(photo => {
       const gridPath = clientFacingObjectPath(photo, "grid");
       const fullPath = clientFacingObjectPath(photo, "full");
       const src = urls.get(gridPath) ?? "";
@@ -63,6 +167,14 @@ export async function galleryFolder(galleryId: string, folderSlug: string) {
       };
     }).filter(photo => photo.src),
   };
+}
+
+export async function galleryClient(galleryId: string) {
+  const db = galleryDb();
+  const { data: gallery } = await db.from("galleries").select("client_id").eq("id", galleryId).maybeSingle();
+  if (!gallery?.client_id) return null;
+  const { data: client } = await db.from("clients").select("name,event_date").eq("id", gallery.client_id).maybeSingle();
+  return client;
 }
 
 export async function selectedPhotoIds(galleryId: string, viewerKeyHash: string | null) {

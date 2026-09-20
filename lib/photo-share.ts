@@ -34,9 +34,9 @@ export async function photoFromShareToken(token: string) {
   if (!share || share.revoked_at) return null;
   if (share.expires_at && new Date(share.expires_at).getTime() <= Date.now()) return null;
   const [{ data: photo }, { data: gallery }] = await Promise.all([
-    db.from("photos").select("id,filename,width,height,thumbnail_path,preview_path,original_path").eq("id", share.photo_id).eq("gallery_id", share.gallery_id).maybeSingle(),
-    db.from("galleries").select("title,status").eq("id", share.gallery_id).maybeSingle(),
+    db.from("photos").select("id,folder_id,filename,width,height,thumbnail_path,preview_path,original_path").eq("id", share.photo_id).eq("gallery_id", share.gallery_id).maybeSingle(),
+    db.from("galleries").select("id,title,slug,status").eq("id", share.gallery_id).maybeSingle(),
   ]);
   if (!photo || !gallery) return null;
-  return { photo, galleryTitle: gallery.title, galleryPublished: gallery.status === "published" };
+  return { photo, galleryId: gallery.id, galleryTitle: gallery.title, gallerySlug: gallery.slug, galleryPublished: gallery.status === "published" };
 }

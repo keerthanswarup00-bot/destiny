@@ -8,6 +8,8 @@
 .shared-photo-actions .client-submit-button{min-width:140px;justify-content:center}
 .client-submit-button.is-secondary{background:#111;border:1px solid #111;color:#FAFAF8}
 .client-submit-button.is-secondary:hover{background:#FAFAF8;color:#111}
+.client-submit-button.is-borderless{background:transparent;border:1px solid #777;color:#111}
+.client-submit-button.is-borderless:hover{background:#111;color:#FAFAF8}
 .shared-photo-notice{margin:8px 0 0;color:#777;font-size:13px;text-align:center}
 .shared-photo-context{margin:28px 0 0;color:#777777;font-size:13px;line-height:1.5;text-align:center}
 .shared-photo-context strong{color:#111111}

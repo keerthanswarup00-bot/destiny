@@ -1,4 +1,18 @@
 "use server";
+
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-export async function signOut() { const supabase = await createSupabaseServerClient(); await supabase.auth.signOut(); redirect("/login"); }
+
+import { ADMIN_SESSION_COOKIE } from "@/lib/admin-session";
+
+export async function signOut() {
+  const jar = await cookies();
+  jar.set(ADMIN_SESSION_COOKIE, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/admin",
+    maxAge: 0,
+  });
+  redirect("/login");
+}

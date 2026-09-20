@@ -72,16 +72,32 @@ const r2PhotoStore: PhotoStore = {
   },
   async removePhotos(keys) {
     for (const key of keys) if (key) await deleteObject(key);
+    await supabasePhotoStore.removePhotos(keys);
   },
   async signedGetUrls(keys, seconds = CLIENT_SIGNED_URL_SECONDS) {
     const out = new Map<string, string>();
-    for (const key of [...new Set(keys)]) out.set(key, await createSignedGetUrl(key, seconds));
+    for (const key of [...new Set(keys)]) {
+      if (await objectExists(key)) {
+        out.set(key, await createSignedGetUrl(key, seconds));
+      } else {
+        const supabaseUrl = (await supabasePhotoStore.signedGetUrls([key], seconds)).get(key);
+        if (supabaseUrl) out.set(key, supabaseUrl);
+      }
+    }
     return out;
   },
   async signedDownloadUrl(key, filename, seconds = DOWNLOAD_SIGNED_URL_SECONDS) {
+    const supabaseUrl = await supabasePhotoStore.signedDownloadUrl(key, filename, seconds);
+    if (!(await objectExists(key))) return supabaseUrl;
     return createSignedGetUrl(key, seconds, filename).catch(() => null);
   },
-  downloadBytes: (key) => downloadObjectBytes(key),
-  objectBytes: (key) => objectBytes(key),
-  objectExists: (key) => objectExists(key),
+  async downloadBytes(key) {
+    return (await downloadObjectBytes(key)) ?? (await supabasePhotoStore.downloadBytes(key));
+  },
+  async objectBytes(key) {
+    return (await objectBytes(key)) ?? (await supabasePhotoStore.objectBytes(key));
+  },
+  async objectExists(key) {
+    return (await objectExists(key)) || (await supabasePhotoStore.objectExists(key));
+  },
 };

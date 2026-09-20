@@ -33,21 +33,27 @@ export function GalleryForm({
       ) : (
         <input name="client_id" type="hidden" value={gallery?.client_id ?? clientId ?? ""} />
       )}
-      <label>Title<input defaultValue={gallery?.title} maxLength={200} name="title" required /></label>
-      <label>Slug<input defaultValue={gallery?.slug} name="slug" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" required title="Use lowercase letters, numbers, and hyphens" /></label>
-      <label>Description<textarea defaultValue={gallery?.description ?? ""} maxLength={5000} name="description" rows={4} /></label>
-      <label>Status
-        <select defaultValue={gallery?.status ?? "draft"} name="status">
-          <option value="draft">Draft</option>
-          <option value="published">Published</option>
-          <option value="archived">Archived</option>
-        </select>
-      </label>
-      <label>Gallery password{gallery?.passwordProtected ? " (currently set)" : ""}
+      <label>Gallery name<input defaultValue={gallery?.title} maxLength={200} name="title" required /></label>
+      {editing ? (
+        <>
+          <label>Description<textarea defaultValue={gallery?.description ?? ""} maxLength={5000} name="description" rows={4} /></label>
+          <label>Status
+            <select defaultValue={gallery?.status ?? "draft"} name="status">
+              <option value="draft">Draft</option>
+              <option value="published">Published</option>
+              <option value="archived">Archived</option>
+            </select>
+          </label>
+          <input name="slug" type="hidden" value={gallery?.slug ?? ""} />
+        </>
+      ) : (
+        <input name="status" type="hidden" value="draft" />
+      )}
+      <label>Gallery password{gallery?.passwordProtected ? " (currently set)" : " (optional)"}
         <input autoComplete="new-password" minLength={6} name="password" type="password" />
       </label>
       {gallery?.passwordProtected ? <label className="switch-row"><span>Remove password<small>Makes the published gallery open without a password.</small></span><input name="clear_password" type="checkbox" /></label> : null}
-      <button className="admin-button">{editing ? "Save collection" : "Create collection"}</button>
+      <button className="admin-button">{editing ? "Save collection" : "Create Gallery"}</button>
     </form>
   );
 }

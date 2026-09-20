@@ -16,7 +16,7 @@ export type PhotoStore = {
 };
 
 function activeProvider(): "supabase" | "r2" {
-  const value = process.env.PHOTO_STORAGE_PROVIDER;
+  const value = process.env.PHOTO_STORAGE_PROVIDER?.toLowerCase();
   return value === "r2" ? "r2" : "supabase";
 }
 

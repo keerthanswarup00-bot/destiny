@@ -117,6 +117,20 @@
 }
 @media(max-width:560px){.gallery-card-grid{grid-template-columns:1fr}}
 
+.gallery-list{display:grid;border:1px solid #ddd;background:#fff}
+.gallery-list-row{display:grid;grid-template-columns:minmax(220px,1.6fr) minmax(90px,.7fr) minmax(100px,.7fr) auto 24px auto;align-items:center;gap:18px;padding:16px 18px;border-bottom:1px solid #eee}
+.gallery-list-row:last-child{border-bottom:0}
+.gallery-list-row:hover{background:#fffde9}
+.gallery-list-main{display:grid;gap:4px;min-width:0}
+.gallery-list-main a{color:#111;text-decoration:none}
+.gallery-list-main strong{font-size:16px;letter-spacing:-.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gallery-list-main span,.gallery-list-detail{color:var(--muted);font-size:13px}
+.gallery-list-actions{display:flex;align-items:center;gap:8px}
+.gallery-list-actions .admin-button{font-size:12px;padding:10px 12px}
+.gallery-list-actions .icon-danger{color:#8b1728}
+@media(max-width:900px){.gallery-list-row{grid-template-columns:minmax(180px,1fr) auto auto}.gallery-list-row>.gallery-list-detail:nth-of-type(2),.gallery-list-row>.status-pill,.gallery-list-row>svg,.gallery-list-row>span:last-of-type{display:none}}
+@media(max-width:560px){.gallery-list-row{grid-template-columns:1fr auto;gap:10px}.gallery-list-detail{display:none}.gallery-list-actions{grid-column:1/-1;justify-content:space-between;border-top:1px solid #eee;padding-top:10px}}
+
 /* P3 — gallery editor */
 .gallery-editor-actions{display:flex;gap:10px;flex-wrap:wrap}
 .gallery-editor-actions .admin-button{display:inline-flex;align-items:center;gap:7px;letter-spacing:.01em}

@@ -47,7 +47,7 @@ export default async function Galleries({ searchParams }: { searchParams: Promis
           <h1>Collections</h1>
         </div>
         <div className="collections-actions">
-          <Link className="admin-button is-secondary" href="/admin/clients#client-form">New Folder</Link>
+          <Link className="admin-button is-secondary" href="/admin/clients#client-form">New Client</Link>
           <a className="admin-button" href="#gallery-form">
             <Plus size={16} strokeWidth={2} /> New Collection
           </a>
@@ -57,9 +57,9 @@ export default async function Galleries({ searchParams }: { searchParams: Promis
         <GalleryForm clients={clients} error={adminError(error)} from="galleries" />
       ) : (
         <div className="admin-panel settings-card">
-          <h2>New collection</h2>
-          <p className="empty">Create a folder first — every collection lives inside a folder.</p>
-          <Link className="admin-button" href="/admin/clients#client-form">New Folder</Link>
+          <h2>Create Client Gallery</h2>
+          <p className="empty">Create a client first, then add their gallery and upload photos.</p>
+          <Link className="admin-button" href="/admin/clients#client-form">New Client</Link>
         </div>
       )}
       <div className="admin-tabs">

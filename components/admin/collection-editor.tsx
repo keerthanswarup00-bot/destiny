@@ -375,7 +375,7 @@ export function CollectionEditor({
               })}
             </ul>
           ) : (
-            <p className="empty">No sets yet — add one to start this collection.</p>
+            <p className="empty">No photo set yet. Create the gallery again or add a set to begin uploading.</p>
           )}
         </aside>
 
@@ -403,7 +403,7 @@ export function CollectionEditor({
                     <ExternalLink size={15} strokeWidth={1.8} /> Open client view
                   </Link>
                   <button className="admin-button" onClick={() => fileInput.current?.click()} type="button">
-                    <Upload size={15} strokeWidth={1.8} /> Upload
+                    <Upload size={15} strokeWidth={1.8} /> Upload Photos
                   </button>
                 </div>
               </div>

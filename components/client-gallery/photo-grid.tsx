@@ -77,21 +77,12 @@ export function ClientPhotoGrid({
       showNotice(result.error ?? "Download is unavailable right now.");
       return;
     }
-    const url = result.url;
-    const filename = result.filename;
-    showNotice("Starting download…");
-    fetch(url).then(res => res.blob()).then(blob => {
-      const href = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = href;
-      anchor.download = filename;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(href);
-    }).catch(() => {
-      window.open(url, "_blank", "noopener");
-    });
+    const anchor = document.createElement("a");
+    anchor.href = result.url;
+    anchor.download = result.filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
   }
 
   const renderOverlay = (photo: JustifiedPhoto) => {

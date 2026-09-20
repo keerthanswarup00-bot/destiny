@@ -4,7 +4,8 @@ import { GalleryForm } from "@/components/admin/gallery-form";
 import { CollectionEditor } from "@/components/admin/collection-editor";
 import { SelectionSubmissions, type AdminSubmission } from "@/components/admin/selection-submissions";
 import { adminDb } from "@/lib/admin-data";
-import { adminError, GALLERY_ASSET_BUCKET } from "@/lib/admin-validation";
+import { adminError } from "@/lib/admin-validation";
+import { photoStore } from "@/lib/storage-provider";
 
 export default async function GalleryDetail({
   params,
@@ -36,11 +37,11 @@ export default async function GalleryDetail({
   const signingPaths = (photos ?? []).map(photo => photo.thumbnail_path || photo.preview_path || photo.original_path).filter(Boolean);
   const originalPaths = (photos ?? []).map(photo => photo.original_path).filter(Boolean);
   const [grid, originals] = await Promise.all([
-    signingPaths.length ? db.storage.from(GALLERY_ASSET_BUCKET).createSignedUrls(signingPaths, 60 * 30) : Promise.resolve({ data: [] }),
-    originalPaths.length ? db.storage.from(GALLERY_ASSET_BUCKET).createSignedUrls(originalPaths, 60 * 30) : Promise.resolve({ data: [] }),
+    signingPaths.length ? photoStore().signedGetUrls(signingPaths, 60 * 30) : Promise.resolve(new Map<string, string>()),
+    originalPaths.length ? photoStore().signedGetUrls(originalPaths, 60 * 30) : Promise.resolve(new Map<string, string>()),
   ]);
-  const urlByPath = new Map((grid.data ?? []).map(item => [item.path, item.signedUrl]));
-  const downloadByPath = new Map((originals.data ?? []).map(item => [item.path, item.signedUrl]));
+  const urlByPath = grid;
+  const downloadByPath = originals;
 
   const photosByFolder: Record<string, { id: string; filename: string; width: number | null; height: number | null; src: string; downloadUrl: string }[]> = {};
   for (const photo of photos ?? []) {
@@ -70,10 +71,9 @@ for (const folder of folders ?? []) {
     ? await db.from("photos").select("id,filename,original_path").in("id", selectedPhotoIds)
     : { data: [] };
   const selectedPaths = (selectedPhotos ?? []).map(photo => photo.original_path);
-  const selectedSigned = selectedPaths.length
-    ? (await db.storage.from(GALLERY_ASSET_BUCKET).createSignedUrls(selectedPaths, 60 * 30)).data ?? []
-    : [];
-  const previewBySelectedPath = new Map(selectedSigned.map(item => [item.path, item.signedUrl]));
+  const previewBySelectedPath = selectedPaths.length
+    ? await photoStore().signedGetUrls(selectedPaths, 60 * 30)
+    : new Map<string, string>();
   const photoById = new Map((selectedPhotos ?? []).map(photo => [photo.id, photo]));
   const submissionView: AdminSubmission[] = (submissions ?? []).map(submission => ({
     id: submission.id,

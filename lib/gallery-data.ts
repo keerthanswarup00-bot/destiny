@@ -1,7 +1,7 @@
 import "server-only";
 import sharp from "sharp";
 import { CLIENT_SIGNED_URL_SECONDS, clientFacingObjectPath } from "@/lib/client-media";
-import { GALLERY_ASSET_BUCKET } from "@/lib/admin-validation";
+import { photoStore } from "@/lib/storage-provider";
 import { galleryDb } from "@/lib/gallery-db";
 
 type PhotoWithPaths = { width: number | null; height: number | null; thumbnail_path: string | null; preview_path: string | null; original_path: string };
@@ -16,9 +16,9 @@ async function resolvePhotoDimensions(photo: PhotoWithPaths): Promise<{ width: n
   const cached = dimensionCache.get(objectPath);
   if (cached) return cached;
   try {
-    const { data, error } = await galleryDb().storage.from(GALLERY_ASSET_BUCKET).download(objectPath);
-    if (error || !data) return { width: null, height: null };
-    const metadata = await sharp(Buffer.from(await data.arrayBuffer())).metadata();
+    const body = await photoStore().downloadBytes(objectPath);
+    if (!body) return { width: null, height: null };
+    const metadata = await sharp(body).metadata();
     const size = { width: metadata.width ?? null, height: metadata.height ?? null };
     if (size.width && size.height) dimensionCache.set(objectPath, size as { width: number; height: number });
     return size;
@@ -28,10 +28,7 @@ async function resolvePhotoDimensions(photo: PhotoWithPaths): Promise<{ width: n
 }
 
 export async function signedClientUrls(paths: string[]) {
-  if (!paths.length) return new Map<string, string>();
-  const unique = [...new Set(paths)];
-  const { data } = await galleryDb().storage.from(GALLERY_ASSET_BUCKET).createSignedUrls(unique, CLIENT_SIGNED_URL_SECONDS);
-  return new Map((data ?? []).filter(item => item.signedUrl).map(item => [item.path, item.signedUrl]));
+  return photoStore().signedGetUrls(paths, CLIENT_SIGNED_URL_SECONDS);
 }
 
 export type GalleryFolderCard = {

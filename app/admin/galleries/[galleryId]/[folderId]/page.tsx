@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { SetWorkspace } from "@/components/admin/set-workspace";
 import { requireAdmin } from "@/lib/auth";
 import { adminDb } from "@/lib/admin-data";
-import { GALLERY_ASSET_BUCKET } from "@/lib/admin-validation";
+import { photoStore } from "@/lib/storage-provider";
 
 export default async function SetPage({ params }: { params: Promise<{ galleryId: string; folderId: string }> }) {
   const { galleryId, folderId } = await params;
@@ -24,11 +24,11 @@ export default async function SetPage({ params }: { params: Promise<{ galleryId:
   const gridPaths = (photos ?? []).map(photo => photo.thumbnail_path || photo.preview_path || photo.original_path).filter(Boolean);
   const originalPaths = (photos ?? []).map(photo => photo.original_path).filter(Boolean);
   const [grid, originals] = await Promise.all([
-    gridPaths.length ? db.storage.from(GALLERY_ASSET_BUCKET).createSignedUrls(gridPaths, 60 * 30) : Promise.resolve({ data: [] }),
-    originalPaths.length ? db.storage.from(GALLERY_ASSET_BUCKET).createSignedUrls(originalPaths, 60 * 30) : Promise.resolve({ data: [] }),
+    gridPaths.length ? photoStore().signedGetUrls(gridPaths, 60 * 30) : Promise.resolve(new Map<string, string>()),
+    originalPaths.length ? photoStore().signedGetUrls(originalPaths, 60 * 30) : Promise.resolve(new Map<string, string>()),
   ]);
-  const urlByPath = new Map((grid.data ?? []).map(item => [item.path, item.signedUrl]));
-  const downloadByPath = new Map((originals.data ?? []).map(item => [item.path, item.signedUrl]));
+  const urlByPath = grid;
+  const downloadByPath = originals;
 
   const photoCards = (photos ?? [])
     .map(photo => {

@@ -3,7 +3,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { adminDb } from "@/lib/admin-data";
-import { ALLOWED_PHOTO_TYPES, GALLERY_ASSET_BUCKET, MAX_PHOTO_BYTES, clientSchema, folderSchema, gallerySchema, photoUploadSchema, slugify } from "@/lib/admin-validation";
+import { ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES, clientSchema, folderSchema, gallerySchema, photoUploadSchema, slugify } from "@/lib/admin-validation";
+import { photoStore } from "@/lib/storage-provider";
 import { hashGalleryPassword } from "@/lib/gallery-password";
 const value = (form: FormData, key: string) => String(form.get(key) ?? "");
 async function db() { await requireAdmin(); return adminDb(); }
@@ -23,7 +24,7 @@ export async function deleteGallery(form: FormData) {
   const id=value(form,"id"), client=value(form,"client_id"); const supabase=await db();
   const { data: galleryPhotos }=await supabase.from("photos").select("original_path,preview_path,thumbnail_path").eq("gallery_id",id);
   const paths=(galleryPhotos??[]).flatMap(photo => [photo.original_path, photo.preview_path, photo.thumbnail_path]).filter((path): path is string => Boolean(path));
-  if(paths.length) await supabase.storage.from(GALLERY_ASSET_BUCKET).remove(paths);
+  if(paths.length) await photoStore().removePhotos(paths);
   await supabase.from("galleries").delete().eq("id",id);
   redirect(`/admin/clients/${client}`);
 }
@@ -33,7 +34,7 @@ export async function deleteFolder(form: FormData) {
   const gallery=value(form,"gallery_id"); const id=value(form,"id"); const supabase=await db();
   const { data: folderPhotos }=await supabase.from("photos").select("original_path,preview_path,thumbnail_path").eq("gallery_id",gallery).eq("folder_id",id);
   const paths=(folderPhotos??[]).flatMap(photo => [photo.original_path, photo.preview_path, photo.thumbnail_path]).filter((path): path is string => Boolean(path));
-  if(paths.length) await supabase.storage.from(GALLERY_ASSET_BUCKET).remove(paths);
+  if(paths.length) await photoStore().removePhotos(paths);
   await supabase.from("folders").delete().eq("id",id).eq("gallery_id",gallery);
   revalidatePath(`/admin/galleries/${gallery}`);
 }
@@ -68,10 +69,13 @@ async function runFolderUpload(gallery: string, folderId: string, form: FormData
     if(!(ALLOWED_PHOTO_TYPES as readonly string[]).includes(file.type) || file.size>MAX_PHOTO_BYTES) return null;
     const id=crypto.randomUUID();
     const original_path=`${gallery}/${folder.id}/${id}/${storageFilename(file.name)}`;
-    const { error: uploadError }=await supabase.storage.from(GALLERY_ASSET_BUCKET).upload(original_path, Buffer.from(await file.arrayBuffer()), { contentType:file.type, upsert:false });
-    if(uploadError) return null;
+    try {
+      await photoStore().uploadPhoto({ key: original_path, body: Buffer.from(await file.arrayBuffer()), contentType: file.type });
+    } catch {
+      return null;
+    }
     const { error: insertError }=await supabase.from("photos").insert({ id, gallery_id:gallery, folder_id:folder.id, filename:file.name.trim().slice(0,500)||storageFilename(file.name), original_path, mime_type:file.type, bytes:file.size, sort_order:sort });
-    if(insertError) { await supabase.storage.from(GALLERY_ASSET_BUCKET).remove([original_path]); return null; }
+    if(insertError) { await photoStore().removePhotos([original_path]); return null; }
     sort+=1;
   }
   revalidatePath(`/admin/galleries/${gallery}`);
@@ -82,7 +86,7 @@ export async function deletePhoto(form: FormData) {
   const { data: photo }=await supabase.from("photos").select("original_path,preview_path,thumbnail_path").eq("id",id).eq("gallery_id",gallery).maybeSingle();
   if(photo) {
     const paths=[photo.original_path, photo.preview_path, photo.thumbnail_path].filter((path): path is string => Boolean(path));
-    if(paths.length) await supabase.storage.from(GALLERY_ASSET_BUCKET).remove(paths);
+    if(paths.length) await photoStore().removePhotos(paths);
     await supabase.from("photos").delete().eq("id",id).eq("gallery_id",gallery);
   }
   revalidatePath(`/admin/galleries/${gallery}`);
@@ -116,7 +120,7 @@ export async function deletePhotos(form: FormData) {
   const supabase=await db();
   const { data: photos }=await supabase.from("photos").select("id,original_path,preview_path,thumbnail_path").eq("gallery_id",gallery).in("id",ids);
   const paths=(photos??[]).flatMap(photo => [photo.original_path, photo.preview_path, photo.thumbnail_path]).filter((path): path is string => Boolean(path));
-  if(paths.length) await supabase.storage.from(GALLERY_ASSET_BUCKET).remove(paths);
+  if(paths.length) await photoStore().removePhotos(paths);
   await supabase.from("photos").delete().eq("gallery_id",gallery).in("id",ids);
   revalidatePath(`/admin/galleries/${gallery}`);
   revalidatePath(`/admin/galleries/${gallery}/${folder}`);

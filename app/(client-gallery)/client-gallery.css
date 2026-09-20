@@ -27,8 +27,8 @@
 .client-folder:hover .client-folder-arrow{opacity:1;transform:translateX(0)}
 .justified-grid{width:100%}
 .justified-row{display:flex;align-items:stretch;width:100%}
-.justified-cell{position:relative;margin:0;height:100%;min-width:0;flex:none}
-.justified-open{display:block;height:100%;padding:0;border:0;background:linear-gradient(110deg,#EDEDE9 8%,#E3E3DE 18%,#EDEDE9 33%);background-size:200% 100%;animation:client-shimmer 1.5s linear infinite;cursor:pointer}
+.justified-cell{position:relative;margin:0;height:100%;min-width:0;flex:none;max-width:100%}
+.justified-open{display:block;height:100%;padding:0;border:0;background:linear-gradient(110deg,#EDEDE9 8%,#E3E3DE 18%,#EDEDE9 33%);background-size:200% 100%;animation:client-shimmer 1.5s linear infinite;cursor:pointer;max-width:100%}
 .justified-open:disabled{cursor:default;animation:none}
 .justified-open img{width:100%;height:100%;display:block;object-fit:contain}
 .justified-open:hover img{opacity:.93;transition:opacity .2s ease}

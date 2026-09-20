@@ -54,7 +54,6 @@ export function JustifiedPhotoGrid({
   const rows = useMemo(() => {
     if (!width || !photos.length) return [];
     const ratios = photos.map(ratioOf);
-    const target = Math.max(MIN_ROW_HEIGHT, Math.min(MAX_ROW_HEIGHT, width * 0.55));
     const out: { items: JustifiedPhoto[]; height: number }[] = [];
     let i = 0;
     while (i < photos.length) {
@@ -62,14 +61,17 @@ export function JustifiedPhotoGrid({
       let count = 0;
       let k = i;
       while (k < photos.length) {
-        const next = sum + ratios[k] * target + gap * count;
-        if (count > 0 && next > width) break;
-        sum += ratios[k];
+        const sumNext = sum + ratios[k];
+        const available = width - gap * count;
+        const realized = sumNext * Math.max(MIN_ROW_HEIGHT, Math.min(MAX_ROW_HEIGHT, available / sumNext)) + gap * count;
+        if (count > 0 && realized > width + 0.001) break;
+        sum = sumNext;
         count += 1;
         k += 1;
       }
       const available = width - gap * (count - 1);
-      const height = Math.max(MIN_ROW_HEIGHT, Math.min(MAX_ROW_HEIGHT, available / sum));
+      const widest = ratios.slice(i, k).reduce((max, r) => Math.max(max, r), 0);
+      const height = Math.min(available / widest, Math.max(MIN_ROW_HEIGHT, Math.min(MAX_ROW_HEIGHT, available / sum)));
       out.push({ items: photos.slice(i, k), height });
       i = k;
     }

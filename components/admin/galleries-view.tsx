@@ -2,24 +2,23 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Lock, Search, Trash2 } from "lucide-react";
+import { Lock, MoreHorizontal, Search, Trash2 } from "lucide-react";
 import { deleteGallery } from "@/app/admin/crud-actions";
 
 export type GalleryViewItem = {
   id: string;
   title: string;
+  slug: string;
   status: string;
   clientName: string | null;
-  createdAt: string;
-  setCount: number;
   photoCount: number;
-  coverUrl: string | null;
   hasPassword: boolean;
 };
 
 export function GalleriesView({ items }: { items: GalleryViewItem[] }) {
   const [query, setQuery] = useState("");
   const [deleteItem, setDeleteItem] = useState<GalleryViewItem | null>(null);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
   const deleteRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (deleteItem && deleteRef.current && !deleteRef.current.open) deleteRef.current.showModal();
@@ -45,14 +44,22 @@ export function GalleriesView({ items }: { items: GalleryViewItem[] }) {
               <span>{gallery.clientName || "No client"}</span>
             </div>
             <span className="gallery-list-detail">{gallery.photoCount} {gallery.photoCount === 1 ? "photo" : "photos"}</span>
-            <span className="gallery-list-detail">{new Date(gallery.createdAt).toLocaleDateString()}</span>
             <span className={`status-pill ${gallery.status}`}>{gallery.status}</span>
             {gallery.hasPassword ? <Lock aria-label="Password protected" size={14} strokeWidth={1.8} /> : <span />}
             <div className="gallery-list-actions">
-              <Link className="admin-button is-secondary" href={`/admin/galleries/${gallery.id}`}>Open Gallery</Link>
-              <button aria-label={`Delete ${gallery.title}`} className="icon-button icon-danger" onClick={() => setDeleteItem(gallery)} type="button">
-                <Trash2 size={16} strokeWidth={1.8} />
-              </button>
+              <Link className="admin-button is-secondary" href={`/admin/galleries/${gallery.id}`}>Open →</Link>
+              <div className="gallery-overflow">
+                <button aria-expanded={menuFor === gallery.id} aria-label={`More actions for ${gallery.title}`} className="icon-button" onClick={() => setMenuFor(menuFor === gallery.id ? null : gallery.id)} type="button">
+                  <MoreHorizontal size={18} strokeWidth={1.8} />
+                </button>
+                {menuFor === gallery.id ? (
+                  <div className="menu gallery-overflow-menu" role="menu">
+                    <Link href={`/gallery/${gallery.slug}`} onClick={() => setMenuFor(null)} role="menuitem">View Gallery</Link>
+                    <button onClick={() => { setMenuFor(null); void navigator.clipboard?.writeText(`${window.location.origin}/gallery/${gallery.slug}`); }} role="menuitem" type="button">Copy Link</button>
+                    <button className="is-danger" onClick={() => { setMenuFor(null); setDeleteItem(gallery); }} role="menuitem" type="button"><Trash2 size={14} /> Delete Gallery</button>
+                  </div>
+                ) : null}
+              </div>
             </div>
           </article>
         ))}

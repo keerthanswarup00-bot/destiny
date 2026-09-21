@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import { Reveal } from "@/components/public/reveal";
 import { getSiteContact, getSiteHome, getSiteStories, resolveSiteAssetPaths } from "@/lib/site/site-content";
+import { INSTAGRAM_HANDLE, INSTAGRAM_URL } from "@/lib/site/social-links";
 
 function heroDelay(ms: number): CSSProperties {
   return { "--d": `${ms}ms` } as CSSProperties;
@@ -16,6 +17,13 @@ function headingLines(text: string): ReactNode[] {
     const node = isLast ? <em key={index}>{line}</em> : line;
     return index < lines.length - 1 ? <span key={index}>{node}<br /></span> : node;
   });
+}
+
+function formatEventDate(value?: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export default async function Home() {
@@ -77,24 +85,23 @@ export default async function Home() {
               <Link className="text-link" href="/gallery">All stories <span>→</span></Link>
             </Reveal>
           </div>
-          <div className="story-grid">
+          <div className="story-list">
             {stories.map((story, index) => (
-              <Reveal as="div" className="story-card" delay={(index % 3) * 90} key={story.id}>
-                <Link href={`/gallery/${story.slug}`} className="story-card">
-                  <span className="story-card__index">{String(index + 1).padStart(2, "0")}</span>
-                  <div className="story-card__media">
-                    {story.coverUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img alt={story.title} src={story.coverUrl} />
-                    ) : (
-                      <span className="story-card__placeholder">DESTINY</span>
-                    )}
-                  </div>
-                  <div className="story-card__body">
-                    <h3>{story.title}</h3>
-                    <p>{[story.category, story.location].filter(Boolean).join(" · ")}</p>
-                  </div>
+              <Reveal className="story" delay={(index % 2) * 110} key={story.id}>
+                <Link href={`/gallery/${story.slug}`} className="story__media" aria-label={story.title}>
+                  {story.coverUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img alt={story.title} src={story.coverUrl} />
+                  ) : (
+                    <span className="story__placeholder">DESTINY</span>
+                  )}
+                  {story.category ? <span className="story__category">{story.category}</span> : null}
                 </Link>
+                <div className="story__row">
+                  <h3>{story.title}</h3>
+                  <p className="story__meta">{[story.location, formatEventDate(story.event_date)].filter(Boolean).join(" · ")}</p>
+                  <span className="story__arrow" aria-hidden="true">→</span>
+                </div>
               </Reveal>
             ))}
           </div>
@@ -147,6 +154,13 @@ export default async function Home() {
                 <Link className="button accent" href={home.cta.button_url}>{home.cta.button_text} <span>→</span></Link>
                 {contact.email ? <a className="cta__mail" href={`mailto:${contact.email}`}>{contact.email}</a> : null}
               </div>
+            </Reveal>
+            <Reveal delay={220}>
+              <a className="cta__instagram" href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer">
+                <span>Follow the stories</span>
+                <strong>{INSTAGRAM_HANDLE}</strong>
+                <span>Instagram →</span>
+              </a>
             </Reveal>
           </div>
         </section>

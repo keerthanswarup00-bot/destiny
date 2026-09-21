@@ -80,7 +80,14 @@ export function JustifiedPhotoGrid({
 
   return (
     <div className={`justified-grid${className ? ` ${className}` : ""}`} ref={ref}>
-      {width === 0 ? null : (() => {
+      {width === 0 ? (
+        <div aria-hidden="true" className="justified-loading">
+          <div className="justified-loading-cell" />
+          <div className="justified-loading-cell" />
+          <div className="justified-loading-cell" />
+          <div className="justified-loading-cell" />
+        </div>
+      ) : (() => {
         let offset = 0;
         return rows.map((row, rowIndex) => {
           const rowStart = offset;
@@ -101,7 +108,9 @@ export function JustifiedPhotoGrid({
                     type="button"
                   >
                     {failed.has(item.id) ? (
-                      <span aria-hidden="true" className="justified-fallback" />
+                      <span aria-label="Image unavailable" className="justified-fallback" role="img" title="Image unavailable">
+                        <span aria-hidden="true" className="justified-fallback-label">Unavailable</span>
+                      </span>
                     ) : item.src ? (
                       /* Signed preview URL; next/image is a poor fit for short-lived tokens. */
                       /* eslint-disable-next-line @next/next/no-img-element */

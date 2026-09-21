@@ -4,21 +4,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  GalleryHorizontalEnd,
-  House,
   FolderOpen,
-  Phone,
-  Palette,
-  Shapes,
-  PanelsTopLeft,
   Users,
+  Inbox,
   Settings,
   UserRound,
   LogOut,
 } from "lucide-react";
 import { signOut } from "@/app/admin/actions";
 
-type NavLink = { label: string; href: string; icon: typeof House };
+type NavLink = { label: string; href: string; icon: typeof LayoutDashboard };
 
 const groups: { label: string; links: NavLink[] }[] = [
   {
@@ -26,24 +21,15 @@ const groups: { label: string; links: NavLink[] }[] = [
     links: [{ label: "Dashboard", href: "/admin", icon: LayoutDashboard }],
   },
   {
-    label: "Website",
+    label: "Galleries",
     links: [
-      { label: "Home", href: "/admin/website/home", icon: House },
-      { label: "Gallery", href: "/admin/website/gallery", icon: GalleryHorizontalEnd },
-      { label: "Contact", href: "/admin/website/contact", icon: Phone },
-      { label: "Branding", href: "/admin/website/branding", icon: PanelsTopLeft },
-      { label: "Appearance", href: "/admin/website/appearance", icon: Palette },
-    ],
-  },
-  {
-    label: "Content",
-    links: [
-      { label: "Gallery Sets", href: "/admin/galleries", icon: FolderOpen },
       { label: "Clients", href: "/admin/clients", icon: Users },
+      { label: "Galleries", href: "/admin/galleries", icon: FolderOpen },
+      { label: "Enquiries", href: "/admin/enquiries", icon: Inbox },
     ],
   },
   {
-    label: "System",
+    label: "Website",
     links: [{ label: "Settings", href: "/admin/settings", icon: Settings }],
   },
 ];

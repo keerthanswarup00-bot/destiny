@@ -2,6 +2,7 @@ import "server-only";
 import { CLIENT_SIGNED_URL_SECONDS } from "@/lib/client-media";
 import { galleryOverviews } from "@/lib/gallery-data";
 import { siteDb } from "@/lib/site/site-db";
+import { getWebsiteGalleryImages } from "@/lib/site/website-gallery";
 import { photoStore } from "@/lib/storage-provider";
 
 /* ---------------------------------------------------------------------------
@@ -172,17 +173,17 @@ export const DEFAULT_SITE_HOME: SiteHome = {
 
 export const DEFAULT_CONTACT: SiteContact = {
   studio_name: "Destiny Events and Photography",
-  email: "hello@destinyevents.photo",
-  phone: "+91 98765 43210",
-  whatsapp: "",
+  email: "destinyeventsandphotography@gmail.com",
+  phone: "9108727795",
+  whatsapp: "9108727795",
   instagram: "",
   location: "India · Available worldwide",
   address: "",
   hours: "",
   heading: "Let's work together.",
   description:
-    "Tell us a little about what you're planning. We'll be in touch within two business days.",
-  cta_text: "Send message",
+    "Tell us a little about what you're planning. We'll get back to you on WhatsApp.",
+  cta_text: "Send enquiry",
 };
 
 export const DEFAULT_BRANDING: SiteBranding = {
@@ -387,6 +388,22 @@ export async function getPortfolioGalleries(): Promise<PortfolioGallery[]> {
   } catch {
     return [];
   }
+}
+
+export type SiteWebsiteImage = {
+  id: string;
+  url: string;
+  width: number | null;
+  height: number | null;
+};
+
+export async function getSiteWebsiteGallery(): Promise<SiteWebsiteImage[]> {
+  return (await getWebsiteGalleryImages()).map(image => ({
+    id: image.id,
+    url: image.url,
+    width: image.width,
+    height: image.height,
+  }));
 }
 
 function asContact(value: unknown): SiteContact {

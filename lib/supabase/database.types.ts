@@ -25,6 +25,31 @@ export type Database = {
         created_at?: string;
         updated_at?: string;
       }>;
+      contact_submissions: Table<{
+        id: string;
+        name: string;
+        email: string | null;
+        phone: string;
+        event_type: string | null;
+        event_date: string | null;
+        message: string | null;
+        status: "new" | "contacted" | "closed";
+        source: "website";
+        created_at: string;
+        updated_at: string;
+      }, {
+        id?: string;
+        name: string;
+        email?: string | null;
+        phone: string;
+        event_type?: string | null;
+        event_date?: string | null;
+        message?: string | null;
+        status?: "new" | "contacted" | "closed";
+        source?: "website";
+        created_at?: string;
+        updated_at?: string;
+      }>;
       galleries: Table<{
         id: string;
         client_id: string;

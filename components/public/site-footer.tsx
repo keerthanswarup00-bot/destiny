@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { displayPhone, waLink } from "@/lib/site/whatsapp";
+import { INSTAGRAM_HANDLE, INSTAGRAM_URL } from "@/lib/site/social-links";
 
 const EXPLORE = [
   { label: "Home", href: "/" },
@@ -8,28 +10,37 @@ const EXPLORE = [
 
 export function SiteFooter({
   brandName,
+  shortName,
   tagline,
   blurb,
   email,
   phone,
+  whatsapp,
   location,
   instagram,
 }: {
   brandName: string;
+  shortName: string;
   tagline: string;
   blurb: string;
   email: string;
   phone: string;
+  whatsapp: string;
   location: string;
   instagram: string;
 }) {
-  const contacts = [email ? { label: "Email", href: `mailto:${email}` } : null, phone ? { label: `${phone}`, href: `tel:${phone.replaceAll(" ", "")}` } : null, instagram ? { label: `${instagram}`, href: `https://instagram.com/${instagram.replace(/^@/, "")}` } : null].filter((entry): entry is { label: string; href: string } => Boolean(entry));
+  const contacts = [
+    email ? { label: "Email", href: `mailto:${email}` } : null,
+    phone ? { label: `${displayPhone(phone)}`, href: `tel:${phone.replaceAll(" ", "")}` } : null,
+    whatsapp ? { label: `${displayPhone(whatsapp)}`, href: waLink(whatsapp) } : null,
+    { label: `Instagram ${INSTAGRAM_HANDLE}`, href: INSTAGRAM_URL, external: true },
+  ].filter((entry): entry is { label: string; href: string; external?: boolean } => Boolean(entry));
   return (
     <footer className="site-footer">
       <div className="site-footer__grid">
         <div className="site-footer__brand">
           <div className="brand">
-            {brandName.toUpperCase()}
+            {(shortName || brandName).toUpperCase()}
             <span>{tagline}</span>
           </div>
           <p className="site-footer__blurb">{blurb}</p>
@@ -43,14 +54,14 @@ export function SiteFooter({
         <div className="site-footer__col">
           <h3>Contact</h3>
           {contacts.map(contact => (
-            <a href={contact.href} key={contact.href} rel="noopener noreferrer">{contact.label}</a>
+            <a href={contact.href} key={contact.href} rel="noopener noreferrer" target={contact.external ? "_blank" : undefined}>{contact.label}</a>
           ))}
           {location ? <p className="site-footer__loc">{location}</p> : null}
         </div>
       </div>
       <div className="site-footer__bottom">
         <p>© {new Date().getFullYear()} {brandName}. All rights reserved.</p>
-        <p>Designed with intention.</p>
+        <p className="site-footer__credit">Website by <a href="https://www.aryanswaroop.com/" target="_blank" rel="noopener noreferrer">Aryan Swaroop ↗</a></p>
       </div>
     </footer>
   );

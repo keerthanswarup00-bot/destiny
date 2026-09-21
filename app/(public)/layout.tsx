@@ -8,14 +8,16 @@ export default async function PublicLayout({ children }: { children: React.React
   const themeStyle = { ...vars } as CSSProperties;
   return (
     <div className="site" style={themeStyle}>
-      <SiteHeader brandName={branding.brand_name} tagline={branding.tagline} logoUrl={branding.logoUrl} />
+      <SiteHeader brandName={branding.brand_name} shortName={branding.short_name} tagline={branding.tagline} logoUrl={branding.logoUrl} />
       <main className="site-main">{children}</main>
       <SiteFooter
         brandName={branding.brand_name}
+        shortName={branding.short_name}
         tagline={branding.tagline}
         blurb={contact.description || "Intentional photography for celebrations, events, and the moments in between."}
         email={contact.email}
         phone={contact.phone}
+        whatsapp={contact.whatsapp}
         location={contact.location}
         instagram={contact.instagram}
       />

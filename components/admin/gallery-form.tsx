@@ -9,17 +9,21 @@ export function GalleryForm({
   gallery,
   from,
   error,
+  modal = false,
+  onCancel,
 }: {
   clients?: ClientOption[];
   clientId?: string;
   gallery?: GalleryValues;
   from?: "galleries";
   error?: string | null;
+  modal?: boolean;
+  onCancel?: () => void;
 }) {
   const editing = Boolean(gallery);
   return (
-    <form action={editing ? updateGallery : createGallery} className="admin-panel settings-card" id="gallery-form">
-      <h2>{editing ? "Edit collection" : "New collection"}</h2>
+    <form action={editing ? updateGallery : createGallery} className={modal ? undefined : "admin-panel settings-card"} id={modal ? undefined : "gallery-form"}>
+      <h2>{editing ? "Edit gallery" : "New gallery"}</h2>
       {error ? <p className="form-error" role="alert">{error}</p> : null}
       {gallery ? <input name="id" type="hidden" value={gallery.id} /> : null}
       {from ? <input name="from" type="hidden" value={from} /> : null}
@@ -53,7 +57,10 @@ export function GalleryForm({
         <input autoComplete="new-password" minLength={6} name="password" type="password" />
       </label>
       {gallery?.passwordProtected ? <label className="switch-row"><span>Remove password<small>Makes the published gallery open without a password.</small></span><input name="clear_password" type="checkbox" /></label> : null}
-      <button className="admin-button">{editing ? "Save collection" : "Create Gallery"}</button>
+      <div className="gallery-form-actions">
+        {modal ? <button className="subtle-button" onClick={onCancel} type="button">Cancel</button> : null}
+        <button className="admin-button">{editing ? "Save gallery" : "Create Gallery"}</button>
+      </div>
     </form>
   );
 }

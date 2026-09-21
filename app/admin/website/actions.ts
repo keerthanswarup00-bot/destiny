@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { adminDb } from "@/lib/admin-data";
 import { ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES } from "@/lib/admin-validation";
+import { ensureWebsiteGallery, websiteGalleryId, websiteImageKey } from "@/lib/site/website-gallery";
 import { photoStore } from "@/lib/storage-provider";
 
 const value = (form: FormData, key: string) => String(form.get(key) ?? "");
@@ -175,23 +176,91 @@ export async function removeStory(form: FormData) {
 export async function saveGalleryPortfolio(form: FormData) {
   const id = value(form, "id");
   const supabase = await db();
+  const title = value(form, "title").trim().slice(0, 200) || null;
+  const description = value(form, "description").trim().slice(0, 5000) || null;
   const category = value(form, "category").trim().slice(0, 100) || null;
   const location = value(form, "location").trim().slice(0, 200) || null;
+  let eventDate = value(form, "event_date").trim() || null;
+  if (eventDate && !/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) eventDate = null;
   const showInPortfolio = checked(form, "show_in_portfolio");
   const portfolioSort = Math.max(0, Number(value(form, "portfolio_sort")) || 0);
   const featured = checked(form, "featured");
   await supabase
     .from("galleries")
-    .update({ category, location, show_in_portfolio: showInPortfolio, portfolio_sort: portfolioSort })
+    .update({ title: title ?? undefined, description, category, location, event_date: eventDate, show_in_portfolio: showInPortfolio, portfolio_sort: portfolioSort })
     .eq("id", id);
   const { data: story } = await supabase.from("site_stories").select("id").eq("gallery_id", id).maybeSingle();
   if (featured && !story) {
-    await supabase.from("site_stories").insert({ gallery_id: id, sort_order: portfolioSort });
+    await supabase.from("site_stories").insert({ gallery_id: id, sort_order: portfolioSort, category, location, event_date: eventDate });
+  } else if (featured && story) {
+    await supabase
+      .from("site_stories")
+      .update({ category, location, event_date: eventDate, sort_order: portfolioSort })
+      .eq("id", story.id);
   } else if (!featured && story) {
     await supabase.from("site_stories").delete().eq("id", story.id);
   }
   revalidate();
   redirect("/admin/website/gallery?saved=1");
+}
+
+/* --------------------------- website gallery ------------------------------- */
+
+export async function uploadWebsiteGalleryImages(form: FormData): Promise<{ ok: boolean; message?: string; count?: number }> {
+  const files = form.getAll("files").filter((entry): entry is File => entry instanceof File && entry.size > 0);
+  if (!files.length) return { ok: false, message: "Choose a photo to upload." };
+  const supabase = await db();
+  const target = await ensureWebsiteGallery(supabase);
+  if (!target) return { ok: false, message: "Could not prepare the website gallery." };
+  const { count } = await supabase.from("photos").select("id", { count: "exact", head: true }).eq("gallery_id", target.galleryId);
+  const uploadedKeys: string[] = [];
+  try {
+    for (const file of files) {
+      if (!(ALLOWED_PHOTO_TYPES as readonly string[]).includes(file.type) || file.size > MAX_PHOTO_BYTES) {
+        if (uploadedKeys.length) await photoStore().removePhotos(uploadedKeys);
+        return { ok: false, message: "Use JPEG, PNG, WebP, or GIF images up to 15MB." };
+      }
+      const id = crypto.randomUUID();
+      const ext = extByMime[file.type] ?? "png";
+      const key = websiteImageKey(id, ext);
+      await photoStore().uploadPhoto({ key, body: Buffer.from(await file.arrayBuffer()), contentType: file.type });
+      uploadedKeys.push(key);
+      const { error } = await supabase.from("photos").insert({
+        id,
+        gallery_id: target.galleryId,
+        folder_id: target.folderId,
+        filename: file.name.trim().slice(0, 500) || `photo-${id}.${ext}`,
+        original_path: key,
+        mime_type: file.type,
+        bytes: file.size,
+        sort_order: (count ?? 0) + uploadedKeys.length,
+      });
+      if (error) throw new Error("website-photo-insert");
+    }
+  } catch {
+    if (uploadedKeys.length) await photoStore().removePhotos(uploadedKeys);
+    return { ok: false, message: "Could not store that image. Try again." };
+  }
+  revalidate();
+  return { ok: true, count: uploadedKeys.length };
+}
+
+export async function deleteWebsiteGalleryImage(form: FormData) {
+  const id = value(form, "id");
+  const supabase = await db();
+  const galleryId = await websiteGalleryId(supabase);
+  if (!galleryId) return;
+  const { data: photo } = await supabase
+    .from("photos")
+    .select("original_path,preview_path,thumbnail_path")
+    .eq("id", id)
+    .eq("gallery_id", galleryId)
+    .maybeSingle();
+  if (!photo) return;
+  const paths = [photo.original_path, photo.preview_path, photo.thumbnail_path].filter((path): path is string => Boolean(path));
+  if (paths.length) await photoStore().removePhotos(paths);
+  await supabase.from("photos").delete().eq("id", id).eq("gallery_id", galleryId);
+  revalidate();
 }
 
 /* --------------------------------- contact ---------------------------------- */

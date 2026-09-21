@@ -24,8 +24,15 @@ export async function deleteGallery(form: FormData) {
   const id=value(form,"id"); const supabase=await db();
   const { data: galleryPhotos }=await supabase.from("photos").select("original_path,preview_path,thumbnail_path").eq("gallery_id",id);
   const paths=(galleryPhotos??[]).flatMap(photo => [photo.original_path, photo.preview_path, photo.thumbnail_path]).filter((path): path is string => Boolean(path));
-  if(paths.length) await photoStore().removePhotos(paths);
-  await supabase.from("galleries").delete().eq("id",id);
+  if(paths.length) {
+    try {
+      await photoStore().removePhotos(paths);
+    } catch {
+      return redirect(`/admin/galleries?error=gallery-storage-delete`);
+    }
+  }
+  const { error }=await supabase.from("galleries").delete().eq("id",id);
+  if(error) return redirect(`/admin/galleries?error=gallery-delete`);
   revalidatePath("/admin/galleries");
   redirect("/admin/galleries");
 }

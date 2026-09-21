@@ -38,7 +38,7 @@ export default async function WebsiteContactPage({ searchParams }: { searchParam
           <div className="field"><span>Page heading</span><input defaultValue={contact.heading} name="heading" type="text" /></div>
           <div className="field"><span>Description</span><textarea defaultValue={contact.description} name="description" rows={3} /></div>
           <div className="field"><span>Form button label</span><input defaultValue={contact.cta_text} name="cta_text" type="text" /></div>
-          <div className="form-actions"><button className="admin-button" type="submit"><Save size={15} /> Save contact</button><span className="hint">The enquiry form itself is decorative — enquiries are not sent yet.</span></div>
+          <div className="form-actions"><button className="admin-button" type="submit"><Save size={15} /> Save contact</button><span className="hint">Enquiries from the public form are saved and opened in WhatsApp via the number above.</span></div>
         </form>
       </section>
       <section className="admin-panel" style={{ marginTop: 24 }}>

@@ -8,7 +8,7 @@ function isActive(pathname: string, prefix: string) {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
 
-export function SiteHeader({ brandName, tagline, logoUrl }: { brandName: string; tagline: string; logoUrl: string | null }) {
+export function SiteHeader({ brandName, shortName, tagline, logoUrl }: { brandName: string; shortName: string; tagline: string; logoUrl: string | null }) {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
 
@@ -37,7 +37,7 @@ export function SiteHeader({ brandName, tagline, logoUrl }: { brandName: string;
           <img alt="" className="brand-logo" src={logoUrl} />
         ) : (
           <>
-            {brandName.toUpperCase()}
+            {(shortName || brandName).toUpperCase()}
             <span>{tagline}</span>
           </>
         )}

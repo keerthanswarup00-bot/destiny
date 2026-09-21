@@ -13,6 +13,8 @@ const errorMessages: Record<string, string> = {
   "client-has-galleries": "This client still has galleries, so it cannot be deleted.",
   "invalid-gallery": "Title is required. Slug must use lowercase letters, numbers, and hyphens.",
   "gallery-create": "Could not create that gallery. The slug may already be in use.",
+  "gallery-storage-delete": "The gallery could not be deleted because one or more photo files could not be removed.",
+  "gallery-delete": "Could not delete that gallery. Try again.",
   "invalid-folder": "Folder name is required and must include a letter or number.",
   "invalid-photo": "Choose a folder and JPEG, PNG, WebP, or GIF files up to 15MB.",
   "photo-upload": "Could not store that photo. Try again.",

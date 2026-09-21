@@ -238,23 +238,14 @@ export function CollectionEditor({
               <ExternalLink size={15} strokeWidth={1.8} /> Preview
             </span>
           )}
-          {isPublished ? (
-            <form action={setGalleryStatus}>
-              <input name="id" type="hidden" value={gallery.id} />
-              <input name="status" type="hidden" value="draft" />
-              <button className="admin-button is-secondary" type="submit" title="Take the client link offline">
-                <EyeOff size={15} strokeWidth={1.8} /> Unpublish
-              </button>
-            </form>
-          ) : (
-            <form action={setGalleryStatus}>
-              <input name="id" type="hidden" value={gallery.id} />
-              <input name="status" type="hidden" value="published" />
-              <button className="admin-button is-secondary" type="submit">
-                Publish
-              </button>
-            </form>
-          )}
+          <form action={setGalleryStatus} className="ce-status-form">
+            <input name="id" type="hidden" value={gallery.id} />
+            <input name="status" type="hidden" value={isPublished ? "draft" : "published"} />
+            <button className="admin-button is-secondary" type="submit">
+              {isPublished ? <EyeOff size={15} strokeWidth={1.8} /> : <Eye size={15} strokeWidth={1.8} />}
+              {isPublished ? " Unpublish" : " Publish"}
+            </button>
+          </form>
         </div>
       </header>
 
@@ -391,20 +382,9 @@ export function CollectionEditor({
                   </p>
                 </div>
                 <div className="ce-workspace-actions">
-                  <form action={setFolderPublished}>
-                    <input name="id" type="hidden" value={activeFolder.id} />
-                    <input name="published" type="hidden" value={activeFolder.published ? "false" : "true"} />
-                    <button className={`set-pill admin-toggle${activeFolder.published ? " is-published" : ""}`} type="submit">
-                      {activeFolder.published ? <Eye size={13} strokeWidth={1.8} /> : <EyeOff size={13} strokeWidth={1.8} />}
-                      {activeFolder.published ? "Published" : "Hidden"}
-                    </button>
-                  </form>
                   <Link className="admin-button is-secondary" href={clientUrl} rel="noreferrer" target="_blank">
                     <ExternalLink size={15} strokeWidth={1.8} /> Open client view
                   </Link>
-                  <button className="admin-button" onClick={() => fileInput.current?.click()} type="button">
-                    <Upload size={15} strokeWidth={1.8} /> Upload Photos
-                  </button>
                 </div>
               </div>
 
@@ -493,10 +473,7 @@ export function CollectionEditor({
                   <div className="upload-zone-icon"><ImageIcon size={26} strokeWidth={1.4} /></div>
                   <strong>Your gallery is ready.</strong>
                   <span>Upload your first photos to get started.</span>
-                  <span>or</span>
-                  <button className="admin-button" onClick={() => fileInput.current?.click()} type="button">
-                    Upload Photos
-                  </button>
+                  <span>Use the Upload Photos action above to add images.</span>
                   <em>JPEG, PNG, WebP or GIF.</em>
                 </div>
               )}

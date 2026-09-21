@@ -17,7 +17,6 @@ import {
   GripVertical,
   Image as ImageIcon,
   ImagePlus,
-  LayoutGrid,
   MoreVertical,
   Pencil,
   Search,
@@ -178,13 +177,13 @@ export function CollectionEditor({
   }
 
   const nextTargets = folders.filter(folder => folder.id !== activeFolder?.id);
-  const clientUrl = activeFolder ? `/gallery/${gallery.slug}/${activeFolder.slug}` : shareUrl;
+  const clientUrl = shareUrl;
 
   return (
     <section className="collection-editor">
       <header className="ce-toolbar">
         <div className="ce-title">
-          <Link aria-label="Back to Collections" className="ce-back icon-button" href="/admin/galleries">
+          <Link aria-label="Back to Client Galleries" className="ce-back icon-button" href="/admin/galleries">
             <ArrowLeft size={18} strokeWidth={1.8} />
           </Link>
           <div>
@@ -222,11 +221,13 @@ export function CollectionEditor({
             </button>
             {toolbarMenuOpen ? (
               <div className="menu ce-more-menu" role="menu">
-                <a href="#gallery-form" onClick={() => setToolbarMenuOpen(false)} role="menuitem"><Settings size={14} strokeWidth={1.8} /> Collection settings</a>
-                <a href="#submitted-selections" onClick={() => setToolbarMenuOpen(false)} role="menuitem"><LayoutGrid size={14} strokeWidth={1.8} /> Submitted selections</a>
+                <a href="#gallery-form" onClick={() => setToolbarMenuOpen(false)} role="menuitem"><Settings size={14} strokeWidth={1.8} /> Gallery settings</a>
               </div>
             ) : null}
           </div>
+          <button className="admin-button ce-primary-upload" onClick={() => fileInput.current?.click()} type="button">
+            <Upload size={15} strokeWidth={1.8} /> Upload Photos
+          </button>
           <CopyButton label="Share" text={shareUrl} />
           {isPublished ? (
             <Link aria-label="Preview the client gallery" className="admin-button is-secondary" href={shareUrl} rel="noreferrer" target="_blank">
@@ -249,7 +250,7 @@ export function CollectionEditor({
             <form action={setGalleryStatus}>
               <input name="id" type="hidden" value={gallery.id} />
               <input name="status" type="hidden" value="published" />
-              <button className="admin-button is-highlight" type="submit">
+              <button className="admin-button is-secondary" type="submit">
                 Publish
               </button>
             </form>
@@ -274,7 +275,6 @@ export function CollectionEditor({
           <nav aria-label="Collection sections" className="ce-iconnav">
             <span className="active" title="Photos"><ImageIcon size={16} strokeWidth={1.8} /><span>Photos</span></span>
             <a href="#gallery-form" title="Collection settings"><Settings size={16} strokeWidth={1.8} /><span>Settings</span></a>
-            <a href="#submitted-selections" title="Submitted selections"><LayoutGrid size={16} strokeWidth={1.8} /><span>Selections</span></a>
             <a href="#share-panel" title="Share"><Share2 size={16} strokeWidth={1.8} /><span>Share</span></a>
           </nav>
           <div className="ce-setlist-head">
@@ -430,9 +430,6 @@ export function CollectionEditor({
                   <div className="ws-toolbar" aria-live="polite">
                     {none ? (
                       <>
-                        <button className="admin-button is-secondary" onClick={() => fileInput.current?.click()} type="button">
-                          <Upload size={15} strokeWidth={1.8} /> Upload pictures
-                        </button>
                         {visible.length !== photos.length ? (
                           <span className="ce-filtered-hint">{visible.length} of {photos.length} shown</span>
                         ) : null}
@@ -445,11 +442,11 @@ export function CollectionEditor({
                             {[...selected].map(id => <input key={id} name="ids" type="hidden" value={id} />)}
                             <input name="gallery_id" type="hidden" value={gallery.id} />
                             <select aria-label="Move selected photos to" className="ws-move-select" defaultValue="" name="folder_id" required>
-                              <option disabled value="">Move to…</option>
+                              <option disabled value="">Add to set…</option>
                               {nextTargets.map(target => <option key={target.id} value={target.id}>{target.name}</option>)}
                             </select>
                             <button className="admin-button is-secondary" type="submit">
-                              <ArrowRight size={15} strokeWidth={1.8} /> Move
+                              <ArrowRight size={15} strokeWidth={1.8} /> Add to set
                             </button>
                           </form>
                         ) : null}
@@ -494,10 +491,11 @@ export function CollectionEditor({
               ) : (
                 <div className="upload-zone ce-empty">
                   <div className="upload-zone-icon"><ImageIcon size={26} strokeWidth={1.4} /></div>
-                  <strong>Drag photos and videos here to upload</strong>
+                  <strong>Your gallery is ready.</strong>
+                  <span>Upload your first photos to get started.</span>
                   <span>or</span>
                   <button className="admin-button" onClick={() => fileInput.current?.click()} type="button">
-                    Upload files from My Computer
+                    Upload Photos
                   </button>
                   <em>JPEG, PNG, WebP or GIF.</em>
                 </div>

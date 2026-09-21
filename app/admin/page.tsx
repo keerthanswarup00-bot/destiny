@@ -11,17 +11,15 @@ function greeting() {
 
 export default async function AdminOverview() {
   const [counts, db] = await Promise.all([dashboardCounts(), adminDb()]);
-  const [{ data: clients }, { data: submissions }, { data: galleries }] = await Promise.all([
+  const [{ data: clients }, { data: galleries }] = await Promise.all([
     db.from("clients").select("id,name,event_date,created_at").order("created_at", { ascending: false }).limit(5),
-    db.from("selection_submissions").select("id,photo_count,status,submitted_at,galleries(id,title)").order("submitted_at", { ascending: false }).limit(5),
     db.from("galleries").select("id,title,status,client_id,created_at").order("created_at", { ascending: false }).limit(5),
   ]);
   const clientRows = clients ?? [];
-  const submissionRows = submissions ?? [];
   const galleryRows = galleries ?? [];
   const { data: allClients } = await db.from("clients").select("id,name");
   const clientName = new Map((allClients ?? []).map(client => [client.id, client.name]));
-  const stats = [["Clients", counts[0]], ["Active galleries", counts[1]], ["Photos", counts[2]], ["Pending selections", counts[3]]];
+  const stats = [["Clients", counts[0]], ["Active galleries", counts[1]], ["Photos", counts[2]]];
 
   return (
     <section className="admin-content">
@@ -59,20 +57,6 @@ export default async function AdminOverview() {
             <span>→</span>
           </Link>
         )) : <p className="empty">No clients yet. Create your first client to start organizing galleries.</p>}
-      </div>
-      <div className="admin-panel">
-        <div className="panel-heading"><h2>Recent selections</h2><Link href="/admin/galleries">View all →</Link></div>
-        {submissionRows.length ? submissionRows.map(submission => {
-          const gallery = Array.isArray(submission.galleries) ? submission.galleries[0] : submission.galleries;
-          return (
-            <Link className="recent-row" href={gallery?.id ? `/admin/galleries/${gallery.id}#submitted-selections` : "/admin/galleries"} key={submission.id}>
-              <strong>{gallery?.title ?? "Unknown gallery"}</strong>
-              <span>{submission.photo_count} {submission.photo_count === 1 ? "photo" : "photos"}</span>
-              <span>{new Date(submission.submitted_at).toLocaleDateString()}</span>
-              <span>→</span>
-            </Link>
-          );
-        }) : <p className="empty">No selections yet. Clients submit their favourites from a published gallery link.</p>}
       </div>
     </section>
   );

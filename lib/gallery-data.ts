@@ -166,6 +166,11 @@ export async function galleryFolder(galleryId: string, folderSlug: string): Prom
   };
 }
 
+export async function galleryFolderPhotos(galleryId: string, folderSlug: string): Promise<GalleryFolderPhotoCard[]> {
+  const detail = await galleryFolder(galleryId, folderSlug);
+  return detail?.photos ?? [];
+}
+
 export async function galleryClient(galleryId: string) {
   const db = galleryDb();
   const { data: gallery } = await db.from("galleries").select("client_id").eq("id", galleryId).maybeSingle();

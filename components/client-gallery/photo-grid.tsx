@@ -91,12 +91,12 @@ export function ClientPhotoGrid({
     const busy = busyId === item.id;
     return (
       <button
-        aria-label={item.selected ? "Remove from selection" : "Add to selection"}
+        aria-label={item.selected ? "Remove from favourites" : "Add to favourites"}
         aria-pressed={item.selected}
         className={`client-heart${item.selected ? " is-selected" : ""}`}
         disabled={disabled || busy}
         onClick={() => onToggle(item.id)}
-        title={item.selected ? "Remove from selection" : "Add to selection"}
+        title={item.selected ? "Remove from favourites" : "Add to favourites"}
         type="button"
       >
         {item.selected ? <Heart fill="currentColor" size={16} strokeWidth={1.6} /> : <Heart size={16} strokeWidth={1.6} />}
@@ -124,20 +124,20 @@ export function ClientPhotoGrid({
         render={{
           controls: () => (notice ? <span aria-live="polite" className="client-lightbox-notice" role="status">{notice}</span> : null),
         }}
-        slideshow={{ autoplay: true, delay: 3500 }}
+        slideshow={{ autoplay: false, delay: 3500 }}
         slides={slides}
         toolbar={{
           buttons: [
             <span className="client-lightbox-counter" key="counter">{index >= 0 ? index + 1 : 0} / {photos.length}</span>,
             <span className="client-lightbox-spacer" key="spacer" />,
             <button
-              aria-label={current?.selected ? "Remove from selection" : "Add to selection"}
+              aria-label={current?.selected ? "Remove from favourites" : "Add to favourites"}
               aria-pressed={current?.selected}
               className={`client-lightbox-action yarl__button${current?.selected ? " is-selected" : ""}`}
               disabled={disabled || Boolean(current && busyId === current.id)}
               key="select"
               onClick={() => { if (current) onToggle(current.id); }}
-              title={current?.selected ? "Remove from selection" : "Add to selection"}
+              title={current?.selected ? "Remove from favourites" : "Add to favourites"}
               type="button"
             >
               {current?.selected ? <Heart fill="currentColor" size={18} strokeWidth={1.6} /> : <Heart size={18} strokeWidth={1.6} />}
@@ -145,6 +145,7 @@ export function ClientPhotoGrid({
             <button aria-label="Download photo" className="client-lightbox-action yarl__button" disabled={!current} key="download" onClick={() => void downloadCurrent()} title="Download photo" type="button"><Download size={17} strokeWidth={1.6} /></button>,
             <button aria-label="Share photo" className="client-lightbox-action yarl__button" disabled={!current} key="share" onClick={() => void shareCurrent()} title="Share photo" type="button"><Share2 size={17} strokeWidth={1.6} /></button>,
             "slideshow",
+            "fullscreen",
             "close",
           ],
         }}

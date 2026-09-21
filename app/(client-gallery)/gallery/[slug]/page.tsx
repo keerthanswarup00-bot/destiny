@@ -1,22 +1,27 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GalleryGate } from "@/components/client-gallery/gallery-gate";
-import { HomeSelectionBar } from "@/components/client-gallery/home-selection-bar";
-import { FolderCover } from "@/components/client-gallery/folder-cover";
+import { GalleryOverview } from "@/components/client-gallery/gallery-overview";
 import { resolveGalleryAccess, viewerKeyHash } from "@/lib/gallery-access";
-import { galleryFolders, galleryClient, selectedPhotoIds, viewerSubmission } from "@/lib/gallery-data";
+import { galleryFolders, galleryFolderPhotos, galleryClient, selectedPhotoIds } from "@/lib/gallery-data";
 
 export default async function ClientGalleryHome({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const access = await resolveGalleryAccess(slug);
   if (access.state === "unavailable") notFound();
   if (access.state === "password") return <GalleryGate slug={access.slug} />;
-  const [folders, selected, submission, client] = await Promise.all([
+  const [folders, selected, client] = await Promise.all([
     galleryFolders(access.gallery.id),
     selectedPhotoIds(access.gallery.id, await viewerKeyHash()),
-    viewerSubmission(access.gallery.id, await viewerKeyHash()),
     galleryClient(access.gallery.id),
   ]);
+  const sets = await Promise.all(folders.map(async folder => ({
+    id: folder.id,
+    name: folder.name,
+    slug: folder.slug,
+    photos: (await galleryFolderPhotos(access.gallery.id, folder.slug)).map(photo => ({ ...photo, selected: selected.has(photo.id) })),
+  })));
+  const favouritePhotos = sets.flatMap(set => set.photos).filter((photo, index, all) => selected.has(photo.id) && all.findIndex(candidate => candidate.id === photo.id) === index);
+  if (favouritePhotos.length) sets.push({ id: "favourites", name: "Fav", slug: "fav", photos: favouritePhotos });
 
   const eventLine = client
     ? [client.name, client.event_date ? new Date(client.event_date).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : null].filter(Boolean).join(" · ")
@@ -38,7 +43,7 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
             <h1>{access.gallery.title}</h1>
             {eventLine ? <p className="client-event">{eventLine}</p> : null}
             {access.gallery.description ? <p className="client-hero-lede">{access.gallery.description}</p> : null}
-            {folders.length ? <a className="client-hero-cta" href="#client-folder-grid">View gallery</a> : null}
+            {folders.length ? <a className="client-hero-cta" href="#client-gallery-grid">View gallery</a> : null}
           </div>
         </header>
       ) : (
@@ -49,45 +54,7 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
           {access.gallery.description ? <p className="lede">{access.gallery.description}</p> : null}
         </header>
       )}
-      {folders.length ? (
-        <>
-          <nav aria-label="Sets" className="client-setnav">
-            <span className="client-setnav-label">Overview</span>
-            {folders.map(folder => (
-              <Link className="client-setnav-link" href={`/gallery/${access.gallery.slug}/${folder.slug}`} key={folder.id}>
-                {folder.name}
-              </Link>
-            ))}
-          </nav>
-          <div className="client-folder-grid" id="client-folder-grid">
-            {folders.map((folder, index) => (
-              <Link className="client-folder" href={`/gallery/${access.gallery.slug}/${folder.slug}`} key={folder.id}>
-                <div
-                  className="client-folder-cover"
-                  style={folder.coverWidth && folder.coverHeight ? { aspectRatio: `${folder.coverWidth} / ${folder.coverHeight}` } : undefined}
-                >
-                  {folder.coverUrl ? (
-                    <FolderCover alt={`${folder.name} — highlight image`} fallback={String(index + 1).padStart(2, "0")} height={folder.coverHeight} src={folder.coverUrl} width={folder.coverWidth} />
-                  ) : (
-                    <span className="client-folder-blank">{String(index + 1).padStart(2, "0")}</span>
-                  )}
-                </div>
-                <div className="client-folder-info">
-                  <span className="client-folder-index">{String(index + 1).padStart(2, "0")}</span>
-                  <span className="client-folder-text">
-                    <strong>{folder.name}</strong>
-                    <span className="client-folder-meta">{folder.photoCount} {folder.photoCount === 1 ? "photo" : "photos"}</span>
-                  </span>
-                  <span aria-hidden="true" className="client-folder-arrow">→</span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </>
-      ) : (
-        <p className="client-empty">This gallery does not have any sets yet.</p>
-      )}
-      <HomeSelectionBar count={selected.size} slug={access.gallery.slug} submitted={Boolean(submission)} />
+      <GalleryOverview selectedIds={[...selected]} sets={sets} slug={access.gallery.slug} />
     </main>
   );
 }

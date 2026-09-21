@@ -60,18 +60,16 @@ export async function submitGalleryPassword(_: PasswordState, form: FormData): P
   }
 }
 
-export async function togglePhotoSelection(form: FormData) {
+export async function togglePhotoFavorite(form: FormData) {
   const slug = String(form.get("slug") ?? "").trim();
   const photoId = String(form.get("photo_id") ?? "").trim();
   const folder = String(form.get("folder") ?? "").trim();
   const gallery = await requireGalleryAccess(slug);
   const db = galleryDb();
   const viewerHash = await ensureViewerKeyHash();
-  const { data: submitted } = await db.from("selection_submissions").select("id").eq("gallery_id", gallery.id).eq("selection_session_hash", viewerHash).maybeSingle();
   const { count } = await db.from("selections").select("id", { count: "exact", head: true }).eq("gallery_id", gallery.id).eq("viewer_key_hash", viewerHash);
-  if (submitted) return { ok: false as const, error: "This selection has already been sent.", selected: false, count: count ?? 0, submitted: true };
   const { data: photo } = await db.from("photos").select("id").eq("id", photoId).eq("gallery_id", gallery.id).maybeSingle();
-  if (!photo) return { ok: false as const, error: "That photograph is unavailable.", selected: false, count: count ?? 0, submitted: false };
+  if (!photo) return { ok: false as const, error: "That photograph is unavailable.", selected: false, count: count ?? 0 };
   const { data: existing } = await db.from("selections").select("id").eq("gallery_id", gallery.id).eq("photo_id", photo.id).eq("viewer_key_hash", viewerHash).maybeSingle();
   if (existing) {
     await db.from("selections").delete().eq("id", existing.id).eq("gallery_id", gallery.id).eq("viewer_key_hash", viewerHash);
@@ -79,9 +77,9 @@ export async function togglePhotoSelection(form: FormData) {
     await db.from("selections").insert({ gallery_id: gallery.id, photo_id: photo.id, viewer_name: "Guest", viewer_key_hash: viewerHash });
   }
   revalidatePath(`/gallery/${gallery.slug}`);
-  if (/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(folder)) revalidatePath(`/gallery/${gallery.slug}/${folder}`);
+  if (/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(folder)) revalidatePath(`/gallery/${gallery.slug}`);
   const { count: nextCount } = await db.from("selections").select("id", { count: "exact", head: true }).eq("gallery_id", gallery.id).eq("viewer_key_hash", viewerHash);
-  return { ok: true as const, error: null, selected: !existing, count: nextCount ?? 0, submitted: false };
+  return { ok: true as const, error: null, selected: !existing, count: nextCount ?? 0 };
 }
 
 type DownloadResult = { url: string | null; filename: string | null; error: string | null };

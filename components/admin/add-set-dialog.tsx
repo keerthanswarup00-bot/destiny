@@ -15,8 +15,7 @@ export function AddSetDialog({ galleryId, highlighted = false }: { galleryId: st
         <form action={createFolder} onSubmit={() => dialog.current?.close()}>
           <h2>Add set</h2>
           <input name="gallery_id" type="hidden" value={galleryId} />
-          <label>Name<input autoFocus maxLength={200} name="name" placeholder="e.g. Ceremony" required /></label>
-          <label>Description <span className="optional">optional</span><textarea maxLength={400} name="description" placeholder="A short note about this set" rows={2} /></label>
+          <label>Set name<input autoFocus maxLength={200} name="name" placeholder="e.g. Ceremony" required /></label>
           <menu>
             <button onClick={() => dialog.current?.close()} type="button">Cancel</button>
             <button className="admin-button">Create set</button>

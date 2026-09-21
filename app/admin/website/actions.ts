@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { adminDb } from "@/lib/admin-data";
 import { ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES } from "@/lib/admin-validation";
-import { ensureWebsiteGallery, websiteGalleryId, websiteImageKey } from "@/lib/site/website-gallery";
+import { ensureWebsiteGallery, normalizeWebsiteGalleryCategory, websiteGalleryId, websiteImageKey } from "@/lib/site/website-gallery";
 import { photoStore } from "@/lib/storage-provider";
 
 const value = (form: FormData, key: string) => String(form.get(key) ?? "");
@@ -209,10 +209,13 @@ export async function saveGalleryPortfolio(form: FormData) {
 export async function uploadWebsiteGalleryImages(form: FormData): Promise<{ ok: boolean; message?: string; count?: number }> {
   const files = form.getAll("files").filter((entry): entry is File => entry instanceof File && entry.size > 0);
   if (!files.length) return { ok: false, message: "Choose a photo to upload." };
+  const category = normalizeWebsiteGalleryCategory(value(form, "category"));
+  if (value(form, "category") && !category) return { ok: false, message: "Choose a valid website gallery category." };
   const supabase = await db();
   const target = await ensureWebsiteGallery(supabase);
   if (!target) return { ok: false, message: "Could not prepare the website gallery." };
-  const { count } = await supabase.from("photos").select("id", { count: "exact", head: true }).eq("gallery_id", target.galleryId);
+  const { count, error: countError } = await supabase.from("photos").select("id", { count: "exact", head: true }).eq("gallery_id", target.galleryId);
+  if (countError) return { ok: false, message: `Could not prepare the upload: ${countError.message}` };
   const uploadedKeys: string[] = [];
   try {
     for (const file of files) {
@@ -233,16 +236,50 @@ export async function uploadWebsiteGalleryImages(form: FormData): Promise<{ ok: 
         original_path: key,
         mime_type: file.type,
         bytes: file.size,
+        category: category ?? null,
+        published_category: null,
+        published: false,
+        pending_delete: false,
         sort_order: (count ?? 0) + uploadedKeys.length,
       });
-      if (error) throw new Error("website-photo-insert");
+      if (error) throw new Error(`Photo record could not be created: ${error.message}`);
     }
-  } catch {
-    if (uploadedKeys.length) await photoStore().removePhotos(uploadedKeys);
-    return { ok: false, message: "Could not store that image. Try again." };
+
+  } catch (error) {
+    if (uploadedKeys.length) {
+      try {
+        await photoStore().removePhotos(uploadedKeys);
+      } catch {
+        // Preserve the original upload/database failure for the admin UI.
+      }
+    }
+    return {
+      ok: false,
+      message: error instanceof Error && error.message
+        ? error.message
+        : "Could not store that image. Try again.",
+    };
   }
   revalidate();
   return { ok: true, count: uploadedKeys.length };
+}
+
+export async function updateWebsiteGalleryImageCategory(form: FormData) {
+  const id = value(form, "id");
+  const categoryValue = value(form, "category");
+  const category = normalizeWebsiteGalleryCategory(categoryValue);
+  if (categoryValue && !category) return;
+  const supabase = await db();
+  const galleryId = await websiteGalleryId(supabase);
+  if (!galleryId) return;
+  const { error } = await supabase
+    .from("photos")
+    .update({ category })
+    .eq("id", id)
+    .eq("gallery_id", galleryId)
+    .eq("pending_delete", false);
+  if (error) throw new Error(`Category could not be updated: ${error.message}`);
+  revalidate();
 }
 
 export async function deleteWebsiteGalleryImage(form: FormData) {
@@ -250,17 +287,63 @@ export async function deleteWebsiteGalleryImage(form: FormData) {
   const supabase = await db();
   const galleryId = await websiteGalleryId(supabase);
   if (!galleryId) return;
-  const { data: photo } = await supabase
+  const { error } = await supabase
     .from("photos")
-    .select("original_path,preview_path,thumbnail_path")
+    .update({ pending_delete: true })
     .eq("id", id)
-    .eq("gallery_id", galleryId)
-    .maybeSingle();
-  if (!photo) return;
-  const paths = [photo.original_path, photo.preview_path, photo.thumbnail_path].filter((path): path is string => Boolean(path));
-  if (paths.length) await photoStore().removePhotos(paths);
-  await supabase.from("photos").delete().eq("id", id).eq("gallery_id", galleryId);
+    .eq("gallery_id", galleryId);
+  if (error) throw new Error(`Image could not be marked for deletion: ${error.message}`);
   revalidate();
+}
+
+export async function deleteWebsiteGalleryImages(form: FormData) {
+  const ids = form.getAll("ids").map(String).filter(Boolean);
+  if (!ids.length) return;
+  const supabase = await db();
+  const galleryId = await websiteGalleryId(supabase);
+  if (!galleryId) return;
+  const { error } = await supabase
+    .from("photos")
+    .update({ pending_delete: true })
+    .in("id", ids)
+    .eq("gallery_id", galleryId);
+  if (error) throw new Error(`Images could not be marked for deletion: ${error.message}`);
+  revalidate();
+}
+
+export async function publishWebsiteGallery(): Promise<void> {
+  const supabase = await db();
+  const galleryId = await websiteGalleryId(supabase);
+  if (!galleryId) throw new Error("Website Gallery is not available.");
+  const { data: pending, error: pendingError } = await supabase
+    .from("photos")
+    .select("id,original_path,preview_path,thumbnail_path,pending_delete")
+    .eq("gallery_id", galleryId)
+    .eq("pending_delete", true);
+  if (pendingError) throw new Error(`Publish could not read pending deletions: ${pendingError.message}`);
+  try {
+    const paths = (pending ?? []).flatMap(photo => [photo.original_path, photo.preview_path, photo.thumbnail_path])
+      .filter((path): path is string => Boolean(path));
+    if (paths.length) await photoStore().removePhotos(paths);
+    if (pending?.length) {
+      const { error } = await supabase.from("photos").delete().in("id", pending.map(photo => photo.id)).eq("gallery_id", galleryId);
+      if (error) throw error;
+    }
+    const { data: working, error: workingError } = await supabase.from("photos").select("id,category").eq("gallery_id", galleryId);
+    if (workingError) throw workingError;
+    for (const photo of working ?? []) {
+      const { error: updateError } = await supabase
+        .from("photos")
+        .update({ published_category: photo.category, published: true, pending_delete: false })
+        .eq("id", photo.id)
+        .eq("gallery_id", galleryId);
+      if (updateError) throw updateError;
+    }
+  } catch {
+    throw new Error("Could not publish the Website Gallery. Retry the publish operation.");
+  }
+  revalidate();
+  redirect("/admin/website/gallery?published=1");
 }
 
 /* --------------------------------- contact ---------------------------------- */

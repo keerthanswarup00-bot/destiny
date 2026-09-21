@@ -29,6 +29,19 @@ export const WEBSITE_CLIENT_NOTES =
 export const WEBSITE_FOLDER_SLUG = "website-images";
 export const WEBSITE_FOLDER_NAME = "Website Images";
 export const WEBSITE_IMAGE_PREFIX = "website-gallery";
+export const WEBSITE_GALLERY_CATEGORIES = ["wedding", "events", "portraits", "celebrations"] as const;
+export type WebsiteGalleryCategory = (typeof WEBSITE_GALLERY_CATEGORIES)[number];
+
+export function normalizeWebsiteGalleryCategory(value: string | null | undefined): WebsiteGalleryCategory | null {
+  const normalized = value?.trim().toLowerCase() ?? "";
+  if (normalized === "weddings") return "wedding";
+  if (normalized === "event") return "events";
+  if (normalized === "portrait") return "portraits";
+  if (normalized === "celebration") return "celebrations";
+  return (WEBSITE_GALLERY_CATEGORIES as readonly string[]).includes(normalized)
+    ? normalized as WebsiteGalleryCategory
+    : null;
+}
 
 type WebsiteDb = ReturnType<typeof galleryDb>;
 
@@ -41,6 +54,10 @@ export function websiteImageKey(id: string, ext: string): string {
 export async function websiteGalleryId(db: WebsiteDb): Promise<string | null> {
   const { data } = await db.from("galleries").select("id").eq("slug", WEBSITE_GALLERY_SLUG).maybeSingle();
   return data?.id ?? null;
+}
+
+export async function websiteGalleryExists(db: WebsiteDb): Promise<boolean> {
+  return Boolean(await websiteGalleryId(db));
 }
 
 /** Idempotently create the system client + gallery + folder that host the feed. */
@@ -103,22 +120,31 @@ export type WebsiteImageRow = {
   bytes: number;
   width: number | null;
   height: number | null;
+  category: WebsiteGalleryCategory | null;
+  published: boolean;
+  pending_delete: boolean;
   created_at: string;
 };
 
 /** Signed, newest-first previews for the public /gallery feed. */
-export async function getWebsiteGalleryImages(): Promise<(WebsiteImageRow & { url: string })[]> {
+export async function getWebsiteGalleryImages(category?: WebsiteGalleryCategory | null): Promise<(WebsiteImageRow & { url: string })[]> {
   const db = galleryDb();
   const galleryId = await websiteGalleryId(db);
   if (!galleryId) return [];
 
-  const { data } = await db
+  let query = db
     .from("photos")
-    .select("id,filename,original_path,mime_type,bytes,width,height,created_at")
+    .select("id,filename,original_path,mime_type,bytes,width,height,published_category,published,pending_delete,created_at")
     .eq("gallery_id", galleryId)
+    .eq("published", true)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false });
-  const rows = (data ?? []) as WebsiteImageRow[];
+  if (category) query = query.eq("published_category", category);
+  const { data } = await query;
+  const rows = (data ?? []).map(row => ({
+    ...row,
+    category: row.published_category,
+  })) as WebsiteImageRow[];
   if (!rows.length) return [];
 
   const urls = await photoStore().signedGetUrls(

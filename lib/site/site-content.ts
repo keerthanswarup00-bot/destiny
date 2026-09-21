@@ -2,7 +2,7 @@ import "server-only";
 import { CLIENT_SIGNED_URL_SECONDS } from "@/lib/client-media";
 import { galleryOverviews } from "@/lib/gallery-data";
 import { siteDb } from "@/lib/site/site-db";
-import { getWebsiteGalleryImages } from "@/lib/site/website-gallery";
+import { getWebsiteGalleryImages, normalizeWebsiteGalleryCategory, websiteGalleryExists, type WebsiteGalleryCategory } from "@/lib/site/website-gallery";
 import { photoStore } from "@/lib/storage-provider";
 
 /* ---------------------------------------------------------------------------
@@ -395,6 +395,7 @@ export type SiteWebsiteImage = {
   url: string;
   width: number | null;
   height: number | null;
+  category: WebsiteGalleryCategory | null;
 };
 
 export async function getSiteWebsiteGallery(): Promise<SiteWebsiteImage[]> {
@@ -403,7 +404,23 @@ export async function getSiteWebsiteGallery(): Promise<SiteWebsiteImage[]> {
     url: image.url,
     width: image.width,
     height: image.height,
+    category: image.category,
   }));
+}
+
+export async function getSiteWebsiteGalleryByCategory(category?: string): Promise<SiteWebsiteImage[]> {
+  const normalized = normalizeWebsiteGalleryCategory(category);
+  return (await getWebsiteGalleryImages(normalized)).map(image => ({
+    id: image.id,
+    url: image.url,
+    width: image.width,
+    height: image.height,
+    category: image.category,
+  }));
+}
+
+export async function hasSiteWebsiteGallery(): Promise<boolean> {
+  return websiteGalleryExists(siteDb());
 }
 
 function asContact(value: unknown): SiteContact {

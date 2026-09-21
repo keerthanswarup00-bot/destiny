@@ -11,6 +11,7 @@ export function WebsiteGalleryUploader() {
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [category, setCategory] = useState("");
 
   async function upload(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -20,11 +21,18 @@ export function WebsiteGalleryUploader() {
     try {
       const form = new FormData();
       for (const file of Array.from(files)) form.append("files", file);
+      form.set("category", category);
       const result = await uploadWebsiteGalleryImages(form);
-      if (!result.ok) setError(result.message ?? "Upload failed.");
+      if (!result.ok) {
+        setError(result.message ?? "Upload failed.");
+        return;
+      }
       router.refresh();
+    } catch (uploadError) {
+      setError(uploadError instanceof Error && uploadError.message ? uploadError.message : "Upload failed. Please try again.");
     } finally {
       setUploading(0);
+      if (fileInput.current) fileInput.current.value = "";
     }
   }
 
@@ -48,7 +56,17 @@ export function WebsiteGalleryUploader() {
           <button className="admin-button" onClick={() => fileInput.current?.click()} type="button">
             <Upload size={15} strokeWidth={1.8} /> Upload images
           </button>
-          <em>JPEG, PNG, WebP or GIF. Multiple files. Goes live on /gallery immediately.</em>
+          <label className="website-gallery-category">
+            <span>Category for these images</span>
+            <select onChange={e => setCategory(e.target.value)} value={category}>
+              <option value="">Uncategorized</option>
+              <option value="wedding">Wedding</option>
+              <option value="events">Events</option>
+              <option value="portraits">Portraits</option>
+              <option value="celebrations">Celebrations</option>
+            </select>
+          </label>
+          <em>JPEG, PNG, WebP or GIF. Multiple files. Publish when you are ready for /gallery.</em>
         </div>
       )}
       <input

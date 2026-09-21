@@ -120,6 +120,10 @@ export type Database = {
         bytes: number;
         width: number | null;
         height: number | null;
+        category: string | null;
+        published_category: string | null;
+        published: boolean;
+        pending_delete: boolean;
         sort_order: number;
         created_at: string;
         updated_at: string;
@@ -135,6 +139,10 @@ export type Database = {
         bytes: number;
         width?: number | null;
         height?: number | null;
+        category?: string | null;
+        published_category?: string | null;
+        published?: boolean;
+        pending_delete?: boolean;
         sort_order?: number;
         created_at?: string;
         updated_at?: string;

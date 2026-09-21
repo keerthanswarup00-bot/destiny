@@ -1,4 +1,5 @@
 "use server";
+import sharp from "sharp";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
@@ -48,6 +49,16 @@ export async function deleteFolder(form: FormData) {
 }
 function galleryFail(gallery: string, code: string) { return redirect(`/admin/galleries/${gallery}?error=${code}`); }
 function storageFilename(filename: string) { const trimmed=filename.trim().slice(0,500); const dot=trimmed.lastIndexOf("."); const ext=dot>0?trimmed.slice(dot).toLowerCase().replace(/[^a-z0-9.]/g,""):""; return `${slugify(dot>0?trimmed.slice(0,dot):trimmed)||"photo"}${ext}`; }
+const THUMBNAIL_LONG_EDGE = 640;
+const PREVIEW_LONG_EDGE = 2400;
+
+async function createDerivative(body: Buffer, longEdge: number, quality: number): Promise<Buffer> {
+  return sharp(body)
+    .resize({ width: longEdge, height: longEdge, fit: "inside", withoutEnlargement: true })
+    .webp({ quality })
+    .toBuffer();
+}
+
 export async function uploadPhotos(form: FormData) {
   const gallery=value(form,"gallery_id");
   const parsed=photoUploadSchema.safeParse({ gallery_id:gallery, folder_id:value(form,"folder_id") });
@@ -77,13 +88,63 @@ async function runFolderUpload(gallery: string, folderId: string, form: FormData
     if(!(ALLOWED_PHOTO_TYPES as readonly string[]).includes(file.type) || file.size>MAX_PHOTO_BYTES) return null;
     const id=crypto.randomUUID();
     const original_path=`${gallery}/${folder.id}/${id}/${storageFilename(file.name)}`;
+    const thumbnail_path=`${gallery}/${folder.id}/${id}/thumbnail.webp`;
+    const preview_path=`${gallery}/${folder.id}/${id}/preview.webp`;
+    const uploadedPaths: string[] = [];
+    const body=Buffer.from(await file.arrayBuffer());
+    let width: number | null = null;
+    let height: number | null = null;
     try {
-      await photoStore().uploadPhoto({ key: original_path, body: Buffer.from(await file.arrayBuffer()), contentType: file.type });
+      await photoStore().uploadPhoto({ key: original_path, body, contentType: file.type });
+      uploadedPaths.push(original_path);
     } catch {
       return null;
     }
-    const { error: insertError }=await supabase.from("photos").insert({ id, gallery_id:gallery, folder_id:folder.id, filename:file.name.trim().slice(0,500)||storageFilename(file.name), original_path, mime_type:file.type, bytes:file.size, sort_order:sort });
-    if(insertError) { await photoStore().removePhotos([original_path]); return null; }
+    try {
+      const metadata=await sharp(body).metadata();
+      width=metadata.width ?? null;
+      height=metadata.height ?? null;
+    } catch {
+      // Preserve the original upload when metadata extraction is unavailable.
+    }
+    try {
+      await photoStore().uploadPhoto({
+        key: thumbnail_path,
+        body: await createDerivative(body, THUMBNAIL_LONG_EDGE, 80),
+        contentType: "image/webp",
+      });
+      uploadedPaths.push(thumbnail_path);
+    } catch {
+      // Derivatives are best effort; the original remains usable.
+    }
+    try {
+      await photoStore().uploadPhoto({
+        key: preview_path,
+        body: await createDerivative(body, PREVIEW_LONG_EDGE, 85),
+        contentType: "image/webp",
+      });
+      uploadedPaths.push(preview_path);
+    } catch {
+      // Derivatives are best effort; the original remains usable.
+    }
+    const { error: insertError }=await supabase.from("photos").insert({
+      id,
+      gallery_id:gallery,
+      folder_id:folder.id,
+      filename:file.name.trim().slice(0,500)||storageFilename(file.name),
+      original_path,
+      preview_path: uploadedPaths.includes(preview_path) ? preview_path : null,
+      thumbnail_path: uploadedPaths.includes(thumbnail_path) ? thumbnail_path : null,
+      width,
+      height,
+      mime_type:file.type,
+      bytes:file.size,
+      sort_order:sort,
+    });
+    if(insertError) {
+      try { await photoStore().removePhotos(uploadedPaths); } catch { /* Preserve the database failure. */ }
+      return null;
+    }
     sort+=1;
   }
   revalidatePath(`/admin/galleries/${gallery}`);

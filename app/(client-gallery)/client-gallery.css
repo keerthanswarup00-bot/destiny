@@ -1,5 +1,5 @@
 html{scroll-behavior:smooth}
-.client-gallery{min-height:100vh;background:#FAFAF8;color:#111111;overflow-x:hidden}
+.client-gallery{--site-bg:#FAFAF8;--site-fg:#111111;--site-line:#E7E7E4;--site-muted:#777777;--site-accent:#F5C400;min-height:100vh;background:#FAFAF8;color:#111111;overflow-x:hidden}
 .client-gallery-frame{width:min(100%,1440px);margin:0 auto;padding:28px clamp(16px,3vw,32px) 96px}
 .client-gallery-brand{display:inline-flex;flex-direction:column;font-size:13px;font-weight:700;letter-spacing:-.06em;margin-bottom:48px}
 .client-gallery-brand span{font-size:9px;letter-spacing:.12em;font-weight:500;color:#777777;margin-top:4px}
@@ -40,6 +40,8 @@ html{scroll-behavior:smooth}
 @keyframes client-shimmer{from{background-position:120% 0}to{background-position:-80% 0}}
 @media(prefers-reduced-motion:reduce){.justified-open,.justified-loading-cell{animation:none}.client-folder,.client-folder-cover img{animation:none}}
 @media(max-width:600px){
+  .client-gallery-links{gap:16px;margin:-24px 0 28px;flex-wrap:wrap}
+  .client-gallery-links a{font-size:10px}
   .client-setnav{display:none}
   .client-folder-arrow{opacity:1;transform:none}
 }
@@ -141,6 +143,13 @@ html{scroll-behavior:smooth}
 .client-review-foot{padding:14px 18px;flex-wrap:wrap}
 }
 .client-gallery-frame{padding-bottom:calc(24px + env(safe-area-inset-bottom,0px))}
+.client-gallery-links{display:flex;align-items:center;gap:24px;margin:-20px 0 34px}
+.client-gallery-links a{color:#777;font-size:11px;letter-spacing:.14em;text-transform:uppercase;border-bottom:1px solid #D8D8D2;padding-bottom:5px;transition:color .2s,border-color .2s}
+.client-gallery-links a:hover{color:#111;border-color:#111}
+.client-gallery-links span{color:#111;font-size:14px;margin-left:4px}
+.client-gallery .site-footer{margin-top:32px;padding-top:64px}
+.client-gallery .site-footer__grid{max-width:1440px;margin:0 auto}
+.client-gallery .site-footer__bottom{max-width:1440px;margin-left:auto;margin-right:auto}
 
 /* S8B.1 — client hero + set navigation */
 .client-hero.has-cover{position:relative;display:grid;place-items:center;aspect-ratio:16/9;max-height:70vh;overflow:hidden;background:#111;margin:0 0 44px}

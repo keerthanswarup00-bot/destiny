@@ -1,18 +1,42 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { GalleryGate } from "@/components/client-gallery/gallery-gate";
 import { GalleryOverview } from "@/components/client-gallery/gallery-overview";
 import { resolveGalleryAccess, viewerKeyHash } from "@/lib/gallery-access";
 import { galleryFolders, galleryFolderPhotos, galleryClient, selectedPhotoIds } from "@/lib/gallery-data";
+import { getSiteBranding, getSiteContact } from "@/lib/site/site-content";
+import { SiteFooter } from "@/components/public/site-footer";
+import { INSTAGRAM_URL } from "@/lib/site/social-links";
 
 export default async function ClientGalleryHome({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const access = await resolveGalleryAccess(slug);
   if (access.state === "unavailable") notFound();
-  if (access.state === "password") return <GalleryGate slug={access.slug} />;
-  const [folders, selected, client] = await Promise.all([
+  if (access.state === "password") {
+    const [branding, contact] = await Promise.all([getSiteBranding(), getSiteContact()]);
+    return (
+      <>
+        <GalleryGate slug={access.slug} />
+        <SiteFooter
+          brandName={branding.brand_name}
+          shortName={branding.short_name}
+          tagline={branding.tagline}
+          blurb={contact.description || "Intentional photography for celebrations, events, and the moments in between."}
+          email={contact.email}
+          phone={contact.phone}
+          whatsapp={contact.whatsapp}
+          location={contact.location}
+          instagram={contact.instagram}
+        />
+      </>
+    );
+  }
+  const [folders, selected, client, branding, contact] = await Promise.all([
     galleryFolders(access.gallery.id),
     selectedPhotoIds(access.gallery.id, await viewerKeyHash()),
     galleryClient(access.gallery.id),
+    getSiteBranding(),
+    getSiteContact(),
   ]);
   const sets = await Promise.all(folders.map(async folder => ({
     id: folder.id,
@@ -31,7 +55,8 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
   const heroImage = hero?.coverUrl ?? null;
 
   return (
-    <main className="client-gallery-frame">
+    <>
+      <main className="client-gallery-frame">
       {heroImage ? (
         <header className="client-hero has-cover">
           {/* Signed preview URL; next/image is a poor fit for short-lived tokens. */}
@@ -54,7 +79,23 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
           {access.gallery.description ? <p className="lede">{access.gallery.description}</p> : null}
         </header>
       )}
+      <nav className="client-gallery-links" aria-label="Destiny links">
+        <Link href="/">Visit website <span aria-hidden="true">↗</span></Link>
+        <a href={INSTAGRAM_URL} rel="noopener noreferrer" target="_blank">Visit Instagram <span aria-hidden="true">↗</span></a>
+      </nav>
       <GalleryOverview selectedIds={[...selected]} sets={sets} slug={access.gallery.slug} />
-    </main>
+      </main>
+      <SiteFooter
+        brandName={branding.brand_name}
+        shortName={branding.short_name}
+        tagline={branding.tagline}
+        blurb={contact.description || "Intentional photography for celebrations, events, and the moments in between."}
+        email={contact.email}
+        phone={contact.phone}
+        whatsapp={contact.whatsapp}
+        location={contact.location}
+        instagram={contact.instagram}
+      />
+    </>
   );
 }

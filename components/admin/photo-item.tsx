@@ -1,7 +1,13 @@
 "use client";
 
 import { useRef } from "react";
+import { useFormStatus } from "react-dom";
 import { deletePhoto, movePhotoToFolder } from "@/app/admin/crud-actions";
+
+function DeletePhotoButton() {
+  const { pending } = useFormStatus();
+  return <button className="admin-button is-danger" disabled={pending} type="submit">{pending ? "Deleting…" : "Delete"}</button>;
+}
 
 export function PhotoItem({
   photo,
@@ -49,7 +55,7 @@ export function PhotoItem({
           <input name="gallery_id" type="hidden" value={galleryId} />
           <menu>
             <button onClick={() => deleteDialog.current?.close()} type="button">Cancel</button>
-            <button className="admin-button">Delete</button>
+            <DeletePhotoButton />
           </menu>
         </form>
       </dialog>

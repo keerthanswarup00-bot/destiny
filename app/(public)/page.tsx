@@ -26,6 +26,11 @@ function formatEventDate(value?: string | null): string {
   return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+function galleryCategoryUrl(label: string): string {
+  const category = label.trim().toLowerCase().replace(/^weddings$/, "wedding");
+  return category ? `/gallery?category=${encodeURIComponent(category)}` : "/gallery";
+}
+
 export default async function Home() {
   const home = await getSiteHome();
   const [stories, contact] = await Promise.all([getSiteStories(), getSiteContact()]);
@@ -61,7 +66,7 @@ export default async function Home() {
           <div className="category-list">
             {home.whatWeDocument.items.map((item, index) => (
               <Reveal key={`${item.label}-${index}`} delay={index * 80}>
-                <Link href="/gallery" className="category-item">
+                <Link href={galleryCategoryUrl(item.label)} className="category-item">
                   <span className="category-item__name">{item.label}</span>
                   <span className="category-item__meta">
                     <span>{String(index + 1).padStart(2, "0")}</span>

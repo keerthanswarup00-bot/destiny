@@ -5,6 +5,22 @@ import { CLIENT_SIGNED_URL_SECONDS, DOWNLOAD_SIGNED_URL_SECONDS } from "@/lib/cl
 import { downloadObjectBytes, deleteObject, objectBytes, objectExists, uploadObject, createSignedGetUrl } from "@/lib/r2";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 
+const R2_DELETE_CONCURRENCY = 8;
+
+async function removeR2Objects(keys: string[]) {
+  const pending = [...new Set(keys.filter(Boolean))];
+  let next = 0;
+  async function worker() {
+    while (next < pending.length) {
+      const index = next++;
+      await deleteObject(pending[index]);
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(R2_DELETE_CONCURRENCY, pending.length) }, () => worker())
+  );
+}
+
 export type PhotoStore = {
   uploadPhoto(opts: { key: string; body: Buffer; contentType: string; metadata?: Record<string, string> }): Promise<void>;
   removePhotos(keys: string[]): Promise<void>;
@@ -71,15 +87,15 @@ const r2PhotoStore: PhotoStore = {
     return uploadObject({ key, body, contentType, metadata });
   },
   async removePhotos(keys) {
-    for (const key of keys) if (key) await deleteObject(key);
+    await removeR2Objects(keys);
     await supabasePhotoStore.removePhotos(keys);
   },
   async signedGetUrls(keys, seconds = CLIENT_SIGNED_URL_SECONDS) {
     const out = new Map<string, string>();
     for (const key of [...new Set(keys)]) {
-      if (await objectExists(key)) {
+      try {
         out.set(key, await createSignedGetUrl(key, seconds));
-      } else {
+      } catch {
         const supabaseUrl = (await supabasePhotoStore.signedGetUrls([key], seconds)).get(key);
         if (supabaseUrl) out.set(key, supabaseUrl);
       }

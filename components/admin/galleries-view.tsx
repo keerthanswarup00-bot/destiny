@@ -1,9 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { Lock, MoreHorizontal, Search, Trash2 } from "lucide-react";
 import { deleteGallery } from "@/app/admin/crud-actions";
+
+function DeleteGalleryButton() {
+  const { pending } = useFormStatus();
+  return <button className="admin-button is-danger" disabled={pending} type="submit">{pending ? "Deleting…" : "Delete Gallery"}</button>;
+}
 
 export type GalleryViewItem = {
   id: string;
@@ -74,7 +80,7 @@ export function GalleriesView({ items }: { items: GalleryViewItem[] }) {
           <input name="id" type="hidden" value={deleteItem?.id ?? ""} />
           <menu>
             <button onClick={() => setDeleteItem(null)} type="button">Cancel</button>
-            <button className="admin-button is-danger" type="submit">Delete Gallery</button>
+            <DeleteGalleryButton />
           </menu>
         </form>
       </dialog>

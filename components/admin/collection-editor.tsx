@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -41,6 +42,11 @@ import {
   setFolderPublished,
   setGalleryStatus,
 } from "@/app/admin/set-actions";
+
+function DeletePhotosButton() {
+  const { pending } = useFormStatus();
+  return <button className="admin-button is-danger" disabled={pending} type="submit">{pending ? "Deleting…" : "Delete"}</button>;
+}
 
 type EditorFolder = {
   id: string;
@@ -566,7 +572,7 @@ export function CollectionEditor({
               {[...selected].map(id => <input key={id} name="ids" type="hidden" value={id} />)}
               <input name="gallery_id" type="hidden" value={gallery.id} />
               {activeFolder ? <input name="folder_id" type="hidden" value={activeFolder.id} /> : null}
-              <button className="admin-button is-danger" type="submit">Delete</button>
+              <DeletePhotosButton />
             </form>
           </div>
         </div>

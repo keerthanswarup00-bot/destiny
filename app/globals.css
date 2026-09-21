@@ -536,6 +536,10 @@ img {
   color: rgba(255, 255, 255, 0.78);
 }
 
+.hero__lede--mobile {
+  display: none;
+}
+
 .hero__actions {
   display: flex;
   flex-wrap: wrap;
@@ -1696,8 +1700,8 @@ img {
   }
 
   .hero {
-    height: min(760px, 92svh);
-    min-height: 540px;
+    height: min(700px, 88svh);
+    min-height: 500px;
     margin-top: -64px;
   }
 
@@ -1713,7 +1717,7 @@ img {
 
   .hero-content {
     width: 100%;
-    padding: 0 20px 42px;
+    padding: 0 20px 34px;
   }
 
   .hero .eyebrow {
@@ -1724,7 +1728,7 @@ img {
 
   .hero h1 {
     max-width: 16ch;
-    margin: 0 0 18px;
+    margin: 0 0 14px;
     font-size: clamp(38px, 10.5vw, 54px);
     line-height: 0.98;
     letter-spacing: -0.045em;
@@ -1732,13 +1736,22 @@ img {
 
   .hero__lede {
     max-width: 34ch;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
     font-size: 14px;
     line-height: 1.5;
   }
 
+  .hero__lede--desktop {
+    display: none;
+  }
+
+  .hero__lede--mobile {
+    display: block;
+  }
+
   .hero__actions {
-    align-items: stretch;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
   }
 
@@ -1747,11 +1760,28 @@ img {
   }
 
   .hero__actions .button {
-    width: 100%;
+    width: auto;
     min-height: 48px;
-    justify-content: space-between;
-    padding: 15px 17px;
-    font-size: 11px;
+    justify-content: center;
+    padding: 13px 10px;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-align: center;
+  }
+
+  .cta {
+    padding-bottom: clamp(110px, 30vw, 150px);
+  }
+
+  .cta::after {
+    right: 50%;
+    bottom: 0.12em;
+    transform: translateX(50%);
+    width: 100%;
+    font-size: clamp(72px, 20vw, 120px);
+    letter-spacing: -0.06em;
+    text-align: center;
+    white-space: nowrap;
   }
 
   .site-footer__grid {
@@ -1801,6 +1831,11 @@ img {
   .hero h1 {
     font-size: clamp(36px, 10.7vw, 46px);
     max-width: 17ch;
+  }
+
+  .hero__actions .button {
+    padding-inline: 7px;
+    font-size: 9px;
   }
 }
 

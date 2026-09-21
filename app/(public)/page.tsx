@@ -51,7 +51,10 @@ export default async function Home() {
         <div className="hero-content">
           <p className="eyebrow hero__in" style={heroDelay(140)}>{home.hero.eyebrow}</p>
           <h1 className="hero__in" style={heroDelay(240)}>{heroHeading}</h1>
-          <p className="hero__lede hero__in" style={heroDelay(340)}>{home.hero.description}</p>
+          <p className="hero__lede hero__lede--desktop hero__in" style={heroDelay(340)}>{home.hero.description}</p>
+          <p className="hero__lede hero__lede--mobile hero__in" style={heroDelay(340)}>
+            Timeless imagery for weddings, events, and celebrations.
+          </p>
           <div className="hero__actions hero__in" style={heroDelay(440)}>
             <Link className="button light" href={home.hero.primary_url}>{home.hero.primary_label} <span>→</span></Link>
             <Link className="button ghost" href={home.hero.secondary_url}>{home.hero.secondary_label}</Link>

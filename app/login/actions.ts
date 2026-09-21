@@ -27,12 +27,13 @@ export async function signIn(_: LoginState, formData: FormData): Promise<LoginSt
     return { error: "Administrator sign-in is not configured on the server." };
   }
 
-  if (isRateLimited(username)) {
+  const isConfiguredAccount = username.toLowerCase() === stored.username.toLowerCase();
+  if (await isRateLimited(username, isConfiguredAccount)) {
     return { error: "Too many failed attempts. Try again in a few minutes." };
   }
 
   if (!credentialsMatch({ username, password }, stored)) {
-    await wrongAdminCredentials(username);
+    await wrongAdminCredentials(username, isConfiguredAccount);
     return { error: "Incorrect administrator username or password." };
   }
 

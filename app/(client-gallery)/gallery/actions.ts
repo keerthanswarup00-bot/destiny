@@ -16,6 +16,16 @@ const GENERIC_FAILURE = "Unable to open this gallery.";
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_FAILURES = 8;
 
+function sharedPhotoOrigin() {
+  const configuredHost = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+  if (!configuredHost && process.env.NODE_ENV === "production") {
+    throw new Error("shared-photo-origin-not-configured");
+  }
+  const origin = new URL(`https://${configuredHost || "localhost:3000"}`);
+  if (process.env.NODE_ENV !== "production") origin.protocol = "http:";
+  return origin.origin;
+}
+
 async function requestFingerprint() {
   const headerList = await headers();
   const forwarded = headerList.get("x-forwarded-for")?.split(",")[0]?.trim();
@@ -153,10 +163,7 @@ export async function shareGalleryPhoto(form: FormData) {
     if (!photo) return { url: null, error: "That photograph is unavailable." };
     const token = await ensurePhotoShareToken(gallery.id, photo.id);
     if (!token) return { url: null, error: "A share link could not be created." };
-    const headerList = await headers();
-    const host = headerList.get("x-forwarded-host") || headerList.get("host") || "localhost:3000";
-    const proto = headerList.get("x-forwarded-proto") || "http";
-    return { url: `${proto}://${host}/p/${token}`, error: null };
+    return { url: `${sharedPhotoOrigin()}/p/${token}`, error: null };
   } catch {
     return { url: null, error: "A share link could not be created." };
   }

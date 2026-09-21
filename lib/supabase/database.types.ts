@@ -375,7 +375,25 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      check_admin_login_rate_limit: {
+        Args: {
+          p_account_key: string | null;
+          p_account_limit: number;
+          p_network_key: string | null;
+          p_network_limit: number;
+          p_window_minutes: number;
+        };
+        Returns: boolean;
+      };
       is_admin: { Args: Record<string, never>; Returns: boolean };
+      record_admin_login_failure: {
+        Args: {
+          p_account_key: string | null;
+          p_network_key: string | null;
+          p_window_minutes: number;
+        };
+        Returns: undefined;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

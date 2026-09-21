@@ -144,6 +144,15 @@
 .website-gallery-actions button:disabled{opacity:.55;cursor:wait}
 .website-gallery-actions + .form-success,.form-success{color:#52745b;font-size:12px;margin:0 0 12px}
 @media (max-width: 640px){.website-gallery-actions{align-items:flex-start;flex-direction:column}.website-gallery-actions .admin-button{width:100%}}
+.settings-directory{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;border:1px solid #e7e7e4;background:#e7e7e4}
+.settings-directory-item{position:relative;display:grid;gap:9px;min-height:170px;padding:26px;background:#fff;color:#111;text-decoration:none}
+.settings-directory-item:hover{background:#fafaf8}
+.settings-directory-item .eyebrow{margin:0;color:#888;font-size:10px}
+.settings-directory-item strong{font-size:20px;letter-spacing:-.04em;font-weight:500}
+.settings-directory-item>span:not(.eyebrow){max-width:34ch;color:#777;font-size:13px;line-height:1.5}
+.settings-directory-item b{position:absolute;right:24px;bottom:22px;color:#111;font-size:18px;font-weight:400}
+.account-card{max-width:520px;display:flex;align-items:center;justify-content:space-between;gap:20px}
+
 .gallery-form-actions{display:flex;align-items:center;justify-content:flex-end;gap:12px}.gallery-create-trigger{display:inline-flex;align-items:center;background:#111;color:#fff}.gallery-create-dialog{width:min(480px,92vw)}.gallery-create-dialog form{padding:28px}.gallery-create-dialog h2{margin:0 0 2px}
 .gallery-no-clients{display:grid;gap:14px;padding:28px}.gallery-no-clients h2{margin:0;font-size:20px}.gallery-no-clients p{margin:0;color:var(--muted);font-size:14px}.gallery-no-clients .subtle-button{justify-self:end}
 @media(max-width:900px){.gallery-list-row{grid-template-columns:minmax(180px,1fr) auto auto}.gallery-list-row>.status-pill,.gallery-list-row>svg{display:none}}

@@ -32,6 +32,10 @@ const groups: { label: string; links: NavLink[] }[] = [
     label: "Website",
     links: [{ label: "Settings", href: "/admin/settings", icon: Settings }],
   },
+  {
+    label: "System",
+    links: [{ label: "Account", href: "/admin/account", icon: UserRound }],
+  },
 ];
 
 function isActive(path: string, href: string): boolean {
@@ -68,18 +72,8 @@ export function AdminNav({ collapsed }: { collapsed: boolean }) {
 }
 
 export function AdminBottomNav({ collapsed }: { collapsed: boolean }) {
-  const path = usePathname();
   return (
     <div className="admin-bottom">
-      <Link
-        aria-current={path === "/admin/settings" ? "page" : undefined}
-        className={path === "/admin/settings" ? "active" : undefined}
-        href="/admin/settings"
-        title={collapsed ? "Account" : undefined}
-      >
-        <UserRound className="nav-icon" size={18} strokeWidth={1.8} />
-        <span>Account</span>
-      </Link>
       <form action={signOut}>
         <button title={collapsed ? "Log out" : undefined} type="submit">
           <LogOut className="nav-icon" size={18} strokeWidth={1.8} />

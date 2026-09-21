@@ -3,7 +3,7 @@
 import { ImageIcon, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { uploadWebsiteGalleryImages } from "@/app/admin/website/actions";
+import { completeWebsiteGalleryUpload, prepareWebsiteGalleryUpload, uploadWebsiteGalleryImages } from "@/app/admin/website/actions";
 
 export function WebsiteGalleryUploader() {
   const router = useRouter();
@@ -22,10 +22,37 @@ export function WebsiteGalleryUploader() {
       const form = new FormData();
       for (const file of Array.from(files)) form.append("files", file);
       form.set("category", category);
-      const result = await uploadWebsiteGalleryImages(form);
+      const directResult = await uploadFilesDirectly(files);
+      const result = directResult.fallback ? await uploadWebsiteGalleryImages(form) : directResult;
       if (!result.ok) {
         setError(result.message ?? "Upload failed.");
         return;
+      }
+
+      async function uploadFilesDirectly(files: FileList | File[]): Promise<{ ok: boolean; message?: string; fallback?: boolean }> {
+        const selectedFiles = Array.from(files);
+        if (!selectedFiles.length) return { ok: false, message: "Upload failed: no file selected." };
+        for (const file of selectedFiles) {
+          const preparation = new FormData();
+          preparation.set("filename", file.name);
+          preparation.set("mime_type", file.type);
+          preparation.set("bytes", String(file.size));
+          preparation.set("category", category);
+          const prepared = await prepareWebsiteGalleryUpload(preparation);
+          if (!prepared.ok) return prepared;
+          const response = await fetch(prepared.uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+          if (!response.ok) return { ok: false, message: `Upload failed: R2 rejected ${file.name}.` };
+          const completion = new FormData();
+          completion.set("id", prepared.id);
+          completion.set("key", prepared.key);
+          completion.set("filename", file.name);
+          completion.set("mime_type", file.type);
+          completion.set("bytes", String(file.size));
+          completion.set("category", category);
+          const completed = await completeWebsiteGalleryUpload(completion);
+          if (!completed.ok) return completed;
+        }
+        return { ok: true, fallback: false };
       }
       router.refresh();
     } catch (uploadError) {

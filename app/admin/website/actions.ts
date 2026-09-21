@@ -6,6 +6,7 @@ import { adminDb } from "@/lib/admin-data";
 import { ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES } from "@/lib/admin-validation";
 import { ensureWebsiteGallery, normalizeWebsiteGalleryCategory, websiteGalleryId, websiteImageKey } from "@/lib/site/website-gallery";
 import { photoStore } from "@/lib/storage-provider";
+import { createSignedPutUrl } from "@/lib/r2";
 
 const value = (form: FormData, key: string) => String(form.get(key) ?? "");
 const checked = (form: FormData, key: string) => value(form, key) === "on";
@@ -46,6 +47,82 @@ const extByMime: Record<string, string> = {
   "image/webp": "webp",
   "image/gif": "gif",
 };
+
+type WebsiteUploadPreparation = {
+  ok: true;
+  id: string;
+  key: string;
+  uploadUrl: string;
+} | {
+  ok: false;
+  message: string;
+  fallback?: boolean;
+};
+
+function isR2Provider() {
+  return process.env.PHOTO_STORAGE_PROVIDER?.trim().toLowerCase() === "r2";
+}
+
+export async function prepareWebsiteGalleryUpload(form: FormData): Promise<WebsiteUploadPreparation> {
+  const filename = value(form, "filename").trim();
+  const mimeType = value(form, "mime_type");
+  const bytes = Number(value(form, "bytes"));
+  const categoryValue = value(form, "category");
+  const category = normalizeWebsiteGalleryCategory(categoryValue);
+  if (!filename || !mimeType || !Number.isFinite(bytes) || bytes <= 0) return { ok: false, message: "Upload failed: invalid file metadata." };
+  if (!(ALLOWED_PHOTO_TYPES as readonly string[]).includes(mimeType) || bytes > MAX_PHOTO_BYTES) {
+    return { ok: false, message: "Upload failed: use JPEG, PNG, WebP, or GIF images up to 15MB." };
+  }
+  if (categoryValue && !category) return { ok: false, message: "Upload failed: choose a valid category." };
+  if (!isR2Provider()) return { ok: false, message: "Direct upload is unavailable for the configured storage provider.", fallback: true };
+  const supabase = await db();
+  const target = await ensureWebsiteGallery(supabase);
+  if (!target) return { ok: false, message: "Upload failed: could not prepare the Website Gallery." };
+  const id = crypto.randomUUID();
+  const ext = extByMime[mimeType] ?? "png";
+  const key = websiteImageKey(id, ext);
+  try {
+    return { ok: true, id, key, uploadUrl: await createSignedPutUrl(key, mimeType) };
+  } catch {
+    return { ok: false, message: "Upload failed: R2 storage is unavailable." };
+  }
+}
+
+export async function completeWebsiteGalleryUpload(form: FormData): Promise<{ ok: boolean; message?: string }> {
+  const id = value(form, "id");
+  const key = value(form, "key");
+  const filename = value(form, "filename").trim();
+  const mimeType = value(form, "mime_type");
+  const bytes = Number(value(form, "bytes"));
+  const categoryValue = value(form, "category");
+  const category = normalizeWebsiteGalleryCategory(categoryValue);
+  if (!id || !key || !filename || !mimeType || !Number.isFinite(bytes)) return { ok: false, message: "Upload failed: invalid file metadata." };
+  if (categoryValue && !category) return { ok: false, message: "Upload failed: choose a valid category." };
+  const supabase = await db();
+  const target = await ensureWebsiteGallery(supabase);
+  if (!target) return { ok: false, message: "Upload failed: could not prepare the Website Gallery." };
+  const { count } = await supabase.from("photos").select("id", { count: "exact", head: true }).eq("gallery_id", target.galleryId);
+  const { error } = await supabase.from("photos").insert({
+    id,
+    gallery_id: target.galleryId,
+    folder_id: target.folderId,
+    filename: filename.slice(0, 500),
+    original_path: key,
+    mime_type: mimeType,
+    bytes,
+    category: category ?? null,
+    published_category: null,
+    published: false,
+    pending_delete: false,
+    sort_order: (count ?? 0) + 1,
+  });
+  if (error) {
+    try { await photoStore().removePhotos([key]); } catch { /* preserve database error */ }
+    return { ok: false, message: "Upload failed: the photo record could not be created." };
+  }
+  revalidate();
+  return { ok: true };
+}
 
 async function receiveAsset(form: FormData, field: string, previous: Record<string, unknown>): Promise<Record<string, unknown>> {
   const file = form.get(field);

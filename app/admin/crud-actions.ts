@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/auth";
 import { adminDb } from "@/lib/admin-data";
 import { ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES, clientSchema, folderSchema, gallerySchema, photoUploadSchema, slugify } from "@/lib/admin-validation";
 import { photoStore } from "@/lib/storage-provider";
+import { createSignedPutUrl, downloadObjectBytes, objectBytes } from "@/lib/r2";
 import { hashGalleryPassword } from "@/lib/gallery-password";
 const value = (form: FormData, key: string) => String(form.get(key) ?? "");
 async function db() { await requireAdmin(); return adminDb(); }
@@ -51,12 +52,157 @@ function galleryFail(gallery: string, code: string) { return redirect(`/admin/ga
 function storageFilename(filename: string) { const trimmed=filename.trim().slice(0,500); const dot=trimmed.lastIndexOf("."); const ext=dot>0?trimmed.slice(dot).toLowerCase().replace(/[^a-z0-9.]/g,""):""; return `${slugify(dot>0?trimmed.slice(0,dot):trimmed)||"photo"}${ext}`; }
 const THUMBNAIL_LONG_EDGE = 640;
 const PREVIEW_LONG_EDGE = 2400;
+const isR2Provider = () => process.env.PHOTO_STORAGE_PROVIDER?.trim().toLowerCase() === "r2";
 
 async function createDerivative(body: Buffer, longEdge: number, quality: number): Promise<Buffer> {
   return sharp(body)
     .resize({ width: longEdge, height: longEdge, fit: "inside", withoutEnlargement: true })
     .webp({ quality })
     .toBuffer();
+}
+
+type ClientGalleryUploadPreparation = {
+  ok: true;
+  id: string;
+  key: string;
+  uploadUrl: string;
+} | {
+  ok: false;
+  message: string;
+  fallback?: boolean;
+};
+
+function photoMetadata(form: FormData) {
+  return {
+    gallery: value(form, "gallery_id"),
+    folder: value(form, "folder_id"),
+    filename: value(form, "filename").trim(),
+    mimeType: value(form, "mime_type"),
+    bytes: Number(value(form, "bytes")),
+  };
+}
+
+function validPhotoMetadata({ filename, mimeType, bytes }: ReturnType<typeof photoMetadata>) {
+  return Boolean(
+    filename &&
+    Number.isFinite(bytes) &&
+    bytes > 0 &&
+    (ALLOWED_PHOTO_TYPES as readonly string[]).includes(mimeType) &&
+    bytes <= MAX_PHOTO_BYTES,
+  );
+}
+
+function clientPhotoPaths(gallery: string, folder: string, id: string, filename: string) {
+  return {
+    original: `${gallery}/${folder}/${id}/${storageFilename(filename)}`,
+    thumbnail: `${gallery}/${folder}/${id}/thumbnail.webp`,
+    preview: `${gallery}/${folder}/${id}/preview.webp`,
+  };
+}
+
+export async function prepareClientGalleryUpload(form: FormData): Promise<ClientGalleryUploadPreparation> {
+  const metadata = photoMetadata(form);
+  const parsed = photoUploadSchema.safeParse({ gallery_id: metadata.gallery, folder_id: metadata.folder });
+  if (!parsed.success || !validPhotoMetadata(metadata)) {
+    return { ok: false, message: "Upload failed: use JPEG, PNG, WebP, or GIF images up to 15MB." };
+  }
+  const supabase = await db();
+  const { data: folder } = await supabase
+    .from("folders")
+    .select("id")
+    .eq("id", parsed.data.folder_id)
+    .eq("gallery_id", parsed.data.gallery_id)
+    .maybeSingle();
+  if (!folder) return { ok: false, message: "Upload failed: the selected folder is unavailable." };
+  if (!isR2Provider()) {
+    return { ok: false, message: "Direct upload is unavailable for the configured storage provider.", fallback: true };
+  }
+  const id = crypto.randomUUID();
+  const key = clientPhotoPaths(parsed.data.gallery_id, folder.id, id, metadata.filename).original;
+  try {
+    return { ok: true, id, key, uploadUrl: await createSignedPutUrl(key, metadata.mimeType) };
+  } catch {
+    return { ok: false, message: "Upload failed: R2 storage is unavailable." };
+  }
+}
+
+export async function completeClientGalleryUpload(form: FormData): Promise<{ ok: boolean; message?: string }> {
+  const metadata = photoMetadata(form);
+  const id = value(form, "id");
+  const parsed = photoUploadSchema.safeParse({ gallery_id: metadata.gallery, folder_id: metadata.folder });
+  if (!parsed.success || !id || !/^[0-9a-f-]{36}$/i.test(id) || !validPhotoMetadata(metadata)) {
+    return { ok: false, message: "Upload failed: invalid photo metadata." };
+  }
+  if (!isR2Provider()) return { ok: false, message: "Upload failed: R2 storage is unavailable." };
+  const supabase = await db();
+  const { data: folder } = await supabase
+    .from("folders")
+    .select("id")
+    .eq("id", parsed.data.folder_id)
+    .eq("gallery_id", parsed.data.gallery_id)
+    .maybeSingle();
+  if (!folder) return { ok: false, message: "Upload failed: the selected folder is unavailable." };
+  const paths = clientPhotoPaths(parsed.data.gallery_id, folder.id, id, metadata.filename);
+  if (value(form, "key") !== paths.original) return { ok: false, message: "Upload failed: invalid storage path." };
+  if (await objectBytes(paths.original) !== metadata.bytes) return { ok: false, message: "Upload failed: the original file was not stored." };
+  const body = await downloadObjectBytes(paths.original);
+  if (!body) return { ok: false, message: "Upload failed: the original file could not be read." };
+  const { count } = await supabase
+    .from("photos")
+    .select("id", { count: "exact", head: true })
+    .eq("gallery_id", parsed.data.gallery_id)
+    .eq("folder_id", folder.id);
+  const uploadedPaths = [paths.original];
+  let width: number | null = null;
+  let height: number | null = null;
+  try {
+    const imageMetadata = await sharp(body).metadata();
+    width = imageMetadata.width ?? null;
+    height = imageMetadata.height ?? null;
+  } catch {
+    // Preserve the original upload when metadata extraction is unavailable.
+  }
+  try {
+    await photoStore().uploadPhoto({
+      key: paths.thumbnail,
+      body: await createDerivative(body, THUMBNAIL_LONG_EDGE, 80),
+      contentType: "image/webp",
+    });
+    uploadedPaths.push(paths.thumbnail);
+  } catch {
+    // Derivatives are best effort; the original remains usable.
+  }
+  try {
+    await photoStore().uploadPhoto({
+      key: paths.preview,
+      body: await createDerivative(body, PREVIEW_LONG_EDGE, 85),
+      contentType: "image/webp",
+    });
+    uploadedPaths.push(paths.preview);
+  } catch {
+    // Derivatives are best effort; the original remains usable.
+  }
+  const { error } = await supabase.from("photos").insert({
+    id,
+    gallery_id: parsed.data.gallery_id,
+    folder_id: folder.id,
+    filename: metadata.filename.slice(0, 500) || storageFilename(metadata.filename),
+    original_path: paths.original,
+    preview_path: uploadedPaths.includes(paths.preview) ? paths.preview : null,
+    thumbnail_path: uploadedPaths.includes(paths.thumbnail) ? paths.thumbnail : null,
+    width,
+    height,
+    mime_type: metadata.mimeType,
+    bytes: metadata.bytes,
+    sort_order: count ?? 0,
+  });
+  if (error) {
+    try { await photoStore().removePhotos(uploadedPaths); } catch { /* Preserve the database failure. */ }
+    return { ok: false, message: "Upload failed: the photo record could not be created." };
+  }
+  revalidatePath(`/admin/galleries/${parsed.data.gallery_id}`);
+  revalidatePath(`/admin/galleries/${parsed.data.gallery_id}/${folder.id}`);
+  return { ok: true };
 }
 
 export async function uploadPhotos(form: FormData) {

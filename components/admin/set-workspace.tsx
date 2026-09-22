@@ -15,8 +15,9 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { deletePhotos, movePhotos, uploadPhotosAsync } from "@/app/admin/crud-actions";
+import { deletePhotos, movePhotos } from "@/app/admin/crud-actions";
 import { setFolderCover, setFolderPublished } from "@/app/admin/set-actions";
+import { uploadClientGalleryFiles } from "@/components/admin/client-gallery-upload";
 
 type WorkspacePhoto = { id: string; filename: string; width: number | null; height: number | null; src: string; downloadUrl: string };
 type MoveTarget = { id: string; name: string };
@@ -35,6 +36,7 @@ export function SetWorkspace({
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -55,13 +57,13 @@ export function SetWorkspace({
   async function uploadFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
     setUploading(files.length);
+    setUploadError(null);
     setDragOver(false);
     try {
-      const form = new FormData();
-      form.append("gallery_id", gallery.id);
-      form.append("folder_id", folder.id);
-      for (const file of Array.from(files)) form.append("files", file);
-      await uploadPhotosAsync(form);
+      const result = await uploadClientGalleryFiles(files, { galleryId: gallery.id, folderId: folder.id });
+      if (!result.ok) setUploadError(result.message);
+    } catch (uploadError) {
+      setUploadError(uploadError instanceof Error && uploadError.message ? uploadError.message : "Upload failed. Please try again.");
     } finally {
       setUploading(0);
       setShowUpload(false);
@@ -136,6 +138,7 @@ export function SetWorkspace({
           Uploading {uploading} {uploading === 1 ? "photo" : "photos"}…
         </div>
       ) : null}
+      {uploadError ? <p className="form-error" role="alert">{uploadError}</p> : null}
 
       <input
         accept="image/jpeg,image/png,image/webp,image/gif"

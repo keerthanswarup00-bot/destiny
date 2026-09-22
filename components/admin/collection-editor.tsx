@@ -34,7 +34,6 @@ import {
   deletePhotos,
   movePhotos,
   renameFolder,
-  uploadPhotosAsync,
 } from "@/app/admin/crud-actions";
 import {
   moveFolder,
@@ -42,6 +41,7 @@ import {
   setFolderPublished,
   setGalleryStatus,
 } from "@/app/admin/set-actions";
+import { uploadClientGalleryFiles } from "@/components/admin/client-gallery-upload";
 
 function DeletePhotosButton() {
   const { pending } = useFormStatus();
@@ -98,6 +98,7 @@ export function CollectionEditor({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [uploading, setUploading] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [moreMenuFor, setMoreMenuFor] = useState<string | null>(null);
@@ -157,13 +158,13 @@ export function CollectionEditor({
   async function uploadFiles(files: FileList | null) {
     if (!files || files.length === 0 || !activeFolder) return;
     setUploading(files.length);
+    setUploadError(null);
     setDragOver(false);
     try {
-      const form = new FormData();
-      form.append("gallery_id", gallery.id);
-      form.append("folder_id", activeFolder.id);
-      for (const file of Array.from(files)) form.append("files", file);
-      await uploadPhotosAsync(form);
+      const result = await uploadClientGalleryFiles(files, { galleryId: gallery.id, folderId: activeFolder.id });
+      if (!result.ok) setUploadError(result.message);
+    } catch (uploadError) {
+      setUploadError(uploadError instanceof Error && uploadError.message ? uploadError.message : "Upload failed. Please try again.");
     } finally {
       setUploading(0);
       router.refresh();
@@ -227,7 +228,7 @@ export function CollectionEditor({
             </button>
             {toolbarMenuOpen ? (
               <div className="menu ce-more-menu" role="menu">
-                <a href="#gallery-form" onClick={() => setToolbarMenuOpen(false)} role="menuitem"><Settings size={14} strokeWidth={1.8} /> Gallery settings</a>
+                <a href="#gallery-settings" onClick={() => setToolbarMenuOpen(false)} role="menuitem"><Settings size={14} strokeWidth={1.8} /> Gallery settings</a>
               </div>
             ) : null}
           </div>
@@ -271,8 +272,8 @@ export function CollectionEditor({
           </div>
           <nav aria-label="Collection sections" className="ce-iconnav">
             <span className="active" title="Photos"><ImageIcon size={16} strokeWidth={1.8} /><span>Photos</span></span>
-            <a href="#gallery-form" title="Collection settings"><Settings size={16} strokeWidth={1.8} /><span>Settings</span></a>
-            <a href="#share-panel" title="Share"><Share2 size={16} strokeWidth={1.8} /><span>Share</span></a>
+            <a href="#gallery-settings" title="Collection settings"><Settings size={16} strokeWidth={1.8} /><span>Settings</span></a>
+            <a href="#settings-sharing" title="Share"><Share2 size={16} strokeWidth={1.8} /><span>Share</span></a>
           </nav>
           <div className="ce-setlist-head">
             <span>Sets</span>
@@ -400,6 +401,7 @@ export function CollectionEditor({
                   Uploading {uploading} {uploading === 1 ? "photo" : "photos"}…
                 </div>
               ) : null}
+              {uploadError ? <p className="form-error" role="alert">{uploadError}</p> : null}
               {!uploading && dragOver ? (
                 <div
                   className="upload-zone is-dragging"

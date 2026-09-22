@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
-import { GalleryForm } from "@/components/admin/gallery-form";
 import { CollectionEditor } from "@/components/admin/collection-editor";
+import { GallerySettings } from "@/components/admin/gallery-settings";
 import { adminDb } from "@/lib/admin-data";
 import { adminError } from "@/lib/admin-validation";
 import { photoStore } from "@/lib/storage-provider";
@@ -64,45 +64,49 @@ for (const folder of folders ?? []) {
 
   return (
     <>
-      <CollectionEditor
-        error={folderError}
-        coverUrl={coverUrl}
-        coversByFolder={coversByFolder}
-        folders={(folders ?? []).map(folder => ({
-          id: folder.id,
-          name: folder.name,
-          slug: folder.slug,
-          description: folder.description,
-          published: folder.published,
-          coverPhotoId: folder.cover_photo_id,
-        }))}
+      <div id="gallery-workspace">
+        <CollectionEditor
+          error={folderError}
+          coverUrl={coverUrl}
+          coversByFolder={coversByFolder}
+          folders={(folders ?? []).map(folder => ({
+            id: folder.id,
+            name: folder.name,
+            slug: folder.slug,
+            description: folder.description,
+            published: folder.published,
+            coverPhotoId: folder.cover_photo_id,
+          }))}
+          gallery={{
+            id: gallery.id,
+            title: gallery.title,
+            slug: gallery.slug,
+            status: gallery.status,
+            description: gallery.description,
+            createdAt: gallery.created_at,
+            clientName: client?.name ?? null,
+            clientId: client?.id ?? null,
+            passwordProtected: Boolean(gallery.password_hash),
+          }}
+          photosByFolder={photosByFolder}
+          shareUrl={shareUrl}
+        />
+      </div>
+      <GallerySettings
+        clients={clients ?? []}
+        error={galleryError}
         gallery={{
           id: gallery.id,
           title: gallery.title,
           slug: gallery.slug,
-          status: gallery.status,
           description: gallery.description,
-          createdAt: gallery.created_at,
+          clientId: gallery.client_id,
           clientName: client?.name ?? null,
-          clientId: client?.id ?? null,
+          status: gallery.status,
           passwordProtected: Boolean(gallery.password_hash),
         }}
-        photosByFolder={photosByFolder}
         shareUrl={shareUrl}
       />
-      <section className="admin-content editor-settings">
-        <GalleryForm
-          clients={clients ?? []}
-          error={galleryError}
-          gallery={{ id: gallery.id, title: gallery.title, slug: gallery.slug, description: gallery.description, client_id: gallery.client_id, status: gallery.status, passwordProtected: Boolean(gallery.password_hash) }}
-        />
-        <aside className="admin-panel settings-card" id="share-panel">
-          <h2>Share collection</h2>
-          <label>Share link<div className="copy-field"><input readOnly value={shareUrl} /></div></label>
-          <p className="empty">{gallery.password_hash ? "A password is currently required to open this collection." : "No password is set — the link opens directly."}</p>
-          <p className="empty">{gallery.status === "published" ? "The link is live and ready to share with your client." : "Publish the gallery when you are ready to make the link live."}</p>
-        </aside>
-      </section>
     </>
   );
 }

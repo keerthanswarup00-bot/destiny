@@ -353,8 +353,6 @@
 .ce-empty .muted{margin:4px 0 0}
 .admin-button.is-static{opacity:.55;cursor:not-allowed;pointer-events:none}
 .admin-dialog::backdrop{background:rgba(17,17,17,.3)}
-.editor-settings{display:grid;grid-template-columns:1.4fr 1fr;gap:24px;align-items:start;padding-top:48px}
-.editor-settings #submitted-selections{grid-column:1/-1}
 .galleries-actions{display:flex;gap:10px;flex-wrap:wrap}
 @media(max-width:760px){
 .collection-editor{height:auto;grid-template-rows:auto auto}
@@ -377,7 +375,6 @@
 .ce-workspace{padding:16px 12px 52px}
 .ce-workspace-head{align-items:flex-start}
 .ce-photo-grid{grid-template-columns:1fr 1fr;gap:4px}
-.editor-settings{grid-template-columns:1fr;padding-top:32px}
 }
 @media(max-width:430px){
 .ce-toolbar-actions .admin-button{padding:10px 11px}
@@ -530,4 +527,76 @@
 }
 @media(max-width:600px){
 .photos-grid{grid-template-columns:1fr}
+}
+
+/* P9 — gallery settings page */
+.gs-page{border-top:1px solid #ECECE9;background:#fff}
+.gs-page,#gallery-workspace{scroll-margin-top:0}
+.gs-shell{max-width:960px;margin:0 auto;padding:52px 24px 96px;box-sizing:border-box}
+.gs-main-form{display:grid;gap:20px}
+.gs-header{display:flex;align-items:flex-start;justify-content:space-between;gap:22px;margin-bottom:4px}
+.gs-heading{min-width:0}
+.gs-back{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:500;color:#555;text-decoration:none;margin-bottom:14px}
+.gs-back:hover{color:#111}
+.gs-crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:#8b8b8b;margin:0 0 10px}
+.gs-crumbs a{color:#727272;text-decoration:none;border-bottom:1px solid transparent}
+.gs-crumbs a:hover{color:#111;border-bottom-color:#d4d4cd}
+.gs-header h1{margin:0;font-size:30px;letter-spacing:-.04em;line-height:1.05;color:#111}
+.gs-lede{margin:8px 0 0;color:#6e6e6e;font-size:14px;line-height:1.5;max-width:52ch}
+.gs-save-button{background:#111;color:#fff;border-radius:5px;padding:12px 18px;font-weight:600;letter-spacing:.01em;flex:none}
+.gs-save-button:hover{background:var(--yellow);color:#000}
+.gs-save-button:disabled{opacity:.6;cursor:wait}
+.gs-card{border:1px solid #E7E7E4;background:#fff;border-radius:10px;overflow:hidden;scroll-margin-top:16px}
+.gs-card-head{padding:20px 22px 0}
+.gs-card-head h2{margin:0;font-size:15px;letter-spacing:-.01em;color:#111}
+.gs-card-head p{margin:5px 0 0;color:#6e6e6e;font-size:12.5px}
+.gs-card-body{padding:20px 22px 24px;display:grid;gap:18px}
+.gs-field{display:grid;gap:7px;min-width:0}
+.gs-field>label,.gs-field-label{font-size:12.5px;font-weight:600;color:#2c2c2c;letter-spacing:.01em}
+.gs-field input[type=text],.gs-field input[type=search],.gs-field select,.gs-field textarea,.gs-password>input{border:1px solid #ddd;background:#fff;padding:11px 12px;font-size:14px;color:#111;width:100%;box-sizing:border-box;border-radius:5px;font-weight:400;font-family:inherit}
+.gs-field input[type=text]:focus,.gs-field select:focus,.gs-field textarea:focus,.gs-password>input:focus{outline:0;border-color:#111}
+.gs-field textarea{resize:vertical;line-height:1.55}
+.gs-status{border:0;margin:0;padding:0;display:grid;gap:12px;min-width:0}
+.gs-status legend{font-size:12.5px;font-weight:600;color:#2c2c2c;letter-spacing:.01em;padding:0;margin:0}
+.gs-status-options{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.gs-status-options label{position:relative;display:grid;gap:3px;border:1px solid #ddd;border-radius:8px;padding:13px 15px;cursor:pointer;transition:border-color .15s ease,background .15s ease,box-shadow .15s ease}
+.gs-status-options label:hover{border-color:#b8b8b2}
+.gs-status-options label.is-active{border-color:#111;background:#FAFAF8;box-shadow:0 0 0 1px #111 inset}
+.gs-status-options input{position:absolute;opacity:0;pointer-events:none}
+.gs-status-options label:has(input:focus-visible){outline:2px solid var(--yellow);outline-offset:2px}
+.gs-status-name{font-size:13.5px;font-weight:600;color:#111}
+.gs-status-hint{font-size:12px;color:#6e6e6e;line-height:1.45}
+.gs-password{display:grid;gap:7px;border-top:1px solid #eee;padding-top:18px}
+.gs-password>label{font-size:12.5px;font-weight:600;color:#2c2c2c;letter-spacing:.01em}
+.gs-password-state{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:1px solid #e2d9ae;background:#FBF7E8;border-radius:6px;color:#6b5d1f;font-size:12px;line-height:1.5}
+.gs-password-state svg{flex:none;margin-top:2px}
+.gs-password-state strong{font-weight:700;color:#5a4f17}
+.gs-clear-password{display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:#111;font-weight:500}
+.gs-clear-password input{width:16px;height:16px;margin-top:2px;accent-color:#111;flex:none}
+.gs-clear-password small{display:block;color:#6e6e6e;font-weight:400;margin-top:2px;font-size:12px}
+.gs-share-row{display:flex;align-items:stretch;gap:10px;min-width:0}
+.gs-share-field{flex:1;min-width:0;display:flex;align-items:center;border:1px solid #ddd;border-radius:8px;background:#FAFAF8;overflow:hidden}
+.gs-share-field input{border:0;outline:0;background:transparent;width:100%;min-width:0;padding:11px 13px;font:inherit;font-size:13px;color:#333;text-overflow:ellipsis}
+.gs-share-row .admin-button{border-radius:8px;flex:none;padding:11px 16px;font-weight:600;font-size:13px}
+.gs-share-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.gs-share-actions .admin-button{border-radius:8px}
+.gs-share-meta{display:grid;gap:6px;border-top:1px solid #eee;padding-top:16px;margin-top:2px}
+.gs-share-meta span{display:flex;align-items:center;gap:7px;color:#6e6e6e;font-size:12.5px;line-height:1.5}
+.gs-share-meta svg{flex:none}
+.gs-danger{border-color:#E9D5DA}
+.gs-danger .gs-card-head h2{color:#8b1728}
+.gs-danger-body{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.gs-danger-text{display:grid;gap:3px;min-width:0}
+.gs-danger-text strong{font-size:14px;color:#111}
+.gs-danger-text span{font-size:12.5px;color:#6e6e6e;line-height:1.5}
+.gs-danger .admin-button.is-danger{border-radius:8px;flex:none}
+@media(max-width:760px){
+.gs-shell{padding:36px 16px 72px}
+.gs-header{flex-direction:column;gap:16px}
+.gs-save-button{width:100%;justify-content:center}
+.gs-status-options{grid-template-columns:1fr}
+.gs-share-row{flex-direction:column;align-items:stretch}
+.gs-share-row .admin-button{justify-content:center}
+.gs-danger-body{flex-direction:column;align-items:stretch}
+.gs-danger .admin-button.is-danger{width:100%;justify-content:center}
 }

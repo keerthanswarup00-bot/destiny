@@ -73,23 +73,72 @@ export async function submitGalleryPassword(_: PasswordState, form: FormData): P
 export async function togglePhotoFavorite(form: FormData) {
   const slug = String(form.get("slug") ?? "").trim();
   const photoId = String(form.get("photo_id") ?? "").trim();
-  const folder = String(form.get("folder") ?? "").trim();
+  const selected = String(form.get("selected") ?? "") === "true";
+
   const gallery = await requireGalleryAccess(slug);
   const db = galleryDb();
   const viewerHash = await ensureViewerKeyHash();
-  const { count } = await db.from("selections").select("id", { count: "exact", head: true }).eq("gallery_id", gallery.id).eq("viewer_key_hash", viewerHash);
-  const { data: photo } = await db.from("photos").select("id").eq("id", photoId).eq("gallery_id", gallery.id).maybeSingle();
-  if (!photo) return { ok: false as const, error: "That photograph is unavailable.", selected: false, count: count ?? 0 };
-  const { data: existing } = await db.from("selections").select("id").eq("gallery_id", gallery.id).eq("photo_id", photo.id).eq("viewer_key_hash", viewerHash).maybeSingle();
-  if (existing) {
-    await db.from("selections").delete().eq("id", existing.id).eq("gallery_id", gallery.id).eq("viewer_key_hash", viewerHash);
-  } else {
-    await db.from("selections").insert({ gallery_id: gallery.id, photo_id: photo.id, viewer_name: "Guest", viewer_key_hash: viewerHash });
+
+  const { data: photo } = await db
+    .from("photos")
+    .select("id")
+    .eq("id", photoId)
+    .eq("gallery_id", gallery.id)
+    .maybeSingle();
+
+  if (!photo) {
+    return {
+      ok: false as const,
+      error: "That photograph is unavailable.",
+      selected: false,
+    };
   }
-  revalidatePath(`/gallery/${gallery.slug}`);
-  if (/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(folder)) revalidatePath(`/gallery/${gallery.slug}`);
-  const { count: nextCount } = await db.from("selections").select("id", { count: "exact", head: true }).eq("gallery_id", gallery.id).eq("viewer_key_hash", viewerHash);
-  return { ok: true as const, error: null, selected: !existing, count: nextCount ?? 0 };
+
+  if (selected) {
+    const { error } = await db
+      .from("selections")
+      .upsert(
+        {
+          gallery_id: gallery.id,
+          photo_id: photo.id,
+          viewer_name: "Guest",
+          viewer_key_hash: viewerHash,
+        },
+        {
+          onConflict: "gallery_id,photo_id,viewer_key_hash",
+          ignoreDuplicates: true,
+        },
+      );
+
+    if (error) {
+      return {
+        ok: false as const,
+        error: "Unable to save this favourite.",
+        selected: false,
+      };
+    }
+  } else {
+    const { error } = await db
+      .from("selections")
+      .delete()
+      .eq("gallery_id", gallery.id)
+      .eq("photo_id", photo.id)
+      .eq("viewer_key_hash", viewerHash);
+
+    if (error) {
+      return {
+        ok: false as const,
+        error: "Unable to remove this favourite.",
+        selected: true,
+      };
+    }
+  }
+
+  return {
+    ok: true as const,
+    error: null,
+    selected,
+  };
 }
 
 type DownloadResult = { url: string | null; filename: string | null; error: string | null };

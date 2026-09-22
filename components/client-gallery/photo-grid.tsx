@@ -14,14 +14,14 @@ export function ClientPhotoGrid({
   folder,
   photos,
   onToggle,
-  busyId,
+  busyIds,
   disabled,
 }: {
   slug: string;
   folder?: string;
   photos: WorkspacePhoto[];
   onToggle: (photoId: string) => void;
-  busyId: string | null;
+  busyIds: Set<string>;
   disabled: boolean;
 }) {
   const [index, setIndex] = useState(-1);
@@ -89,7 +89,7 @@ export function ClientPhotoGrid({
   const renderOverlay = (photo: JustifiedPhoto) => {
     const item = photos.find(p => p.id === photo.id);
     if (!item) return null;
-    const busy = busyId === item.id;
+    const busy = busyIds.has(item.id);
     return (
       <button
         aria-label={item.selected ? "Remove from favourites" : "Add to favourites"}
@@ -138,7 +138,7 @@ export function ClientPhotoGrid({
               aria-label={current?.selected ? "Remove from favourites" : "Add to favourites"}
               aria-pressed={current?.selected}
               className={`client-lightbox-action yarl__button${current?.selected ? " is-selected" : ""}`}
-              disabled={disabled || Boolean(current && busyId === current.id)}
+              disabled={disabled || Boolean(current && busyIds.has(current.id))}
               key="select"
               onClick={() => { if (current) onToggle(current.id); }}
               title={current?.selected ? "Remove from favourites" : "Add to favourites"}

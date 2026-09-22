@@ -5,7 +5,7 @@ import { galleryDb } from "@/lib/gallery-db";
 import { photoStore } from "@/lib/storage-provider";
 
 export async function signedDownloadUrl(filename: string, paths: { thumbnail_path: string | null; preview_path: string | null; original_path: string }) {
-  const path = clientFacingObjectPath(paths, "full");
+  const path = paths.original_path || clientFacingObjectPath(paths, "full");
   return photoStore().signedDownloadUrl(path, safeDownloadName(filename), DOWNLOAD_SIGNED_URL_SECONDS);
 }
 

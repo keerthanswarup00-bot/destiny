@@ -152,7 +152,7 @@ html{scroll-behavior:smooth}
 .client-gallery .site-footer__bottom{max-width:1440px;margin-left:auto;margin-right:auto}
 
 /* S8B.1 — client hero + set navigation */
-.client-hero.has-cover{position:relative;display:grid;place-items:center;aspect-ratio:16/9;max-height:70vh;overflow:hidden;background:#111;margin:0 0 44px}
+.client-hero.has-cover{position:relative;display:grid;place-items:center;aspect-ratio:16/9;max-height:70vh;overflow:hidden;background:#111;margin:0 auto 44px}
 .client-hero-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
 .client-hero-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.42) 0%,rgba(0,0,0,.16) 45%,rgba(0,0,0,.5) 100%)}
 .client-hero-inner{position:relative;z-index:1;text-align:center;padding:48px 20px;max-width:880px}
@@ -174,4 +174,10 @@ html{scroll-behavior:smooth}
 .client-setnav::-webkit-scrollbar{display:none}
 .client-hero.has-cover{aspect-ratio:4/3;max-height:none}
 .client-hero-inner{padding:32px 14px}
+}
+
+/* Client hero — laptop/desktop sizing and centering */
+@media(min-width:1024px){
+.client-hero.has-cover{width:min(100%,1400px);height:min(75vh,760px);max-height:none;margin-inline:auto}
+.client-gallery-links{justify-content:center}
 }

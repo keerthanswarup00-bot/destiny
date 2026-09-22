@@ -63,6 +63,8 @@ export type Database = {
         location: string | null;
         show_in_portfolio: boolean;
         portfolio_sort: number;
+        highlight_photo_id: string | null;
+        highlight_crop: Json | null;
         created_by: string | null;
         created_at: string;
         updated_at: string;
@@ -79,6 +81,8 @@ export type Database = {
         location?: string | null;
         show_in_portfolio?: boolean;
         portfolio_sort?: number;
+        highlight_photo_id?: string | null;
+        highlight_crop?: Json | null;
         created_by?: string | null;
         created_at?: string;
         updated_at?: string;
@@ -116,6 +120,7 @@ export type Database = {
         original_path: string;
         preview_path: string | null;
         thumbnail_path: string | null;
+        download_path: string | null;
         mime_type: string;
         bytes: number;
         width: number | null;
@@ -135,6 +140,7 @@ export type Database = {
         original_path: string;
         preview_path?: string | null;
         thumbnail_path?: string | null;
+        download_path?: string | null;
         mime_type: string;
         bytes: number;
         width?: number | null;

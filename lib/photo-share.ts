@@ -1,12 +1,19 @@
 import "server-only";
-import { DOWNLOAD_SIGNED_URL_SECONDS, clientFacingObjectPath, safeDownloadName } from "@/lib/client-media";
+import { DOWNLOAD_SIGNED_URL_SECONDS, safeDownloadName } from "@/lib/client-media";
 import { hashViewerToken, photoShareToken } from "@/lib/gallery-cookie";
 import { galleryDb } from "@/lib/gallery-db";
 import { photoStore } from "@/lib/storage-provider";
 
-export async function signedDownloadUrl(filename: string, paths: { thumbnail_path: string | null; preview_path: string | null; original_path: string }) {
-  const path = paths.original_path || clientFacingObjectPath(paths, "full");
-  return photoStore().signedDownloadUrl(path, safeDownloadName(filename), DOWNLOAD_SIGNED_URL_SECONDS);
+type DownloadablePaths = { thumbnail_path: string | null; preview_path: string | null; original_path: string; download_path?: string | null };
+
+export async function signedDownloadUrl(filename: string, paths: DownloadablePaths) {
+  // Client-facing downloads always serve the watermarked full-resolution
+  // derivative (falling back to the watermarked preview/thumbnail for legacy
+  // rows). The private original is never eligible for a client download.
+  const path = paths.download_path || paths.preview_path || paths.thumbnail_path;
+  if (!path) return null;
+  const webpName = filename.replace(/\.[a-z0-9]+$/i, "") + ".webp";
+  return photoStore().signedDownloadUrl(path, safeDownloadName(webpName), DOWNLOAD_SIGNED_URL_SECONDS);
 }
 
 export async function ensurePhotoShareToken(galleryId: string, photoId: string) {
@@ -32,7 +39,7 @@ export async function photoFromShareToken(token: string) {
   if (!share || share.revoked_at) return null;
   if (share.expires_at && new Date(share.expires_at).getTime() <= Date.now()) return null;
   const [{ data: photo }, { data: gallery }] = await Promise.all([
-    db.from("photos").select("id,folder_id,filename,width,height,thumbnail_path,preview_path,original_path").eq("id", share.photo_id).eq("gallery_id", share.gallery_id).maybeSingle(),
+    db.from("photos").select("id,folder_id,filename,width,height,thumbnail_path,preview_path,download_path,original_path").eq("id", share.photo_id).eq("gallery_id", share.gallery_id).maybeSingle(),
     db.from("galleries").select("id,title,slug,status").eq("id", share.gallery_id).maybeSingle(),
   ]);
   if (!photo || !gallery) return null;

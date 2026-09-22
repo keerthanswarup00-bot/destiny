@@ -101,7 +101,7 @@ type DownloadResult = { url: string | null; filename: string | null; error: stri
  */
 async function photoDownloadInfo(galleryId: string, photoId: string) {
   const db = galleryDb();
-  const { data: photo } = await db.from("photos").select("id,folder_id,filename,sort_order,thumbnail_path,preview_path,original_path").eq("id", photoId).eq("gallery_id", galleryId).maybeSingle();
+  const { data: photo } = await db.from("photos").select("id,folder_id,filename,sort_order,thumbnail_path,preview_path,download_path,original_path").eq("id", photoId).eq("gallery_id", galleryId).maybeSingle();
   if (!photo) return null;
   const [{ data: folder }, { data: gallery }, { data: folderPhotos }] = await Promise.all([
     db.from("folders").select("name").eq("id", photo.folder_id).eq("gallery_id", galleryId).maybeSingle(),

@@ -56,8 +56,11 @@ export async function galleryFolders(galleryId: string): Promise<GalleryFolderCa
     // first photo of THIS set only. Never another Set, never a gallery-wide image.
     const chosen = folderPhotos.find(photo => photo.id === folder.cover_photo_id) ?? folderPhotos[0];
     if (chosen) {
-      const dims = await resolvePhotoDimensions(chosen);
-      covers.set(folder.id, { path: clientFacingObjectPath(chosen, "grid"), width: dims.width, height: dims.height });
+      const path = clientFacingObjectPath(chosen, "grid");
+      if (path) {
+        const dims = await resolvePhotoDimensions(chosen);
+        covers.set(folder.id, { path, width: dims.width, height: dims.height });
+      }
     }
   }
   const urls = await signedClientUrls([...covers.values()].map(cover => cover.path));
@@ -112,8 +115,11 @@ export async function galleryOverviews(galleryIds: string[]): Promise<Map<string
       const folderPhotos = photos.filter(photo => photo.folder_id === firstPublished.id);
       const chosen = folderPhotos.find(photo => photo.id === firstPublished.cover_photo_id) ?? folderPhotos[0];
       if (chosen) {
-        const dims = await resolvePhotoDimensions(chosen);
-        covers.set(id, { path: clientFacingObjectPath(chosen, "grid"), width: dims.width, height: dims.height });
+        const path = clientFacingObjectPath(chosen, "grid");
+        if (path) {
+          const dims = await resolvePhotoDimensions(chosen);
+          covers.set(id, { path, width: dims.width, height: dims.height });
+        }
       }
     }
     out.set(id, { coverUrl, coverWidth, coverHeight, setCount, photoCount });
@@ -145,16 +151,18 @@ export async function galleryFolder(galleryId: string, folderSlug: string): Prom
   if (!folder) return null;
   const { data: photos } = await db.from("photos").select("id,width,height,sort_order,thumbnail_path,preview_path,original_path").eq("gallery_id", galleryId).eq("folder_id", folder.id).order("sort_order").order("id");
   const photosWithDimensions = await Promise.all((photos ?? []).map(async photo => ({ ...photo, ...(await resolvePhotoDimensions(photo)) })));
-  const gridPaths = photosWithDimensions.map(photo => clientFacingObjectPath(photo, "grid"));
-  const fullPaths = photosWithDimensions.map(photo => clientFacingObjectPath(photo, "full"));
-  const [urls, fullUrls] = await Promise.all([signedClientUrls(gridPaths), signedClientUrls(fullPaths)]);
+  const eligible = photosWithDimensions
+    .map(photo => ({ photo, grid: clientFacingObjectPath(photo, "grid"), full: clientFacingObjectPath(photo, "full") }))
+    .filter(entry => entry.grid !== null);
+  const gridPaths = eligible.map(entry => entry.grid as string);
+  const fullPaths = eligible.map(entry => entry.full ?? (entry.grid as string));
+  const [urls, fullUrls] = await Promise.all([signedClientUrls(gridPaths), signedClientUrls([...new Set(fullPaths)])]);
   return {
     folder,
-    photos: photosWithDimensions.map(photo => {
-      const gridPath = clientFacingObjectPath(photo, "grid");
-      const fullPath = clientFacingObjectPath(photo, "full");
+    photos: eligible.map(({ photo, grid, full }) => {
+      const gridPath = grid as string;
       const src = urls.get(gridPath) ?? "";
-      const fullSrc = fullUrls.get(fullPath) ?? src;
+      const fullSrc = fullUrls.get(full ?? "") ?? src;
       return {
         id: photo.id,
         width: photo.width,

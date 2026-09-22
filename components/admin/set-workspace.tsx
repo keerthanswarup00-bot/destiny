@@ -18,6 +18,7 @@ import {
 import { deletePhotos, movePhotos } from "@/app/admin/crud-actions";
 import { setFolderCover, setFolderPublished } from "@/app/admin/set-actions";
 import { uploadClientGalleryFiles } from "@/components/admin/client-gallery-upload";
+import { StagedUploadQueue, type StagedUploadQueueHandle } from "@/components/admin/upload-queue";
 
 type WorkspacePhoto = { id: string; filename: string; width: number | null; height: number | null; src: string; downloadUrl: string };
 type MoveTarget = { id: string; name: string };
@@ -40,7 +41,9 @@ export function SetWorkspace({
   const [showUpload, setShowUpload] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [queueCount, setQueueCount] = useState(0);
   const fileInput = useRef<HTMLInputElement>(null);
+  const queueRef = useRef<StagedUploadQueueHandle>(null);
 
   const toggle = (id: string) =>
     setSelected(prev => {
@@ -54,8 +57,14 @@ export function SetWorkspace({
   const single = selected.size === 1;
   const singleId = single ? [...selected][0] : null;
 
-  async function uploadFiles(files: FileList | null) {
+  function stageFiles(files: FileList | null | File[]) {
     if (!files || files.length === 0) return;
+    setUploadError(null);
+    queueRef.current?.addFiles(files);
+  }
+
+  async function commitPending(files: File[]) {
+    if (!files.length) return;
     setUploading(files.length);
     setUploadError(null);
     setDragOver(false);
@@ -67,6 +76,7 @@ export function SetWorkspace({
     } finally {
       setUploading(0);
       setShowUpload(false);
+      queueRef.current?.clear();
       router.refresh();
     }
   }
@@ -118,19 +128,29 @@ export function SetWorkspace({
       </header>
 
       {showUpload && !uploading ? (
-        <div
-          className={`upload-zone${dragOver ? " is-dragging" : ""}`}
-          onDragLeave={() => setDragOver(false)}
-          onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-          onDrop={e => { e.preventDefault(); uploadFiles(e.dataTransfer.files); }}
-        >
-          <button aria-label="Close" className="upload-close" onClick={() => setShowUpload(false)} type="button"><X size={16} /></button>
-          <div className="upload-zone-icon"><ImageIcon size={26} strokeWidth={1.5} /></div>
-          <strong>Drop photos here</strong>
-          <span>or</span>
-          <button className="admin-button" onClick={() => fileInput.current?.click()} type="button">Browse files</button>
-          <em>JPEG, PNG, WebP or GIF.</em>
-        </div>
+        <>
+          <StagedUploadQueue
+            onCommit={commitPending}
+            onCountChange={setQueueCount}
+            ref={queueRef}
+            uploading={uploading > 0}
+          />
+          {!queueCount ? (
+            <div
+              className={`upload-zone${dragOver ? " is-dragging" : ""}`}
+              onDragLeave={() => setDragOver(false)}
+              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+              onDrop={e => { e.preventDefault(); stageFiles(e.dataTransfer.files); }}
+            >
+              <button aria-label="Close" className="upload-close" onClick={() => setShowUpload(false)} type="button"><X size={16} /></button>
+              <div className="upload-zone-icon"><ImageIcon size={26} strokeWidth={1.5} /></div>
+              <strong>Drop photos here</strong>
+              <span>or</span>
+              <button className="admin-button" onClick={() => fileInput.current?.click()} type="button">Browse files</button>
+              <em>JPEG, PNG, WebP or GIF.</em>
+            </div>
+          ) : null}
+        </>
       ) : null}
       {uploading ? (
         <div className="upload-progress" role="status">
@@ -145,7 +165,7 @@ export function SetWorkspace({
         aria-hidden="true"
         className="visually-hidden-input"
         multiple
-        onChange={e => uploadFiles(e.target.files)}
+        onChange={e => stageFiles(e.target.files)}
         ref={fileInput}
         tabIndex={-1}
         type="file"

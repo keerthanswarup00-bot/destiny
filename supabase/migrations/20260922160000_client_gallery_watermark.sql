@@ -1,0 +1,2 @@
+-- Client Gallery watermarking: full-resolution, watermarked download derivative.
+alter table public.photos add column if not exists download_path text check (download_path is null or download_path !~ '^/');

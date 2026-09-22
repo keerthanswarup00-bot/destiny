@@ -1,11 +1,15 @@
 import "server-only";
 
-type PhotoPaths = { thumbnail_path: string | null; preview_path: string | null; original_path: string };
+type PhotoPaths = { thumbnail_path: string | null; preview_path: string | null; original_path: string; download_path?: string | null };
 
-/** Prefer future derivatives; fall back to the original upload until those exist. */
-export function clientFacingObjectPath(photo: PhotoPaths, kind: "grid" | "full") {
-  if (kind === "grid") return photo.thumbnail_path || photo.preview_path || photo.original_path;
-  return photo.preview_path || photo.original_path;
+/**
+ * Resolve the object path client-facing views may sign.
+ * Only watermarked derivatives are ever eligible: the private original is never
+ * returned to the browser (grid, lightbox, or shared links).
+ */
+export function clientFacingObjectPath(photo: PhotoPaths, kind: "grid" | "full"): string | null {
+  if (kind === "grid") return photo.thumbnail_path || photo.preview_path;
+  return photo.preview_path || photo.thumbnail_path;
 }
 
 export const CLIENT_SIGNED_URL_SECONDS = 60 * 15;

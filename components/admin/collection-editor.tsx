@@ -42,6 +42,7 @@ import {
   setGalleryStatus,
 } from "@/app/admin/set-actions";
 import { uploadClientGalleryFiles } from "@/components/admin/client-gallery-upload";
+import { StagedUploadQueue, type StagedUploadQueueHandle } from "@/components/admin/upload-queue";
 
 function DeletePhotosButton() {
   const { pending } = useFormStatus();
@@ -107,6 +108,7 @@ export function CollectionEditor({
   const [deleteFor, setDeleteFor] = useState<EditorFolder | null>(null);
   const [toolbarMenuOpen, setToolbarMenuOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const queueRef = useRef<StagedUploadQueueHandle>(null);
   const renameRef = useRef<HTMLDialogElement>(null);
   const coverRef = useRef<HTMLDialogElement>(null);
   const deleteRef = useRef<HTMLDialogElement>(null);
@@ -155,8 +157,14 @@ export function CollectionEditor({
 
   const clear = () => setSelected(new Set());
 
-  async function uploadFiles(files: FileList | null) {
+  function stageFiles(files: FileList | null | File[]) {
     if (!files || files.length === 0 || !activeFolder) return;
+    setUploadError(null);
+    queueRef.current?.addFiles(files);
+  }
+
+  async function commitPending(files: File[]) {
+    if (!files.length || !activeFolder) return;
     setUploading(files.length);
     setUploadError(null);
     setDragOver(false);
@@ -167,6 +175,7 @@ export function CollectionEditor({
       setUploadError(uploadError instanceof Error && uploadError.message ? uploadError.message : "Upload failed. Please try again.");
     } finally {
       setUploading(0);
+      queueRef.current?.clear();
       router.refresh();
     }
   }
@@ -407,10 +416,18 @@ export function CollectionEditor({
                   className="upload-zone is-dragging"
                   onDragLeave={() => setDragOver(false)}
                   onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-                  onDrop={e => { e.preventDefault(); uploadFiles(e.dataTransfer.files); }}
+                  onDrop={e => { e.preventDefault(); setDragOver(false); stageFiles(e.dataTransfer.files); }}
                 >
                   <strong>Drop photos here to upload</strong>
                 </div>
+              ) : null}
+
+              {!uploading ? (
+                <StagedUploadQueue
+                  onCommit={commitPending}
+                  ref={queueRef}
+                  uploading={uploading > 0}
+                />
               ) : null}
 
               {photos.length ? (
@@ -491,7 +508,7 @@ export function CollectionEditor({
                 aria-hidden="true"
                 className="visually-hidden-input"
                 multiple
-                onChange={e => uploadFiles(e.target.files)}
+                onChange={e => stageFiles(e.target.files)}
                 ref={fileInput}
                 tabIndex={-1}
                 type="file"

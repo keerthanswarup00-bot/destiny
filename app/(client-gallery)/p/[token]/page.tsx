@@ -12,6 +12,7 @@ export default async function SharedPhotoPage({ params }: { params: Promise<{ to
   const shared = await photoFromShareToken(token);
   if (!shared) notFound();
   const path = clientFacingObjectPath(shared.photo, "full");
+  if (!path) notFound();
   const urls = await signedClientUrls([path]);
   const src = urls.get(path);
   if (!src) notFound();

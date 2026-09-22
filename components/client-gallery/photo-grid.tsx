@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Lightbox from "yet-another-react-lightbox";
+import Lightbox, { isImageSlide } from "yet-another-react-lightbox";
 import Slideshow from "yet-another-react-lightbox/plugins/slideshow";
 import { Download, Heart, Share2 } from "lucide-react";
 import { downloadGalleryPhoto, shareGalleryPhoto } from "@/app/(client-gallery)/gallery/actions";
 import { JustifiedPhotoGrid, type JustifiedPhoto } from "@/components/gallery/justified-photo-grid";
+import { ClientZoomableSlide } from "@/components/client-gallery/zoomable-slide";
 import type { WorkspacePhoto } from "@/components/client-gallery/gallery-workspace";
 
 export function ClientPhotoGrid({
@@ -123,6 +124,9 @@ export function ClientPhotoGrid({
         plugins={[Slideshow]}
         render={{
           controls: () => (notice ? <span aria-live="polite" className="client-lightbox-notice" role="status">{notice}</span> : null),
+          slide: ({ slide, offset, rect }) => offset === 0 && isImageSlide(slide) ? (
+            <ClientZoomableSlide rect={rect} slide={slide} />
+          ) : null,
         }}
         slideshow={{ autoplay: false, delay: 3500 }}
         slides={slides}

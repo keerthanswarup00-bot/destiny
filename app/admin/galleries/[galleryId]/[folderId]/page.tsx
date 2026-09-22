@@ -13,13 +13,16 @@ export default async function SetPage({ params }: { params: Promise<{ galleryId:
     { data: folder },
     { data: folders },
     { data: photos },
+    { data: branding },
   ] = await Promise.all([
     db.from("galleries").select("id,title,slug,status").eq("id", galleryId).maybeSingle(),
     db.from("folders").select("id,name,slug,description,published").eq("id", folderId).eq("gallery_id", galleryId).maybeSingle(),
     db.from("folders").select("id,name").eq("gallery_id", galleryId).order("sort_order").order("id"),
     db.from("photos").select("id,filename,width,height,thumbnail_path,preview_path,original_path,sort_order").eq("gallery_id", galleryId).eq("folder_id", folderId).order("sort_order").order("id"),
+    db.from("site_branding").select("watermark_path,watermark_enabled").eq("id", "branding").maybeSingle(),
   ]);
   if (!gallery || !folder) notFound();
+  const watermarkEnabled = Boolean(branding?.watermark_path && branding.watermark_enabled !== false);
 
   const gridPaths = (photos ?? []).map(photo => photo.thumbnail_path || photo.preview_path || photo.original_path).filter(Boolean);
   const originalPaths = (photos ?? []).map(photo => photo.original_path).filter(Boolean);
@@ -51,6 +54,7 @@ export default async function SetPage({ params }: { params: Promise<{ galleryId:
         gallery={{ id: gallery.id, title: gallery.title, slug: gallery.slug }}
         moveTargets={(folders ?? []).map(f => ({ id: f.id, name: f.name }))}
         photos={photoCards}
+        watermarkEnabled={watermarkEnabled}
       />
     </section>
   );

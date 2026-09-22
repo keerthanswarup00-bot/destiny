@@ -126,6 +126,78 @@ export type WebsiteImageRow = {
   created_at: string;
 };
 
+/**
+ * Normalized, non-destructive Highlight crop.
+ *
+ * The public /gallery Highlight banner and the admin editor share the same
+ * 16/9 frame. `zoom >= 1` is the magnification above the no-crop cover fit;
+ * `x` and `y` are the 0..1 point of the cover-fit image centered in the frame
+ * (0.5/0.5 + zoom 1 renders the plain centered cover image - "no crop").
+ */
+export type HighlightCrop = { x: number; y: number; zoom: number };
+
+/** Maximum zoom the editor and public render will accept. */
+export const HIGHLIGHT_MAX_ZOOM = 8;
+
+/** Coerce/validate a persisted highlight crop into a clean normalized one. */
+export function normalizeHighlightCrop(value: unknown): HighlightCrop | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const x = Number(record.x);
+  const y = Number(record.y);
+  const zoom = Number(record.zoom);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(zoom)) return null;
+  return {
+    x: Math.min(1, Math.max(0, x)),
+    y: Math.min(1, Math.max(0, y)),
+    zoom: Math.min(HIGHLIGHT_MAX_ZOOM, Math.max(1, zoom)),
+  };
+}
+
+export type WebsiteHighlight = {
+  photo: WebsiteImageRow & { url: string };
+  crop: HighlightCrop | null;
+};
+
+/**
+ * The signed Highlight banner photo for the public /gallery feed, if a
+ * published highlight photo exists. Only published photos surface publicly;
+ * unpublished highlights are skipped rather than rendered from working data.
+ */
+export async function getWebsiteGalleryHighlight(): Promise<WebsiteHighlight | null> {
+  const db = galleryDb();
+  const galleryId = await websiteGalleryId(db);
+  if (!galleryId) return null;
+  const { data: gallery } = await db
+    .from("galleries")
+    .select("highlight_photo_id,highlight_crop")
+    .eq("id", galleryId)
+    .maybeSingle();
+  if (!gallery?.highlight_photo_id) return null;
+
+  const { data: photo } = await db
+    .from("photos")
+    .select("id,filename,original_path,mime_type,bytes,width,height,published_category,published,pending_delete,created_at")
+    .eq("id", gallery.highlight_photo_id)
+    .eq("gallery_id", galleryId)
+    .eq("published", true)
+    .maybeSingle();
+  if (!photo) return null;
+
+  const urls = await photoStore().signedGetUrls([photo.original_path], CLIENT_SIGNED_URL_SECONDS);
+  const url = urls.get(photo.original_path);
+  if (!url) return null;
+
+  return {
+    photo: {
+      ...photo,
+      category: photo.published_category as WebsiteImageRow["category"],
+      url,
+    },
+    crop: normalizeHighlightCrop(gallery.highlight_crop),
+  };
+}
+
 /** Signed, newest-first previews for the public /gallery feed. */
 export async function getWebsiteGalleryImages(category?: WebsiteGalleryCategory | null): Promise<(WebsiteImageRow & { url: string })[]> {
   const db = galleryDb();

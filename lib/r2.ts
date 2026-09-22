@@ -1,5 +1,5 @@
 import "server-only";
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand, type PutObjectCommandInput } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command, type PutObjectCommandInput } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 function required(name: string): string {
@@ -42,6 +42,21 @@ export async function uploadObject({ key, body, contentType, metadata }: R2Objec
 
 export async function deleteObject(key: string) {
   await r2().send(new DeleteObjectCommand({ Bucket: R2_BUCKET(), Key: key }));
+}
+
+/** List every object key in the R2 bucket (paginated ListObjectsV2). */
+export async function listObjects(): Promise<string[]> {
+  const bucket = R2_BUCKET();
+  const keys: string[] = [];
+  let token: string | undefined;
+  do {
+    const page = await r2().send(new ListObjectsV2Command({ Bucket: bucket, ContinuationToken: token }));
+    for (const item of page.Contents ?? []) {
+      if (item.Key) keys.push(item.Key);
+    }
+    token = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (token);
+  return keys;
 }
 
 export async function objectExists(key: string): Promise<boolean> {

@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { GalleryHighlight } from "@/components/public/gallery-highlight";
 import { PhotoGrid } from "@/components/public/photo-grid";
 import { Reveal } from "@/components/public/reveal";
-import { getPortfolioGalleries, getSiteWebsiteGalleryByCategory, hasSiteWebsiteGallery } from "@/lib/site/site-content";
+import { getPortfolioGalleries, getSiteWebsiteGalleryByCategory, getSiteWebsiteGalleryHighlight, hasSiteWebsiteGallery } from "@/lib/site/site-content";
 
 export const metadata = { title: "Gallery", description: "Selected work from Destiny Events and Photography." };
 
@@ -36,13 +37,16 @@ export default async function Gallery({ searchParams }: { searchParams: Promise<
   const { category: rawCategory } = await searchParams;
   const category = normalizeCategory(rawCategory);
   const websiteGalleryExists = await hasSiteWebsiteGallery();
-  const websiteImages = websiteGalleryExists ? await getSiteWebsiteGalleryByCategory(category) : [];
+  const [websiteImages, highlight] = websiteGalleryExists
+    ? await Promise.all([getSiteWebsiteGalleryByCategory(category), getSiteWebsiteGalleryHighlight()])
+    : [[], null];
   if (websiteGalleryExists) {
     return (
       <section className="section gallery-page">
         <Reveal><p className="eyebrow">GALLERY</p></Reveal>
         <Reveal delay={90}><h1>Moments, held<br /><em>in their truest light.</em></h1></Reveal>
         <Reveal delay={170}><p className="intro">A collection of celebrations, connections, and quiet in-between moments.</p></Reveal>
+        {highlight ? <GalleryHighlight crop={highlight.crop} height={highlight.height} url={highlight.url} width={highlight.width} /> : null}
         <GalleryFilters active={category} />
         <div className="photo-grid expanded">
           {websiteImages.map((image, index) => (

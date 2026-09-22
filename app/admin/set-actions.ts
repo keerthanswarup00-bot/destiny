@@ -1,9 +1,14 @@
 "use server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { adminDb } from "@/lib/admin-data";
 import { requireAdmin } from "@/lib/auth";
 
 function v(form: FormData, key: string) { return String(form.get(key) ?? ""); }
+
+/** Invalidate cached public site-content reads (tags mirror SITE_CACHE_TAGS in lib/site/site-content.ts). */
+async function invalidateTags(...tags: string[]) {
+  await Promise.all(tags.map(tag => revalidateTag(tag)));
+}
 
 export async function setFolderPublished(form: FormData) {
   await requireAdmin();
@@ -15,6 +20,7 @@ export async function setFolderPublished(form: FormData) {
   await supabase.from("folders").update({ published }).eq("id", folder.id).eq("gallery_id", folder.gallery_id);
   revalidatePath(`/admin/galleries/${folder.gallery_id}`);
   revalidatePath(`/gallery/${(await signedGallerySlug(folder.gallery_id)) ?? ""}`);
+  await invalidateTags("site-stories", "site-portfolio");
 }
 
 export async function setFolderCover(form: FormData) {
@@ -29,6 +35,7 @@ export async function setFolderCover(form: FormData) {
   await supabase.from("folders").update({ cover_photo_id: cover?.id ?? null }).eq("id", id).eq("gallery_id", folder.gallery_id);
   revalidatePath(`/admin/galleries/${folder.gallery_id}`);
   revalidatePath(`/gallery/${(await signedGallerySlug(folder.gallery_id)) ?? ""}`);
+  await invalidateTags("site-stories", "site-portfolio");
 }
 
 export async function moveFolder(form: FormData) {
@@ -61,6 +68,7 @@ export async function setGalleryStatus(form: FormData) {
   await supabase.from("galleries").update({ status }).eq("id", id);
   revalidatePath(`/admin/galleries/${id}`);
   revalidatePath(`/gallery/${(await signedGallerySlug(id)) ?? ""}`);
+  await invalidateTags("site-stories", "site-portfolio");
 }
 
 async function signedGallerySlug(galleryId: string) {

@@ -6,8 +6,10 @@ import { requireAdmin } from "@/lib/auth";
 import { adminDb } from "@/lib/admin-data";
 import { ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES, clientSchema, folderSchema, gallerySchema, photoUploadSchema, slugify } from "@/lib/admin-validation";
 import { photoStore } from "@/lib/storage-provider";
-import { createSignedPutUrl, downloadObjectBytes, objectBytes } from "@/lib/r2";
+import { auditStorageOrphans as auditOrphans, cleanupOrphanedPhotoKeys as cleanupOrphans, isClientPhotoStorageKey, photoStoragePaths } from "@/lib/storage-ops";
+import { createSignedPutUrl, downloadObjectBytes } from "@/lib/r2";
 import { hashGalleryPassword } from "@/lib/gallery-password";
+import { validateWatermarkSettings, watermarkSourceFromBytes, watermarkedDerivative, type ActiveWatermarkConfig, type WatermarkSource } from "@/lib/watermark-core";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 const value = (form: FormData, key: string) => String(form.get(key) ?? "");
@@ -28,7 +30,7 @@ export async function updateGallery(form: FormData) { const id=value(form,"id");
 export async function deleteGallery(form: FormData) {
   const id=value(form,"id"); const supabase=await db();
   const { data: galleryPhotos }=await supabase.from("photos").select("original_path,preview_path,thumbnail_path,download_path").eq("gallery_id",id);
-  const paths=(galleryPhotos??[]).flatMap(photo => [photo.original_path, photo.preview_path, photo.thumbnail_path, photo.download_path]).filter((path): path is string => Boolean(path));
+  const paths=(galleryPhotos??[]).flatMap(photoStoragePaths);
   if(paths.length) {
     try {
       await photoStore().removePhotos(paths);
@@ -46,10 +48,28 @@ export async function createFolder(form: FormData) { const gallery=value(form,"g
 export async function renameFolder(form: FormData) { const gallery=value(form,"gallery_id"),id=value(form,"id"), parsed=folderSchema.safeParse({name:value(form,"name")}); const slug=parsed.success?slugify(parsed.data.name):""; if(!parsed.success||!slug) return redirect(`/admin/galleries/${gallery}?error=invalid-folder`); const supabase=await db(); const description=value(form,"description").trim().slice(0,400)||null; await supabase.from("folders").update({name:parsed.data.name,slug,description}).eq("id",id).eq("gallery_id",gallery); revalidatePath(`/admin/galleries/${gallery}`); }
 export async function deleteFolder(form: FormData) {
   const gallery=value(form,"gallery_id"); const id=value(form,"id"); const supabase=await db();
-  const { data: folderPhotos }=await supabase.from("photos").select("original_path,preview_path,thumbnail_path,download_path").eq("gallery_id",gallery).eq("folder_id",id);
-  const paths=(folderPhotos??[]).flatMap(photo => [photo.original_path, photo.preview_path, photo.thumbnail_path, photo.download_path]).filter((path): path is string => Boolean(path));
-  if(paths.length) await photoStore().removePhotos(paths);
-  await supabase.from("folders").delete().eq("id",id).eq("gallery_id",gallery);
+  // Deleting a folder cascades every descendant folder in the DB, so storage
+  // must cover the whole subtree or nested-set photos become orphans.
+  const { data: allFolders }=await supabase.from("folders").select("id,parent_folder_id").eq("gallery_id",gallery);
+  const affected=new Set<string>([id]);
+  let changed=true;
+  while(changed){
+    changed=false;
+    for(const folder of allFolders ?? []){
+      if(folder.parent_folder_id && affected.has(folder.parent_folder_id) && !affected.has(folder.id)){ affected.add(folder.id); changed=true; }
+    }
+  }
+  const { data: folderPhotos }=await supabase.from("photos").select("original_path,preview_path,thumbnail_path,download_path").eq("gallery_id",gallery).in("folder_id",[...affected]);
+  const paths=(folderPhotos??[]).flatMap(photoStoragePaths);
+  if(paths.length){
+    try {
+      await photoStore().removePhotos(paths);
+    } catch {
+      return redirect(`/admin/galleries/${gallery}?error=folder-storage-delete`);
+    }
+  }
+  const { error }=await supabase.from("folders").delete().eq("id",id).eq("gallery_id",gallery);
+  if(error) return redirect(`/admin/galleries/${gallery}?error=folder-delete`);
   revalidatePath(`/admin/galleries/${gallery}`);
 }
 function galleryFail(gallery: string, code: string) { return redirect(`/admin/galleries/${gallery}?error=${code}`); }
@@ -63,60 +83,32 @@ const isR2Provider = () => process.env.PHOTO_STORAGE_PROVIDER?.trim().toLowerCas
 /* Client Gallery watermarking                                         */
 /* ------------------------------------------------------------------ */
 
-// The active watermark logo is the admin-managed asset stored in R2 and
-// referenced by site_branding.watermark_path. When no logo is configured the
-// watermark is OFF and uploads produce normal unwatermarked derivatives.
-const WATERMARK_WIDTH_RATIO = 0.12; // ≈12% of image width
-const WATERMARK_MIN_WIDTH = 120;
-const WATERMARK_MAX_WIDTH = 640;
-const WATERMARK_MARGIN_X_RATIO = 0.03; // 3% of width from the right edge
-const WATERMARK_MARGIN_Y_RATIO = 0.025; // 2.5% of height from the bottom edge
-const WATERMARK_MIN_MARGIN = 16;
-
-type WatermarkSource = { key: string; buffer: Buffer; width: number; height: number };
+// The active watermark is the admin-managed logo configured in Settings →
+// Watermark together with its saved appearance settings. When no logo is
+// configured, or the admin has disabled the watermark, uploads produce normal
+// unwatermarked derivatives.
 // Keyed by the stored object path so a replaced logo invalidates the cache.
 const watermarkSourceCache = new Map<string, WatermarkSource>();
-const resizedWatermarkCache = new Map<string, Buffer>();
 
-async function activeWatermark(supabase: SupabaseClient<Database>): Promise<WatermarkSource | null> {
-  const { data } = await supabase.from("site_branding").select("watermark_path").eq("id", "branding").maybeSingle();
+async function activeWatermark(supabase: SupabaseClient<Database>): Promise<ActiveWatermarkConfig | null> {
+  const { data } = await supabase.from("site_branding").select("watermark_path,watermark_enabled,watermark_opacity,watermark_scale,watermark_margin,watermark_position").eq("id", "branding").maybeSingle();
   const key = (data?.watermark_path as string | null) ?? null;
-  if (!key) return null;
+  if (!key || data?.watermark_enabled === false) return null;
+  const settings = validateWatermarkSettings({
+    enabled: data?.watermark_enabled,
+    opacity: data?.watermark_opacity,
+    scale: data?.watermark_scale,
+    margin: data?.watermark_margin,
+    position: data?.watermark_position,
+  });
   const cached = watermarkSourceCache.get(key);
-  if (cached) return cached;
+  if (cached) return { source: cached, settings };
   const bytes = await photoStore().downloadBytes(key);
   if (!bytes) return null;
-  try {
-    const buffer = await sharp(bytes).png().toBuffer();
-    const info = await sharp(buffer).metadata();
-    if (!info.width || !info.height) return null;
-    const source: WatermarkSource = { key, buffer, width: info.width, height: info.height };
-    watermarkSourceCache.set(key, source);
-    return source;
-  } catch {
-    return null;
-  }
-}
-
-async function resizedWatermark(logoWidth: number, source: WatermarkSource): Promise<Buffer> {
-  const cacheKey = `${source.key}:${logoWidth}`;
-  let cached = resizedWatermarkCache.get(cacheKey);
-  if (!cached) {
-    const logoHeight = Math.max(1, Math.round(logoWidth * (source.height / source.width)));
-    cached = await sharp(source.buffer)
-      .resize({ width: logoWidth, height: logoHeight, fit: "fill" })
-      .png()
-      .toBuffer();
-    resizedWatermarkCache.set(cacheKey, cached);
-  }
-  return cached;
-}
-
-/** Bottom-right placement inset proportional to the image size (never fixed px). */
-function watermarkPlacement(imageWidth: number, imageHeight: number, logoWidth: number, logoHeight: number) {
-  const marginX = Math.max(WATERMARK_MIN_MARGIN, Math.round(imageWidth * WATERMARK_MARGIN_X_RATIO));
-  const marginY = Math.max(WATERMARK_MIN_MARGIN, Math.round(imageHeight * WATERMARK_MARGIN_Y_RATIO));
-  return { left: Math.max(0, imageWidth - logoWidth - marginX), top: Math.max(0, imageHeight - logoHeight - marginY) };
+  const source = await watermarkSourceFromBytes(bytes, key);
+  if (!source) return null;
+  watermarkSourceCache.set(key, source);
+  return { source, settings };
 }
 
 function withinLongEdge(width: number, height: number, longEdge: number) {
@@ -126,35 +118,21 @@ function withinLongEdge(width: number, height: number, longEdge: number) {
   return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
 }
 
-/** WebP at the exact target size; the logo is not distorted and, when a watermark is set, burned into the pixels. */
-async function watermarkedDerivative(body: Buffer, targetWidth: number, targetHeight: number, quality: number, watermark: WatermarkSource | null): Promise<Buffer> {
-  const pipeline = sharp(body).resize({ width: targetWidth, height: targetHeight, fit: "fill" });
-  if (watermark) {
-    const aspect = watermark.height / watermark.width;
-    const marginX = Math.max(WATERMARK_MIN_MARGIN, Math.round(targetWidth * WATERMARK_MARGIN_X_RATIO));
-    const marginY = Math.max(WATERMARK_MIN_MARGIN, Math.round(targetHeight * WATERMARK_MARGIN_Y_RATIO));
-    const availableWidth = Math.max(1, targetWidth - marginX);
-    const availableHeight = Math.max(1, targetHeight - marginY);
-    let logoWidth = Math.min(Math.max(Math.round(targetWidth * WATERMARK_WIDTH_RATIO), WATERMARK_MIN_WIDTH), WATERMARK_MAX_WIDTH);
-    // A small photo can be smaller than WATERMARK_MIN_WIDTH; the logo must never
-    // be larger than the target image, so shrink it while keeping its aspect.
-    const fit = Math.min(availableWidth / logoWidth, availableHeight / (logoWidth * aspect));
-    if (fit < 1) logoWidth = Math.max(1, Math.floor(logoWidth * fit));
-    const logoHeight = Math.max(1, Math.round(logoWidth * aspect));
-    const logo = await resizedWatermark(logoWidth, watermark);
-    const placement = watermarkPlacement(targetWidth, targetHeight, logoWidth, logoHeight);
-    pipeline.composite([{ input: logo, left: placement.left, top: placement.top }]);
-  }
-  return pipeline.webp({ quality }).toBuffer();
-}
-
 /**
  * Build and store the three client-facing derivatives (watermarked when a logo
  * is configured, plain otherwise). A photo with no derivatives is never made
  * visible to a client; on partial failure the created derivatives are removed
- * before the error propagates.
+ * before the error propagates. `overwrite` allows re-stamping an existing
+ * photo (keys may already exist); `keepOnFailure` lists currently-referenced
+ * keys that must never be deleted by that cleanup so no failure can leave a
+ * photo with broken images.
  */
-async function storeWatermarkedDerivatives(body: Buffer, paths: { thumbnail: string; preview: string; download: string }, watermark: WatermarkSource | null): Promise<{ width: number | null; height: number | null; uploaded: string[] }> {
+async function storeWatermarkedDerivatives(
+  body: Buffer,
+  paths: { thumbnail: string; preview: string; download: string },
+  watermark: ActiveWatermarkConfig | null,
+  options?: { overwrite?: boolean; keepOnFailure?: string[] },
+): Promise<{ width: number | null; height: number | null; uploaded: string[] }> {
   const metadata = await sharp(body).metadata();
   const width = metadata.width;
   const height = metadata.height;
@@ -165,14 +143,20 @@ async function storeWatermarkedDerivatives(body: Buffer, paths: { thumbnail: str
     { key: paths.download, size: { width, height }, quality: DOWNLOAD_QUALITY },
   ];
   const uploaded: string[] = [];
+  const protectedKeys = new Set(options?.keepOnFailure ?? []);
   try {
     for (const job of jobs) {
       const derivative = await watermarkedDerivative(body, job.size.width, job.size.height, job.quality, watermark);
-      await photoStore().uploadPhoto({ key: job.key, body: derivative, contentType: "image/webp" });
+      await photoStore().uploadPhoto({
+        key: job.key,
+        body: derivative,
+        contentType: "image/webp",
+        upsert: options?.overwrite === true ? true : undefined,
+      });
       uploaded.push(job.key);
     }
   } catch (error) {
-    try { await photoStore().removePhotos(uploaded); } catch { /* Preserve the original failure. */ }
+    try { await photoStore().removePhotos(uploaded.filter(key => !protectedKeys.has(key))); } catch { /* Preserve the original failure. */ }
     throw error;
   }
   return { width, height, uploaded };
@@ -261,10 +245,31 @@ export async function completeClientGalleryUpload(form: FormData): Promise<{ ok:
     .maybeSingle();
   if (!folder) return { ok: false, message: "Upload failed: the selected folder is unavailable." };
   const paths = clientPhotoPaths(parsed.data.gallery_id, folder.id, id, metadata.filename);
-  if (value(form, "key") !== paths.original) return { ok: false, message: "Upload failed: invalid storage path." };
-  if (await objectBytes(paths.original) !== metadata.bytes) return { ok: false, message: "Upload failed: the original file was not stored." };
+  if (value(form, "key") !== paths.original) {
+    // The client must never choose its own key. Clean up any object it
+    // managed to upload under the prepared key before rejecting.
+    try {
+      if (isClientPhotoStorageKey(value(form, "key"))) await photoStore().removePhotos([value(form, "key")]);
+    } catch { /* Best-effort cleanup of a rejected upload. */ }
+    return { ok: false, message: "Upload failed: invalid storage path." };
+  }
+  // Idempotent retry: a previous completion already recorded this photo.
+  const { data: existing } = await supabase.from("photos").select("id,original_path").eq("id", id).maybeSingle();
+  if (existing) {
+    if (existing.original_path === paths.original) return { ok: true };
+    // The id collides with a different photo; never touch the existing record.
+    return { ok: false, message: "Upload failed: invalid photo reference." };
+  }
+  // A single read verifies integrity AND feeds derivative generation, so the
+  // upload cannot race between a HEAD size-check and the GET (and one fewer
+  // round trip to storage).
   const body = await downloadObjectBytes(paths.original);
-  if (!body) return { ok: false, message: "Upload failed: the original file could not be read." };
+  if (!body || body.byteLength !== metadata.bytes) {
+    // Nothing was stored, or it is partial/corrupt. Removing a missing key is
+    // an idempotent no-op, so cleanup is safe on either outcome.
+    try { await photoStore().removePhotos([paths.original]); } catch { /* Best-effort cleanup. */ }
+    return { ok: false, message: "Upload failed: the original file was not stored." };
+  }
   const { count } = await supabase
     .from("photos")
     .select("id", { count: "exact", head: true })
@@ -392,11 +397,17 @@ async function runFolderUpload(gallery: string, folderId: string, form: FormData
 export async function deletePhoto(form: FormData) {
   const gallery=value(form,"gallery_id"); const id=value(form,"id"); const supabase=await db();
   const { data: photo }=await supabase.from("photos").select("original_path,preview_path,thumbnail_path,download_path").eq("id",id).eq("gallery_id",gallery).maybeSingle();
-  if(photo) {
-    const paths=[photo.original_path, photo.preview_path, photo.thumbnail_path, photo.download_path].filter((path): path is string => Boolean(path));
-    if(paths.length) await photoStore().removePhotos(paths);
-    await supabase.from("photos").delete().eq("id",id).eq("gallery_id",gallery);
+  if(!photo) return;
+  const paths=photoStoragePaths(photo);
+  if(paths.length){
+    try {
+      await photoStore().removePhotos(paths);
+    } catch {
+      return redirect(`/admin/galleries/${gallery}?error=photo-storage-delete`);
+    }
   }
+  const { error }=await supabase.from("photos").delete().eq("id",id).eq("gallery_id",gallery);
+  if(error) return redirect(`/admin/galleries/${gallery}?error=photo-delete`);
   revalidatePath(`/admin/galleries/${gallery}`);
 }
 
@@ -427,9 +438,177 @@ export async function deletePhotos(form: FormData) {
   if(!ids.length) return;
   const supabase=await db();
   const { data: photos }=await supabase.from("photos").select("id,original_path,preview_path,thumbnail_path,download_path").eq("gallery_id",gallery).in("id",ids);
-  const paths=(photos??[]).flatMap(photo => [photo.original_path, photo.preview_path, photo.thumbnail_path, photo.download_path]).filter((path): path is string => Boolean(path));
-  if(paths.length) await photoStore().removePhotos(paths);
-  await supabase.from("photos").delete().eq("gallery_id",gallery).in("id",ids);
+  const paths=(photos??[]).flatMap(photoStoragePaths);
+  if(paths.length){
+    try {
+      await photoStore().removePhotos(paths);
+    } catch {
+      return redirect(`/admin/galleries/${gallery}?error=photos-storage-delete`);
+    }
+  }
+  const { error }=await supabase.from("photos").delete().eq("gallery_id",gallery).in("id",ids);
+  if(error) return redirect(`/admin/galleries/${gallery}?error=photos-delete`);
   revalidatePath(`/admin/galleries/${gallery}`);
   revalidatePath(`/admin/galleries/${gallery}/${folder}`);
+}
+
+/* ------------------------------------------------------------------ */
+/* Apply the current watermark to existing photos                      */
+/* ------------------------------------------------------------------ */
+
+// Reuses activeWatermark(), storeWatermarkedDerivatives(),
+// clientPhotoPaths() and photoStore so reprocessing is pixel-identical to a
+// fresh upload (same logo, same sizing, same placement, same derivatives).
+const WATERMARK_CONCURRENCY = 3;
+
+type ReapplyPhoto = {
+  id: string;
+  folder_id: string;
+  original_path: string;
+  thumbnail_path: string | null;
+  preview_path: string | null;
+  download_path: string | null;
+};
+
+/**
+ * Regenerate one existing photo's client-facing derivatives from its private
+ * original using the CURRENT watermark. The original is only ever read, never
+ * replaced. The new derivatives are stored first, the DB paths are updated only
+ * after that succeeds, and then the obsolete old derivatives are removed. On
+ * failure the photo keeps its previous valid derivatives and any newly written
+ * files are cleaned up.
+ */
+async function reapplyPhotoWatermark(supabase: SupabaseClient<Database>, gallery: string, photo: ReapplyPhoto, watermark: ActiveWatermarkConfig): Promise<void> {
+  const body = await photoStore().downloadBytes(photo.original_path);
+  if (!body) throw new Error("original-unreadable");
+  const paths = clientPhotoPaths(gallery, photo.folder_id, photo.id, photo.original_path.split("/").pop() ?? "photo.webp");
+  const previous = [photo.thumbnail_path, photo.preview_path, photo.download_path].filter((path): path is string => Boolean(path));
+  const derivatives = await storeWatermarkedDerivatives(
+    body,
+    { thumbnail: paths.thumbnail, preview: paths.preview, download: paths.download },
+    watermark,
+    { overwrite: true, keepOnFailure: previous },
+  );
+  const next = [paths.thumbnail, paths.preview, paths.download];
+  const { error } = await supabase
+    .from("photos")
+    .update({ thumbnail_path: paths.thumbnail, preview_path: paths.preview, download_path: paths.download })
+    .eq("id", photo.id)
+    .eq("gallery_id", gallery);
+  if (error) {
+    // The photo still references its previous valid derivatives; drop only the
+    // freshly written keys that are NOT those referenced paths so storage stays
+    // consistent without ever breaking a live thumbnail/preview/download.
+    try { await photoStore().removePhotos(derivatives.uploaded.filter(key => !previous.includes(key))); } catch { /* Preserve the database failure. */ }
+    throw new Error("db-update-failed");
+  }
+  const obsolete = previous.filter(path => !next.includes(path));
+  if (obsolete.length) {
+    try { await photoStore().removePhotos(obsolete); } catch { /* A stale derivative is harmless. */ }
+  }
+}
+
+export type ApplyWatermarkResult = {
+  ok: boolean;
+  message: string;
+  succeeded: number;
+  failed: number;
+  failedIds: string[];
+  total: number;
+};
+
+/**
+ * Admin bulk action: (re)watermark existing photos with the current logo.
+ * Each photo is processed from its stored private original with bounded
+ * concurrency, and a single photo failure never blocks the others. Failed ids
+ * are returned so the client can offer a targeted retry.
+ */
+export async function applyWatermarkToPhotos(form: FormData): Promise<ApplyWatermarkResult> {
+  const gallery = value(form, "gallery_id");
+  const folder = value(form, "folder_id");
+  const ids = form.getAll("ids").map(entry => String(entry)).filter(Boolean);
+  const total = ids.length;
+  if (!total) return { ok: false, message: "No photos selected.", succeeded: 0, failed: 0, failedIds: [], total: 0 };
+  const supabase = await db();
+  const watermark = await activeWatermark(supabase);
+  if (!watermark) {
+    return { ok: false, message: "Watermarking is currently off. Add or enable a watermark logo in Settings → Watermark first.", succeeded: 0, failed: 0, failedIds: [], total };
+  }
+  const activeWatermarkConfig: ActiveWatermarkConfig = watermark;
+  const query = supabase
+    .from("photos")
+    .select("id,folder_id,original_path,thumbnail_path,preview_path,download_path")
+    .eq("gallery_id", gallery)
+    .in("id", ids);
+  const { data: photos } = folder ? await query.eq("folder_id", folder) : await query;
+  const pending = photos ?? [];
+  const succeeded: string[] = [];
+  const failedIds: string[] = [];
+  let next = 0;
+  async function worker() {
+    while (next < pending.length) {
+      const photo = pending[next++];
+      try {
+        await reapplyPhotoWatermark(supabase, gallery, photo, activeWatermarkConfig);
+        succeeded.push(photo.id);
+      } catch (error) {
+        console.error(`client-gallery: apply watermark failed for ${photo.id}`, error);
+        failedIds.push(photo.id);
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(WATERMARK_CONCURRENCY, pending.length) }, () => worker()));
+  revalidatePath(`/admin/galleries/${gallery}`);
+  if (folder) revalidatePath(`/admin/galleries/${gallery}/${folder}`);
+  return {
+    ok: succeeded.length > 0 && failedIds.length === 0,
+    message: failedIds.length ? `${failedIds.length} of ${pending.length} photos failed.` : "Watermark applied.",
+    succeeded: succeeded.length,
+    failed: failedIds.length,
+    failedIds,
+    total: pending.length,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Storage orphan audit (admin-only, no prompt-safe web UI)            */
+/* ------------------------------------------------------------------ */
+
+async function referencedPhotoPaths(): Promise<Set<string>> {
+  const supabase = await db();
+  const { data } = await supabase.from("photos").select("original_path,preview_path,thumbnail_path,download_path");
+  const referenced = new Set<string>();
+  for (const photo of data ?? []) for (const path of photoStoragePaths(photo)) referenced.add(path);
+  return referenced;
+}
+
+/**
+ * Read-only storage audit: list every object in the active provider bucket and
+ * report the photo-shaped keys no gallery photo references. Returns
+ * { ok:false } on storage-list failure so the caller can display it. Deletes
+ * nothing.
+ */
+export async function auditStorageOrphans(): Promise<{ ok: boolean; count: number; keys: string[]; error?: string }> {
+  try {
+    const referenced = await referencedPhotoPaths();
+    const orphans = await auditOrphans(referenced);
+    return { ok: true, count: orphans.length, keys: orphans };
+  } catch (error) {
+    return { ok: false, count: 0, keys: [], error: error instanceof Error ? error.message : "Could not audit storage." };
+  }
+}
+
+/**
+ * Deliberate cleanup of explicit keys only. Each key must be photo-shaped AND
+ * unreferenced by any gallery photo before it is removed; the DB rows are
+ * never touched. Safe to call repeatedly (missing objects are idempotent).
+ */
+export async function cleanupStorageOrphans(keys: string[]): Promise<{ ok: boolean; removed: number; rejected: number }> {
+  try {
+    const referenced = await referencedPhotoPaths();
+    const removed = await cleanupOrphans(keys, referenced);
+    return { ok: true, removed: removed.length, rejected: keys.length - removed.length };
+  } catch {
+    return { ok: false, removed: 0, rejected: keys.length };
+  }
 }

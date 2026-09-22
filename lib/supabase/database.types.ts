@@ -349,6 +349,11 @@ export type Database = {
         social_image_path: string | null;
         watermark_path: string | null;
         watermark_mime: string | null;
+        watermark_enabled: boolean;
+        watermark_opacity: number;
+        watermark_scale: number;
+        watermark_margin: number;
+        watermark_position: string;
         created_at: string;
         updated_at: string;
       }, {
@@ -366,6 +371,11 @@ export type Database = {
         social_image_path?: string | null;
         watermark_path?: string | null;
         watermark_mime?: string | null;
+        watermark_enabled?: boolean;
+        watermark_opacity?: number;
+        watermark_scale?: number;
+        watermark_margin?: number;
+        watermark_position?: string;
         created_at?: string;
         updated_at?: string;
       }>;

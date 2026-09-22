@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { deletePhotos, movePhotos } from "@/app/admin/crud-actions";
 import { setFolderCover, setFolderPublished } from "@/app/admin/set-actions";
+import { ApplyWatermarkButton } from "@/components/admin/apply-watermark-button";
+import { DeleteSelectedButton } from "@/components/admin/delete-selected-button";
 import { uploadClientGalleryFiles } from "@/components/admin/client-gallery-upload";
 import { StagedUploadQueue, type StagedUploadQueueHandle } from "@/components/admin/upload-queue";
 
@@ -28,11 +30,13 @@ export function SetWorkspace({
   folder,
   moveTargets,
   photos,
+  watermarkEnabled,
 }: {
   gallery: { id: string; title: string; slug: string };
   folder: { id: string; name: string; slug: string; description: string | null; published: boolean };
   moveTargets: MoveTarget[];
   photos: WorkspacePhoto[];
+  watermarkEnabled: boolean;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -56,6 +60,8 @@ export function SetWorkspace({
   const none = selected.size === 0;
   const single = selected.size === 1;
   const singleId = single ? [...selected][0] : null;
+  const allSelected = photos.length > 0 && photos.every(photo => selected.has(photo.id));
+  const selectAll = () => setSelected(new Set(photos.map(photo => photo.id)));
 
   function stageFiles(files: FileList | null | File[]) {
     if (!files || files.length === 0) return;
@@ -174,6 +180,9 @@ export function SetWorkspace({
       <div className="ws-toolbar" aria-live="polite">
         {none ? (
           <>
+            {photos.length ? (
+              <button className="admin-button is-secondary" onClick={selectAll} type="button">Select All</button>
+            ) : null}
             <button className="admin-button is-secondary" onClick={() => fileInput.current?.click()} type="button">
               <Upload size={15} strokeWidth={1.8} /> Upload pictures
             </button>
@@ -184,6 +193,11 @@ export function SetWorkspace({
         ) : (
           <>
             <strong className="ws-selected-count">{selected.size} selected</strong>
+            {allSelected ? (
+              <button className="admin-button is-secondary" onClick={clear} type="button">Deselect All</button>
+            ) : (
+              <button className="admin-button is-secondary" onClick={selectAll} type="button">Select All</button>
+            )}
             <form className="ws-move-form" action={movePhotos}>
               {[...selected].map(id => <input key={id} name="ids" type="hidden" value={id} />)}
               <input name="gallery_id" type="hidden" value={gallery.id} />
@@ -198,6 +212,12 @@ export function SetWorkspace({
             <button className="admin-button is-secondary" onClick={downloadSelected} type="button">
               <Download size={15} strokeWidth={1.8} /> Download
             </button>
+            <ApplyWatermarkButton
+              disabled={!watermarkEnabled}
+              folderId={folder.id}
+              galleryId={gallery.id}
+              photoIds={[...selected]}
+            />
             {singleId ? (
               <form action={setFolderCover}>
                 <input name="id" type="hidden" value={folder.id} />
@@ -243,14 +263,17 @@ export function SetWorkspace({
 
       {confirmDelete ? (
         <div className="ws-confirm">
-          <p>Delete {selected.size} {selected.size === 1 ? "photo" : "photos"}? This can&apos;t be undone.</p>
+          <p>
+            Delete {selected.size} {selected.size === 1 ? "photo" : "photos"}?
+            This will permanently remove {selected.size === 1 ? "this photo" : "these photos"} from this gallery.
+          </p>
           <div>
             <button className="admin-button is-secondary" onClick={() => setConfirmDelete(false)} type="button">Cancel</button>
             <form action={deletePhotos} onSubmit={() => setConfirmDelete(false)}>
               {[...selected].map(id => <input key={id} name="ids" type="hidden" value={id} />)}
               <input name="gallery_id" type="hidden" value={gallery.id} />
               <input name="folder_id" type="hidden" value={folder.id} />
-              <button className="admin-button is-danger" type="submit">Delete</button>
+              <DeleteSelectedButton count={selected.size} />
             </form>
           </div>
         </div>

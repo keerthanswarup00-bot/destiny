@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -28,7 +27,9 @@ import {
   X,
 } from "lucide-react";
 import { AddSetDialog } from "@/components/admin/add-set-dialog";
+import { ApplyWatermarkButton } from "@/components/admin/apply-watermark-button";
 import { CopyButton } from "@/components/admin/copy-button";
+import { DeleteSelectedButton } from "@/components/admin/delete-selected-button";
 import {
   deleteFolder,
   deletePhotos,
@@ -43,11 +44,6 @@ import {
 } from "@/app/admin/set-actions";
 import { uploadClientGalleryFiles } from "@/components/admin/client-gallery-upload";
 import { StagedUploadQueue, type StagedUploadQueueHandle } from "@/components/admin/upload-queue";
-
-function DeletePhotosButton() {
-  const { pending } = useFormStatus();
-  return <button className="admin-button is-danger" disabled={pending} type="submit">{pending ? "Deleting…" : "Delete"}</button>;
-}
 
 type EditorFolder = {
   id: string;
@@ -75,6 +71,7 @@ export function CollectionEditor({
   coversByFolder,
   shareUrl,
   error,
+  watermarkEnabled,
 }: {
   gallery: {
     id: string;
@@ -93,6 +90,7 @@ export function CollectionEditor({
   coversByFolder?: Record<string, string | null>;
   shareUrl: string;
   error?: string | null;
+  watermarkEnabled: boolean;
 }) {
   const router = useRouter();
   const [activeId, setActiveId] = useState<string>(folders[0]?.id ?? "");
@@ -139,6 +137,12 @@ export function CollectionEditor({
   const none = selected.size === 0;
   const single = selected.size === 1;
   const singleId = single ? [...selected][0] : null;
+  const allVisibleSelected = visible.length > 0 && visible.every(photo => selected.has(photo.id));
+  const selectAllVisible = () => setSelected(new Set(visible.map(photo => photo.id)));
+  const deselectAllVisible = () => {
+    const ids = new Set(visible.map(photo => photo.id));
+    setSelected(prev => new Set([...prev].filter(id => !ids.has(id))));
+  };
 
   const switchSet = (id: string) => {
     setActiveId(id);
@@ -435,6 +439,9 @@ export function CollectionEditor({
                   <div className="ws-toolbar" aria-live="polite">
                     {none ? (
                       <>
+                        {visible.length ? (
+                          <button className="admin-button is-secondary" onClick={selectAllVisible} type="button">Select All</button>
+                        ) : null}
                         {visible.length !== photos.length ? (
                           <span className="ce-filtered-hint">{visible.length} of {photos.length} shown</span>
                         ) : null}
@@ -442,6 +449,11 @@ export function CollectionEditor({
                     ) : (
                       <>
                         <strong className="ws-selected-count">{selected.size} selected</strong>
+                        {allVisibleSelected ? (
+                          <button className="admin-button is-secondary" onClick={deselectAllVisible} type="button">Deselect All</button>
+                        ) : (
+                          <button className="admin-button is-secondary" onClick={selectAllVisible} type="button">Select All</button>
+                        )}
                         {nextTargets.length ? (
                           <form className="ws-move-form" action={movePhotos}>
                             {[...selected].map(id => <input key={id} name="ids" type="hidden" value={id} />)}
@@ -458,6 +470,12 @@ export function CollectionEditor({
                         <button className="admin-button is-secondary" onClick={downloadSelected} type="button">
                           <Download size={15} strokeWidth={1.8} /> Download
                         </button>
+                        <ApplyWatermarkButton
+                          disabled={!watermarkEnabled}
+                          folderId={activeFolder.id}
+                          galleryId={gallery.id}
+                          photoIds={[...selected]}
+                        />
                         {singleId ? (
                           <form action={setFolderCover} onSubmit={() => router.refresh()}>
                             <input name="id" type="hidden" value={activeFolder.id} />
@@ -584,14 +602,17 @@ export function CollectionEditor({
       ) : null}
       {confirmDelete ? (
         <div className="ws-confirm">
-          <p>Delete {selected.size} {selected.size === 1 ? "photo" : "photos"}? This can&apos;t be undone.</p>
+          <p>
+            Delete {selected.size} {selected.size === 1 ? "photo" : "photos"}?
+            This will permanently remove {selected.size === 1 ? "this photo" : "these photos"} from this gallery.
+          </p>
           <div>
             <button className="admin-button is-secondary" onClick={() => setConfirmDelete(false)} type="button">Cancel</button>
             <form action={deletePhotos} onSubmit={() => setConfirmDelete(false)}>
               {[...selected].map(id => <input key={id} name="ids" type="hidden" value={id} />)}
               <input name="gallery_id" type="hidden" value={gallery.id} />
               {activeFolder ? <input name="folder_id" type="hidden" value={activeFolder.id} /> : null}
-              <DeletePhotosButton />
+              <DeleteSelectedButton count={selected.size} />
             </form>
           </div>
         </div>

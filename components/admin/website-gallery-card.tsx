@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { deleteWebsiteGalleryImage, updateWebsiteGalleryImageCategory } from "@/app/admin/website/actions";
+import { deleteWebsiteGalleryImage, removeWebsiteGalleryHighlight, setWebsiteGalleryHighlight, updateWebsiteGalleryImageCategory } from "@/app/admin/website/actions";
 
 export function WebsiteGalleryCard({
   id,
@@ -10,6 +10,8 @@ export function WebsiteGalleryCard({
   bytes,
   category,
   selected,
+  isHighlight,
+  onCrop,
   onSelected,
 }: {
   id: string;
@@ -18,6 +20,8 @@ export function WebsiteGalleryCard({
   bytes: number;
   category: string | null;
   selected: boolean;
+  isHighlight: boolean;
+  onCrop: () => void;
   onSelected: () => void;
 }) {
   const deleteDialog = useRef<HTMLDialogElement>(null);
@@ -32,6 +36,7 @@ export function WebsiteGalleryCard({
           <img alt="" src={previewUrl} />
         </a>
       ) : <div className="photo-card-fallback">Preview unavailable</div>}
+      {isHighlight ? <span className="status-pill is-highlight">Highlight</span> : null}
       <div className="photo-card-meta">
         <label className="website-gallery-select"><input checked={selected} onChange={onSelected} type="checkbox" /> Select</label>
         <strong>{filename}</strong>
@@ -50,6 +55,20 @@ export function WebsiteGalleryCard({
           </label>
           <button type="submit">Save category</button>
         </form>
+        {isHighlight ? (
+          <>
+            <button onClick={onCrop} type="button">Crop highlight</button>
+            <form action={removeWebsiteGalleryHighlight}>
+              <input name="id" type="hidden" value={id} />
+              <button type="submit">Remove highlight</button>
+            </form>
+          </>
+        ) : (
+          <form action={setWebsiteGalleryHighlight}>
+            <input name="id" type="hidden" value={id} />
+            <button type="submit">Set as highlight</button>
+          </form>
+        )}
         <button onClick={() => deleteDialog.current?.showModal()} type="button">Delete</button>
       </div>
       <dialog className="admin-dialog" ref={deleteDialog}>

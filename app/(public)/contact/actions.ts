@@ -1,6 +1,6 @@
 "use server";
 
-import { getSiteContact } from "@/lib/site/site-content";
+import { loadSiteContact } from "@/lib/site/site-content";
 import { siteDb } from "@/lib/site/site-db";
 import { buildEnquiryMessage, waLink } from "@/lib/site/whatsapp";
 
@@ -38,7 +38,7 @@ export async function submitEnquiry(_prev: EnquiryState, formData: FormData): Pr
   if (Object.keys(errors).length > 0) return { result: { ok: false, errors } };
   if (values.honeypot) return { result: { ok: false, errors: {} } };
 
-  const contact = await getSiteContact();
+  const contact = await loadSiteContact();
 
   let saved = false;
   try {

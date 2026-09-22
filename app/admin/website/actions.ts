@@ -1,10 +1,10 @@
 "use server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { adminDb } from "@/lib/admin-data";
 import { ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES } from "@/lib/admin-validation";
-import { ensureWebsiteGallery, normalizeWebsiteGalleryCategory, websiteGalleryId, websiteImageKey } from "@/lib/site/website-gallery";
+import { ensureWebsiteGallery, HIGHLIGHT_MAX_ZOOM, normalizeHighlightCrop, normalizeWebsiteGalleryCategory, websiteGalleryId, websiteImageKey } from "@/lib/site/website-gallery";
 import { photoStore } from "@/lib/storage-provider";
 import { createSignedPutUrl } from "@/lib/r2";
 
@@ -16,6 +16,11 @@ const revalidate = () => {
   revalidatePath("/gallery");
   revalidatePath("/contact");
 };
+
+/** Invalidate cached public site-content reads. Tags mirror SITE_CACHE_TAGS in lib/site/site-content.ts. */
+async function invalidateTags(...tags: string[]) {
+  await Promise.all(tags.map(tag => revalidateTag(tag)));
+}
 
 async function db() {
   await requireAdmin();
@@ -38,6 +43,7 @@ async function patchHome(section: string, patch: Record<string, unknown>, redire
   const merged = { ...(previous as Record<string, unknown>), ...patch };
   await supabase.from("site_home").upsert({ id: "home", ...row, [section]: merged }, { onConflict: "id" });
   revalidate();
+  await invalidateTags("site-home");
   redirect(`${redirectTo}?saved=1`);
 }
 
@@ -121,6 +127,7 @@ export async function completeWebsiteGalleryUpload(form: FormData): Promise<{ ok
     return { ok: false, message: "Upload failed: the photo record could not be created." };
   }
   revalidate();
+  await invalidateTags("site-website-gallery");
   return { ok: true };
 }
 
@@ -235,6 +242,7 @@ export async function saveStoryRow(form: FormData) {
     .update({ title: value(form, "title").trim().slice(0, 200) || null, sort_order: Math.max(0, Number(value(form, "sort_order")) || 0), published: checked(form, "published") })
     .eq("id", id);
   revalidate();
+  await invalidateTags("site-stories");
   redirect("/admin/website/home?saved=1");
 }
 
@@ -245,6 +253,7 @@ export async function removeStory(form: FormData) {
   await supabase.from("site_stories").delete().eq("id", id);
   void gallery;
   revalidate();
+  await invalidateTags("site-stories");
   redirect("/admin/website/gallery?saved=1");
 }
 
@@ -278,6 +287,7 @@ export async function saveGalleryPortfolio(form: FormData) {
     await supabase.from("site_stories").delete().eq("id", story.id);
   }
   revalidate();
+  await invalidateTags("site-stories", "site-portfolio");
   redirect("/admin/website/gallery?saved=1");
 }
 
@@ -338,6 +348,7 @@ export async function uploadWebsiteGalleryImages(form: FormData): Promise<{ ok: 
     };
   }
   revalidate();
+  await invalidateTags("site-website-gallery");
   return { ok: true, count: uploadedKeys.length };
 }
 
@@ -357,6 +368,7 @@ export async function updateWebsiteGalleryImageCategory(form: FormData) {
     .eq("pending_delete", false);
   if (error) throw new Error(`Category could not be updated: ${error.message}`);
   revalidate();
+  await invalidateTags("site-website-gallery");
 }
 
 export async function deleteWebsiteGalleryImage(form: FormData) {
@@ -371,6 +383,7 @@ export async function deleteWebsiteGalleryImage(form: FormData) {
     .eq("gallery_id", galleryId);
   if (error) throw new Error(`Image could not be marked for deletion: ${error.message}`);
   revalidate();
+  await invalidateTags("site-website-gallery");
 }
 
 export async function deleteWebsiteGalleryImages(form: FormData) {
@@ -386,6 +399,72 @@ export async function deleteWebsiteGalleryImages(form: FormData) {
     .eq("gallery_id", galleryId);
   if (error) throw new Error(`Images could not be marked for deletion: ${error.message}`);
   revalidate();
+  await invalidateTags("site-website-gallery");
+}
+
+export async function setWebsiteGalleryHighlight(form: FormData) {
+  const id = value(form, "id");
+  const supabase = await db();
+  const galleryId = await websiteGalleryId(supabase);
+  if (!galleryId || !id) return redirect("/admin/website/gallery?saved=1");
+  const { error } = await supabase
+    .from("photos")
+    .select("id")
+    .eq("id", id)
+    .eq("gallery_id", galleryId)
+    .eq("pending_delete", false)
+    .maybeSingle();
+  if (error) throw new Error(`Highlight could not be set: ${error.message}`);
+  const { error: updateError } = await supabase
+    .from("galleries")
+    .update({ highlight_photo_id: id, highlight_crop: null })
+    .eq("id", galleryId);
+  if (updateError) throw new Error(`Highlight could not be set: ${updateError.message}`);
+  revalidate();
+  await invalidateTags("site-website-gallery");
+  redirect("/admin/website/gallery?highlight=1");
+}
+
+export async function removeWebsiteGalleryHighlight(form: FormData) {
+  const supabase = await db();
+  const galleryId = await websiteGalleryId(supabase);
+  if (!galleryId) return redirect("/admin/website/gallery?saved=1");
+  void form;
+  const { error } = await supabase
+    .from("galleries")
+    .update({ highlight_photo_id: null, highlight_crop: null })
+    .eq("id", galleryId);
+  if (error) throw new Error(`Highlight could not be removed: ${error.message}`);
+  revalidate();
+  await invalidateTags("site-website-gallery");
+  redirect("/admin/website/gallery?saved=1");
+}
+
+export async function saveWebsiteGalleryHighlightCrop(form: FormData) {
+  const id = value(form, "id");
+  const crop = normalizeHighlightCrop({ x: Number(value(form, "x")), y: Number(value(form, "y")), zoom: Number(value(form, "zoom")) });
+  const supabase = await db();
+  const galleryId = await websiteGalleryId(supabase);
+  if (!galleryId || !id || !crop) return redirect("/admin/website/gallery?saved=1");
+  const { data: gallery } = await supabase
+    .from("galleries")
+    .select("highlight_photo_id")
+    .eq("id", galleryId)
+    .maybeSingle();
+  if (gallery?.highlight_photo_id !== id) return redirect("/admin/website/gallery?saved=1");
+  const rounded = {
+    x: Math.round(crop.x * 10000) / 10000,
+    y: Math.round(crop.y * 10000) / 10000,
+    zoom: Math.round(Math.min(HIGHLIGHT_MAX_ZOOM, Math.max(1, crop.zoom)) * 100) / 100,
+  };
+  const { error } = await supabase
+    .from("galleries")
+    .update({ highlight_crop: rounded })
+    .eq("id", galleryId);
+  if (error) throw new Error(`Crop could not be saved: ${error.message}`);
+  revalidate();
+  await invalidateTags("site-website-gallery");
+  redirect("/admin/website/gallery?crop=1");
 }
 
 export async function publishWebsiteGallery(): Promise<void> {
@@ -420,6 +499,7 @@ export async function publishWebsiteGallery(): Promise<void> {
     throw new Error("Could not publish the Website Gallery. Retry the publish operation.");
   }
   revalidate();
+  await invalidateTags("site-website-gallery");
   redirect("/admin/website/gallery?published=1");
 }
 
@@ -445,6 +525,7 @@ export async function saveContact(form: FormData) {
     { onConflict: "id" },
   );
   revalidate();
+  await invalidateTags("site-contact");
   redirect("/admin/website/contact?saved=1");
 }
 
@@ -486,6 +567,7 @@ export async function saveBranding(form: FormData) {
     { onConflict: "id" },
   );
   revalidate();
+  await invalidateTags("site-branding");
   redirect("/admin/website/branding?saved=1");
 }
 
@@ -504,5 +586,6 @@ export async function saveTheme(form: FormData) {
     { onConflict: "id" },
   );
   revalidate();
+  await invalidateTags("site-theme");
   redirect("/admin/website/appearance?saved=1");
 }

@@ -1,8 +1,10 @@
 import "server-only";
+import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { CLIENT_SIGNED_URL_SECONDS } from "@/lib/client-media";
 import { galleryOverviews } from "@/lib/gallery-data";
 import { siteDb } from "@/lib/site/site-db";
-import { getWebsiteGalleryImages, normalizeWebsiteGalleryCategory, websiteGalleryExists, type WebsiteGalleryCategory } from "@/lib/site/website-gallery";
+import { getWebsiteGalleryHighlight, getWebsiteGalleryImages, normalizeWebsiteGalleryCategory, websiteGalleryExists, type WebsiteGalleryCategory } from "@/lib/site/website-gallery";
 import { photoStore } from "@/lib/storage-provider";
 
 /* ---------------------------------------------------------------------------
@@ -257,6 +259,31 @@ export function themeCssVars(tokens: ThemeTokens): Record<string, string> {
   };
 }
 
+/* ---------------------------- public read cache ---------------------------- */
+
+/**
+ * Stable tags used to invalidate public website content after admin edits.
+ * Mirror these exact strings in the admin CMS Server Actions that call
+ * revalidateTag() (app/admin/website/actions.ts, app/admin/set-actions.ts).
+ */
+export const SITE_CACHE_TAGS = {
+  home: "site-home",
+  stories: "site-stories",
+  portfolio: "site-portfolio",
+  contact: "site-contact",
+  branding: "site-branding",
+  theme: "site-theme",
+  websiteGallery: "site-website-gallery",
+} as const;
+
+/**
+ * CMS results embed signed object URLs valid for CLIENT_SIGNED_URL_SECONDS
+ * (60 * 15 = 15 minutes). Keep the cache TTL well inside that window so a
+ * served page never holds an expired URL. Admin edits invalidate the tags
+ * immediately, so this TTL is only a safety net.
+ */
+const SITE_CACHE_SECONDS = 300;
+
 /* --------------------------------- reads ---------------------------------- */
 
 function asHome(value: unknown): SiteHome {
@@ -271,7 +298,7 @@ function asHome(value: unknown): SiteHome {
   };
 }
 
-export async function getSiteHome(): Promise<SiteHome> {
+async function loadSiteHome(): Promise<SiteHome> {
   try {
     const db = siteDb();
     const { data } = await db.from("site_home").select("hero,what_we_document,stories,approach,cta").eq("id", "home").maybeSingle();
@@ -280,6 +307,14 @@ export async function getSiteHome(): Promise<SiteHome> {
     return DEFAULT_SITE_HOME;
   }
 }
+
+/*
+ * Public CMS reads are wrapped with `cache` (request-scoped memoization, so
+ * duplicate calls within one render — e.g. generateMetadata + layout — run
+ * once) and `unstable_cache` (persists the result across requests until the
+ * matching tag is revalidated or the TTL elapses). See SITE_CACHE_TAGS.
+ */
+export const getSiteHome = cache(unstable_cache(loadSiteHome, ["site-home"], { tags: [SITE_CACHE_TAGS.home], revalidate: SITE_CACHE_SECONDS }));
 
 async function signedAssetMap(paths: (string | null)[]): Promise<Map<string, string>> {
   const unique = [...new Set(paths.filter((path): path is string => Boolean(path)))];
@@ -305,7 +340,7 @@ export type SiteStory = {
   coverHeight: number | null;
 };
 
-export async function getSiteStories(): Promise<SiteStory[]> {
+async function loadSiteStories(): Promise<SiteStory[]> {
   try {
     const db = siteDb();
     const [{ data: storyRows }, { data: galleryRows }] = await Promise.all([
@@ -343,6 +378,8 @@ export async function getSiteStories(): Promise<SiteStory[]> {
   }
 }
 
+export const getSiteStories = cache(unstable_cache(loadSiteStories, ["site-stories"], { tags: [SITE_CACHE_TAGS.stories], revalidate: SITE_CACHE_SECONDS }));
+
 export type PortfolioGallery = {
   id: string;
   slug: string;
@@ -357,7 +394,7 @@ export type PortfolioGallery = {
   coverHeight: number | null;
 };
 
-export async function getPortfolioGalleries(): Promise<PortfolioGallery[]> {
+async function loadPortfolioGalleries(): Promise<PortfolioGallery[]> {
   try {
     const db = siteDb();
     const { data: galleries } = await db
@@ -390,6 +427,13 @@ export async function getPortfolioGalleries(): Promise<PortfolioGallery[]> {
   }
 }
 
+export const getPortfolioGalleries = cache(
+  unstable_cache(loadPortfolioGalleries, ["site-portfolio"], {
+    tags: [SITE_CACHE_TAGS.portfolio, SITE_CACHE_TAGS.stories],
+    revalidate: SITE_CACHE_SECONDS,
+  }),
+);
+
 export type SiteWebsiteImage = {
   id: string;
   url: string;
@@ -398,7 +442,7 @@ export type SiteWebsiteImage = {
   category: WebsiteGalleryCategory | null;
 };
 
-export async function getSiteWebsiteGallery(): Promise<SiteWebsiteImage[]> {
+async function loadSiteWebsiteGallery(): Promise<SiteWebsiteImage[]> {
   return (await getWebsiteGalleryImages()).map(image => ({
     id: image.id,
     url: image.url,
@@ -408,7 +452,14 @@ export async function getSiteWebsiteGallery(): Promise<SiteWebsiteImage[]> {
   }));
 }
 
-export async function getSiteWebsiteGalleryByCategory(category?: string): Promise<SiteWebsiteImage[]> {
+export const getSiteWebsiteGallery = cache(
+  unstable_cache(loadSiteWebsiteGallery, ["site-website-gallery"], {
+    tags: [SITE_CACHE_TAGS.websiteGallery],
+    revalidate: SITE_CACHE_SECONDS,
+  }),
+);
+
+async function loadSiteWebsiteGalleryByCategory(category?: string): Promise<SiteWebsiteImage[]> {
   const normalized = normalizeWebsiteGalleryCategory(category);
   return (await getWebsiteGalleryImages(normalized)).map(image => ({
     id: image.id,
@@ -419,16 +470,48 @@ export async function getSiteWebsiteGalleryByCategory(category?: string): Promis
   }));
 }
 
-export async function hasSiteWebsiteGallery(): Promise<boolean> {
+export const getSiteWebsiteGalleryByCategory = cache(
+  unstable_cache(loadSiteWebsiteGalleryByCategory, ["site-website-gallery-by-category"], {
+    tags: [SITE_CACHE_TAGS.websiteGallery],
+    revalidate: SITE_CACHE_SECONDS,
+  }),
+);
+
+async function loadHasSiteWebsiteGallery(): Promise<boolean> {
   return websiteGalleryExists(siteDb());
 }
+
+export const hasSiteWebsiteGallery = cache(
+  unstable_cache(loadHasSiteWebsiteGallery, ["has-site-website-gallery"], {
+    tags: [SITE_CACHE_TAGS.websiteGallery],
+    revalidate: SITE_CACHE_SECONDS,
+  }),
+);
+
+async function loadSiteWebsiteGalleryHighlight() {
+  const highlight = await getWebsiteGalleryHighlight();
+  if (!highlight) return null;
+  return {
+    url: highlight.photo.url,
+    width: highlight.photo.width,
+    height: highlight.photo.height,
+    crop: highlight.crop,
+  };
+}
+
+export const getSiteWebsiteGalleryHighlight = cache(
+  unstable_cache(loadSiteWebsiteGalleryHighlight, ["site-website-gallery-highlight"], {
+    tags: [SITE_CACHE_TAGS.websiteGallery],
+    revalidate: SITE_CACHE_SECONDS,
+  }),
+);
 
 function asContact(value: unknown): SiteContact {
   if (!value || typeof value !== "object") return DEFAULT_CONTACT;
   return { ...DEFAULT_CONTACT, ...(value as Partial<SiteContact>) };
 }
 
-export async function getSiteContact(): Promise<SiteContact> {
+export async function loadSiteContact(): Promise<SiteContact> {
   try {
     const db = siteDb();
     const { data } = await db.from("site_contact").select("*").eq("id", "contact").maybeSingle();
@@ -438,12 +521,19 @@ export async function getSiteContact(): Promise<SiteContact> {
   }
 }
 
+export const getSiteContact = cache(
+  unstable_cache(loadSiteContact, ["site-contact"], {
+    tags: [SITE_CACHE_TAGS.contact],
+    revalidate: SITE_CACHE_SECONDS,
+  }),
+);
+
 function asBranding(value: unknown): SiteBranding {
   if (!value || typeof value !== "object") return DEFAULT_BRANDING;
   return { ...DEFAULT_BRANDING, ...(value as Partial<SiteBranding>) };
 }
 
-export async function getSiteBranding(): Promise<SiteBrandingResolved> {
+async function loadSiteBranding(): Promise<SiteBrandingResolved> {
   try {
     const db = siteDb();
     const { data } = await db.from("site_branding").select("*").eq("id", "branding").maybeSingle();
@@ -455,7 +545,14 @@ export async function getSiteBranding(): Promise<SiteBrandingResolved> {
   }
 }
 
-export async function getSiteThemeSetting(): Promise<SiteTheme> {
+export const getSiteBranding = cache(
+  unstable_cache(loadSiteBranding, ["site-branding"], {
+    tags: [SITE_CACHE_TAGS.branding],
+    revalidate: SITE_CACHE_SECONDS,
+  }),
+);
+
+async function loadSiteThemeSetting(): Promise<SiteTheme> {
   try {
     const db = siteDb();
     const { data } = await db.from("site_theme").select("preset,accent").eq("id", "theme").maybeSingle();
@@ -468,6 +565,13 @@ export async function getSiteThemeSetting(): Promise<SiteTheme> {
     return DEFAULT_THEME;
   }
 }
+
+export const getSiteThemeSetting = cache(
+  unstable_cache(loadSiteThemeSetting, ["site-theme"], {
+    tags: [SITE_CACHE_TAGS.theme],
+    revalidate: SITE_CACHE_SECONDS,
+  }),
+);
 
 export async function getSiteThemeTokens(): Promise<ThemeTokens> {
   return themeTokens(await getSiteThemeSetting());

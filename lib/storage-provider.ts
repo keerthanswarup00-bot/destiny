@@ -2,23 +2,69 @@ import "server-only";
 import { galleryDb } from "@/lib/gallery-db";
 import { GALLERY_ASSET_BUCKET } from "@/lib/admin-validation";
 import { CLIENT_SIGNED_URL_SECONDS, DOWNLOAD_SIGNED_URL_SECONDS } from "@/lib/client-media";
-import { downloadObjectBytes, deleteObject, objectBytes, objectExists, uploadObject, createSignedGetUrl, headObject } from "@/lib/r2";
+import { downloadObjectBytes, deleteObject, objectBytes, objectExists, uploadObject, createSignedGetUrl, headObject, listObjects } from "@/lib/r2";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 
 const R2_DELETE_CONCURRENCY = 8;
+const SUPABASE_REMOVE_BATCH = 50;
+const SUPABASE_REMOVE_CONCURRENCY = 4;
+const MAX_REMOVE_ERRORS = 8;
 
+/** Throw one aggregated error describing all failed removals (best effort). */
+async function aggregateErrors(failures: { key: string; error: unknown }[]) {
+  if (!failures.length) return;
+  const details = failures.slice(0, MAX_REMOVE_ERRORS).map(failure => `${failure.key}: ${failure.error instanceof Error ? failure.error.message : String(failure.error)}`);
+  throw new Error(`storage-remove-failed (${details.length} of ${failures.length}): ${details.join("; ")}`);
+}
+
+/**
+ * Delete the exact keys from R2 with bounded concurrency. Every key is
+ * attempted even when some fail; a missing object is an idempotent success
+ * (S3 DeleteObject semantics). Real failures are aggregated and thrown once
+ * all keys have been tried so the caller can report that cleanup failed
+ * without losing the remaining keys.
+ */
 async function removeR2Objects(keys: string[]) {
   const pending = [...new Set(keys.filter(Boolean))];
+  if (!pending.length) return;
+  const failures: { key: string; error: unknown }[] = [];
   let next = 0;
   async function worker() {
     while (next < pending.length) {
-      const index = next++;
-      await deleteObject(pending[index]);
+      const key = pending[next++];
+      try {
+        await deleteObject(key);
+      } catch (error) {
+        failures.push({ key, error });
+      }
     }
   }
-  await Promise.all(
-    Array.from({ length: Math.min(R2_DELETE_CONCURRENCY, pending.length) }, () => worker())
-  );
+  await Promise.all(Array.from({ length: Math.min(R2_DELETE_CONCURRENCY, pending.length) }, () => worker()));
+  await aggregateErrors(failures);
+}
+
+/** Delete the exact keys from the Supabase bucket, deduped and batched. */
+async function removeSupabaseObjects(keys: string[]) {
+  const pending = [...new Set(keys.filter(Boolean))];
+  if (!pending.length) return;
+  const supabase = await galleryDb();
+  const failures: { key: string; error: unknown }[] = [];
+  let next = 0;
+  async function worker() {
+    while (next < pending.length) {
+      const batch = pending.slice(next, next + SUPABASE_REMOVE_BATCH);
+      next += batch.length;
+      try {
+        const bucket = supabase.storage.from(GALLERY_ASSET_BUCKET);
+        const { error } = await bucket.remove(batch);
+        if (error) throw error;
+      } catch (error) {
+        for (const key of batch) failures.push({ key, error });
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(SUPABASE_REMOVE_CONCURRENCY, Math.ceil(pending.length / SUPABASE_REMOVE_BATCH)) }, () => worker()));
+  await aggregateErrors(failures);
 }
 
 export type PhotoStore = {
@@ -29,6 +75,7 @@ export type PhotoStore = {
   downloadBytes(key: string): Promise<Buffer | null>;
   objectBytes(key: string): Promise<number | null>;
   objectExists(key: string): Promise<boolean>;
+  listKeys(): Promise<string[]>;
 };
 
 function activeProvider(): "supabase" | "r2" {
@@ -49,9 +96,7 @@ const supabasePhotoStore: PhotoStore = {
     if (error) throw new Error("storage-upload-failed");
   },
   async removePhotos(keys) {
-    if (!keys.length) return;
-    const supabase = await galleryDb();
-    await supabase.storage.from(GALLERY_ASSET_BUCKET).remove(keys);
+    await removeSupabaseObjects(keys);
   },
   async signedGetUrls(keys, seconds = CLIENT_SIGNED_URL_SECONDS) {
     if (!keys.length) return new Map();
@@ -80,6 +125,31 @@ const supabasePhotoStore: PhotoStore = {
   async objectExists(key) {
     return (await supabasePhotoStore.objectBytes(key)) !== null;
   },
+  async listKeys() {
+    const supabase = await galleryDb();
+    const bucket = supabase.storage.from(GALLERY_ASSET_BUCKET);
+    const out: string[] = [];
+    async function walk(prefix: string, depth: number) {
+      if (depth > 6) return;
+      for (let offset = 0; ;) {
+        const { data, error } = await bucket.list(prefix, { limit: 100, offset });
+        if (error) throw error;
+        for (const item of data ?? []) {
+          if (item.id === null) {
+            const folderPath = prefix ? `${prefix}/${item.name}` : item.name;
+            await walk(folderPath, depth + 1);
+          } else {
+            const key = prefix ? `${prefix}/${item.name}` : item.name;
+            out.push(key);
+          }
+        }
+        if ((data?.length ?? 0) < 100) break;
+        offset += data?.length ?? 0;
+      }
+    }
+    await walk("", 0);
+    return out;
+  },
 };
 
 const r2PhotoStore: PhotoStore = {
@@ -87,8 +157,22 @@ const r2PhotoStore: PhotoStore = {
     return uploadObject({ key, body, contentType, metadata });
   },
   async removePhotos(keys) {
-    await removeR2Objects(keys);
-    await supabasePhotoStore.removePhotos(keys);
+    // R2 is authoritative, but legacy copies may also live in the Supabase
+    // bucket (the pre-R2 upload path / provider switch). Attempt BOTH stores
+    // and report the failure only after each has tried every key, so no
+    // object is left behind because the first store errored.
+    const failures: { key: string; error: unknown }[] = [];
+    try {
+      await removeR2Objects(keys);
+    } catch (error) {
+      failures.push({ key: "<r2>", error });
+    }
+    try {
+      await removeSupabaseObjects(keys);
+    } catch (error) {
+      failures.push({ key: "<supabase>", error });
+    }
+    await aggregateErrors(failures);
   },
   async signedGetUrls(keys, seconds = CLIENT_SIGNED_URL_SECONDS) {
     const out = new Map<string, string>();
@@ -121,5 +205,8 @@ const r2PhotoStore: PhotoStore = {
   },
   async objectExists(key) {
     return (await objectExists(key)) || (await supabasePhotoStore.objectExists(key));
+  },
+  async listKeys() {
+    return listObjects();
   },
 };

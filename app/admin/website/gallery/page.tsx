@@ -3,7 +3,7 @@ import { WebsiteGalleryManager } from "@/components/admin/website-gallery-manage
 import { WebsiteGalleryUploader } from "@/components/admin/website-gallery-uploader";
 import { CLIENT_SIGNED_URL_SECONDS } from "@/lib/client-media";
 import { adminDb } from "@/lib/admin-data";
-import { normalizeWebsiteGalleryCategory, websiteGalleryId } from "@/lib/site/website-gallery";
+import { normalizeHighlightCrop, normalizeWebsiteGalleryCategory, websiteGalleryId } from "@/lib/site/website-gallery";
 import { photoStore } from "@/lib/storage-provider";
 
 type PhotoRow = {
@@ -18,8 +18,8 @@ type PhotoRow = {
   pending_delete: boolean;
 };
 
-export default async function WebsiteGalleryPage({ searchParams }: { searchParams: Promise<{ category?: string; published?: string }> }) {
-  const { category: rawCategory, published } = await searchParams;
+export default async function WebsiteGalleryPage({ searchParams }: { searchParams: Promise<{ category?: string; published?: string; highlight?: string; crop?: string }> }) {
+  const { category: rawCategory, published, highlight: highlightQuery, crop: cropQuery } = await searchParams;
   const category = normalizeWebsiteGalleryCategory(rawCategory);
   const db = await adminDb();
   const galleryId = await websiteGalleryId(db);
@@ -36,6 +36,30 @@ export default async function WebsiteGalleryPage({ searchParams }: { searchParam
     return previewUrl     ? [{ id: row.id, filename: row.filename, bytes: row.bytes, category: row.category, previewUrl }] : [];
   });
 
+  let highlight: { id: string; previewUrl: string; crop: { x: number; y: number; zoom: number } | null; published: boolean } | null = null;
+  if (galleryId) {
+    const { data: gallery } = await db
+      .from("galleries")
+      .select("highlight_photo_id,highlight_crop")
+      .eq("id", galleryId)
+      .maybeSingle();
+    const highlightRow = gallery?.highlight_photo_id
+      ? rows.find(row => row.id === gallery.highlight_photo_id)
+      : null;
+    if (gallery?.highlight_photo_id && highlightRow) {
+      const highlightUrls = await photoStore().signedGetUrls([highlightRow.original_path], CLIENT_SIGNED_URL_SECONDS);
+      const previewUrl = highlightUrls.get(highlightRow.original_path);
+      if (previewUrl) {
+        highlight = {
+          id: highlightRow.id,
+          previewUrl,
+          crop: normalizeHighlightCrop(gallery.highlight_crop),
+          published: highlightRow.published && !highlightRow.pending_delete,
+        };
+      }
+    }
+  }
+
   return (
     <div className="admin-content">
       <div className="website-editor-title">
@@ -47,6 +71,8 @@ export default async function WebsiteGalleryPage({ searchParams }: { searchParam
       <WebsiteTabs />
       <section className="admin-panel" style={{ padding: "18px 20px", marginBottom: 16 }}>
         {published === "1" ? <p className="form-success" role="status">Website Gallery published.</p> : null}
+        {highlightQuery === "1" ? <p className="form-success" role="status">Highlight set. Open &ldquo;Crop highlight&rdquo; on the highlighted image to frame it.</p> : null}
+        {cropQuery === "1" ? <p className="form-success" role="status">Highlight crop saved.</p> : null}
         <WebsiteGalleryUploader />
         <nav className="website-gallery-filters" aria-label="Website Gallery categories">
           {[["", "All"], ["wedding", "Wedding"], ["events", "Events"], ["portraits", "Portraits"], ["celebrations", "Celebrations"]].map(([value, label]) => (
@@ -59,7 +85,7 @@ export default async function WebsiteGalleryPage({ searchParams }: { searchParam
           <h2>Gallery images</h2>
           <span className="hint">{images.length} {images.length === 1 ? "image" : "images"} · newest first</span>
         </div>
-        <WebsiteGalleryManager dirtyCount={dirtyCount} images={images} />
+        <WebsiteGalleryManager dirtyCount={dirtyCount} highlight={highlight} images={images} />
         {images.length === 0 ? <p className="placeholder">No working images in this view. New uploads remain unpublished until you publish them.</p> : null}
       </section>
     </div>

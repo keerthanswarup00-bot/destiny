@@ -24,12 +24,14 @@ export default async function GalleryDetail({
   if (!gallery) notFound();
   const shareUrl = `${proto}://${host}/gallery/${gallery.slug}`;
 
-  const [{ data: client }, { data: clients }, { data: folders }, { data: photos }] = await Promise.all([
+  const [{ data: client }, { data: clients }, { data: folders }, { data: photos }, { data: branding }] = await Promise.all([
     db.from("clients").select("id,name").eq("id", gallery.client_id).maybeSingle(),
     db.from("clients").select("id,name").order("name"),
     db.from("folders").select("id,name,slug,parent_folder_id,sort_order,published,cover_photo_id,description").eq("gallery_id", galleryId).order("sort_order").order("id"),
     db.from("photos").select("id,filename,folder_id,thumbnail_path,preview_path,original_path,width,height,sort_order").eq("gallery_id", galleryId).order("sort_order").order("id"),
+    db.from("site_branding").select("watermark_path,watermark_enabled").eq("id", "branding").maybeSingle(),
   ]);
+  const watermarkEnabled = Boolean(branding?.watermark_path && branding.watermark_enabled !== false);
 
   const signingPaths = (photos ?? []).map(photo => photo.thumbnail_path || photo.preview_path || photo.original_path).filter(Boolean);
   const originalPaths = (photos ?? []).map(photo => photo.original_path).filter(Boolean);
@@ -60,13 +62,18 @@ for (const folder of folders ?? []) {
 }
 
   const galleryError = error === "invalid-gallery" ? message : null;
-  const folderError = error === "invalid-folder" ? message : null;
+  const folderError =
+    error === "invalid-folder" || error === "folder-storage-delete" || error === "folder-delete" ? message : null;
+  const photoError =
+    error === "invalid-photo" || error === "photo-storage-delete" || error === "photo-delete" ||
+    error === "photos-storage-delete" || error === "photos-delete" ? message : null;
+  const workspaceError = folderError ?? photoError;
 
   return (
     <>
       <div id="gallery-workspace">
         <CollectionEditor
-          error={folderError}
+          error={workspaceError}
           coverUrl={coverUrl}
           coversByFolder={coversByFolder}
           folders={(folders ?? []).map(folder => ({
@@ -90,6 +97,7 @@ for (const folder of folders ?? []) {
           }}
           photosByFolder={photosByFolder}
           shareUrl={shareUrl}
+          watermarkEnabled={watermarkEnabled}
         />
       </div>
       <GallerySettings

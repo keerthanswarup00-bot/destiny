@@ -124,9 +124,9 @@ export function ClientPhotoGrid({
         plugins={[Slideshow]}
         render={{
           controls: () => (notice ? <span aria-live="polite" className="client-lightbox-notice" role="status">{notice}</span> : null),
-          slide: ({ slide, offset, rect }) => offset === 0 && isImageSlide(slide) ? (
-            <ClientZoomableSlide rect={rect} slide={slide} />
-          ) : null,
+          slide: ({ slide, offset, rect }) => isImageSlide(slide) ? (
+            <ClientZoomableSlide rect={rect} slide={slide} slideOffset={offset} />
+          ) : undefined,
         }}
         slideshow={{ autoplay: false, delay: 3500 }}
         slides={slides}

@@ -25,7 +25,15 @@ function clampSigned(value: number, bound: number) {
   return bound > 0 ? Math.min(Math.abs(value), bound) * Math.sign(value) : 0;
 }
 
-export function ClientZoomableSlide({ slide, rect }: { slide: Slide; rect: Rect }) {
+export function ClientZoomableSlide({
+  slide,
+  rect,
+  slideOffset = 0,
+}: {
+  slide: Slide;
+  rect: Rect;
+  slideOffset?: number;
+}) {
   const { render, carousel, on } = useLightboxProps();
   const { currentIndex } = useLightboxState();
   const { containerRef } = useController();
@@ -112,6 +120,7 @@ export function ClientZoomableSlide({ slide, rect }: { slide: Slide; rect: Rect 
 
   const onPointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
+      if (slideOffset !== 0) return;
       if (event.pointerType === "mouse" && event.buttons > 1) return;
       const pointers = pointersRef.current;
       const { timeStamp } = event;
@@ -153,7 +162,7 @@ export function ClientZoomableSlide({ slide, rect }: { slide: Slide; rect: Rect 
         };
       }
     },
-    [applyZoomChange, containerCenter, settle],
+    [applyZoomChange, containerCenter, settle, slideOffset],
   );
 
   const onPointerMove = useCallback(
@@ -202,6 +211,7 @@ export function ClientZoomableSlide({ slide, rect }: { slide: Slide; rect: Rect 
 
   const onDoubleClick = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
+      if (slideOffset !== 0) return;
       if (touchZoomHandledRef.current) {
         touchZoomHandledRef.current = false;
         return;
@@ -211,7 +221,7 @@ export function ClientZoomableSlide({ slide, rect }: { slide: Slide; rect: Rect 
       applyZoomChange(nextZoom, anchorX, anchorY);
       settle();
     },
-    [applyZoomChange, containerCenter, settle],
+    [applyZoomChange, containerCenter, settle, slideOffset],
   );
 
   useLayoutEffect(() => {
@@ -241,6 +251,12 @@ export function ClientZoomableSlide({ slide, rect }: { slide: Slide; rect: Rect 
   }, [rect.width, rect.height]);
 
   useLayoutEffect(() => {
+    if (slideOffset !== 0 && zoomRef.current > 1) {
+      commit(1, { x: 0, y: 0 });
+    }
+  }, [slideOffset, commit]);
+
+  useLayoutEffect(() => {
     applyTransform();
   }, [applyTransform, zoom, offset]);
 
@@ -248,6 +264,7 @@ export function ClientZoomableSlide({ slide, rect }: { slide: Slide; rect: Rect 
     const node = wrapperRef.current;
     if (!node) return;
     const onWheel = (event: WheelEvent) => {
+      if (slideOffset !== 0) return;
       if (event.ctrlKey || event.metaKey || zoomRef.current > 1) {
         event.preventDefault();
         event.stopPropagation();
@@ -258,7 +275,7 @@ export function ClientZoomableSlide({ slide, rect }: { slide: Slide; rect: Rect 
     };
     node.addEventListener("wheel", onWheel, { passive: false });
     return () => node.removeEventListener("wheel", onWheel);
-  }, [applyZoomChange, containerCenter]);
+  }, [applyZoomChange, containerCenter, slideOffset]);
 
   useEffect(
     () => () => {
@@ -277,12 +294,12 @@ export function ClientZoomableSlide({ slide, rect }: { slide: Slide; rect: Rect 
       onPointerMove={onPointerMove}
       onPointerUp={releasePointer}
       ref={wrapperRef}
-      style={{ touchAction: "none" }}
+      style={{ touchAction: slideOffset === 0 ? "none" : undefined }}
     >
       <ImageSlide
         imageFit={carousel.imageFit}
         imageProps={carousel.imageProps}
-        offset={0}
+        offset={slideOffset}
         onClick={() => on.click?.({ index: currentIndex })}
         rect={rect}
         render={render}

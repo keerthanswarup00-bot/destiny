@@ -152,11 +152,46 @@ const supabasePhotoStore: PhotoStore = {
   },
 };
 
+const R2_HEAD_CONCURRENCY = 8;
+const r2ExistenceCache = new Map<string, boolean>();
+
+function isClientDerivativeKey(key: string): boolean {
+  return key.endsWith("/thumbnail.webp") || key.endsWith("/preview.webp") || key.endsWith("/download.webp");
+}
+
+async function checkR2ObjectsExistence(keys: string[]): Promise<Map<string, boolean>> {
+  const results = new Map<string, boolean>();
+  const toCheck = keys.filter(k => !r2ExistenceCache.has(k));
+  if (toCheck.length) {
+    let next = 0;
+    const worker = async () => {
+      while (next < toCheck.length) {
+        const key = toCheck[next++];
+        try {
+          const exists = await headObject(key);
+          r2ExistenceCache.set(key, exists);
+        } catch {
+          r2ExistenceCache.set(key, false);
+        }
+      }
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(R2_HEAD_CONCURRENCY, toCheck.length) }, () => worker())
+    );
+  }
+  for (const key of keys) {
+    results.set(key, r2ExistenceCache.get(key) ?? false);
+  }
+  return results;
+}
+
 const r2PhotoStore: PhotoStore = {
   uploadPhoto({ key, body, contentType, metadata }) {
+    r2ExistenceCache.set(key, true);
     return uploadObject({ key, body, contentType, metadata });
   },
   async removePhotos(keys) {
+    for (const key of keys) r2ExistenceCache.set(key, false);
     // R2 is authoritative, but legacy copies may also live in the Supabase
     // bucket (the pre-R2 upload path / provider switch). Attempt BOTH stores
     // and report the failure only after each has tried every key, so no
@@ -176,20 +211,60 @@ const r2PhotoStore: PhotoStore = {
   },
   async signedGetUrls(keys, seconds = CLIENT_SIGNED_URL_SECONDS) {
     const out = new Map<string, string>();
-    const missing: string[] = [];
-    for (const key of [...new Set(keys)]) {
-      // Presigning does not verify existence, so HEAD first and only fall back
-      // to Supabase when the R2 object is genuinely absent.
-      if (await headObject(key)) {
-        out.set(key, await createSignedGetUrl(key, seconds));
+    const unique = [...new Set(keys.filter(Boolean))];
+    if (!unique.length) return out;
+
+    const directR2Keys: string[] = [];
+    const legacyCandidates: string[] = [];
+
+    for (const key of unique) {
+      if (isClientDerivativeKey(key)) {
+        directR2Keys.push(key);
       } else {
-        missing.push(key);
+        legacyCandidates.push(key);
       }
     }
-    if (missing.length) {
-      const supabaseUrls = await supabasePhotoStore.signedGetUrls(missing, seconds);
-      for (const [key, url] of supabaseUrls) out.set(key, url);
+
+    // Normal R2 path: newly uploaded client derivatives are guaranteed to
+    // exist in R2; sign them directly in parallel with zero HEAD requests.
+    if (directR2Keys.length) {
+      await Promise.all(
+        directR2Keys.map(async key => {
+          out.set(key, await createSignedGetUrl(key, seconds));
+        })
+      );
     }
+
+    // Legacy/missing candidates: verify presence before presigning, falling
+    // back to Supabase for objects that predate R2 storage. Checked with
+    // bounded concurrency and cached so no sequential per-photo HEAD loops occur.
+    if (legacyCandidates.length) {
+      const missing: string[] = [];
+      const existence = await checkR2ObjectsExistence(legacyCandidates);
+      const r2KeysToSign: string[] = [];
+
+      for (const key of legacyCandidates) {
+        if (existence.get(key)) {
+          r2KeysToSign.push(key);
+        } else {
+          missing.push(key);
+        }
+      }
+
+      if (r2KeysToSign.length) {
+        await Promise.all(
+          r2KeysToSign.map(async key => {
+            out.set(key, await createSignedGetUrl(key, seconds));
+          })
+        );
+      }
+
+      if (missing.length) {
+        const supabaseUrls = await supabasePhotoStore.signedGetUrls(missing, seconds);
+        for (const [key, url] of supabaseUrls) out.set(key, url);
+      }
+    }
+
     return out;
   },
   async signedDownloadUrl(key, filename, seconds = DOWNLOAD_SIGNED_URL_SECONDS) {

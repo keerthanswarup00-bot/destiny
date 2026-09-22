@@ -53,6 +53,34 @@ export async function objectExists(key: string): Promise<boolean> {
   }
 }
 
+function isObjectMissing(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const e = error as { name?: string; Code?: string; $metadata?: { httpStatusCode?: number } };
+  return (
+    e.$metadata?.httpStatusCode === 404 ||
+    e.name === "NotFound" ||
+    e.name === "NoSuchKey" ||
+    e.Code === "NotFound" ||
+    e.Code === "NoSuchKey"
+  );
+}
+
+/**
+ * HEAD an object. Returns true when present, false only when the object is
+ * genuinely absent (HTTP 404 / NoSuchKey). Any other R2/storage error (auth,
+ * network, throttling, ...) propagates to the caller instead of being treated
+ * as a miss.
+ */
+export async function headObject(key: string): Promise<boolean> {
+  try {
+    await r2().send(new HeadObjectCommand({ Bucket: R2_BUCKET(), Key: key }));
+    return true;
+  } catch (error) {
+    if (isObjectMissing(error)) return false;
+    throw error;
+  }
+}
+
 export async function objectBytes(key: string): Promise<number | null> {
   try {
     const head = await r2().send(new HeadObjectCommand({ Bucket: R2_BUCKET(), Key: key }));

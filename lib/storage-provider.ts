@@ -2,7 +2,7 @@ import "server-only";
 import { galleryDb } from "@/lib/gallery-db";
 import { GALLERY_ASSET_BUCKET } from "@/lib/admin-validation";
 import { CLIENT_SIGNED_URL_SECONDS, DOWNLOAD_SIGNED_URL_SECONDS } from "@/lib/client-media";
-import { downloadObjectBytes, deleteObject, objectBytes, objectExists, uploadObject, createSignedGetUrl } from "@/lib/r2";
+import { downloadObjectBytes, deleteObject, objectBytes, objectExists, uploadObject, createSignedGetUrl, headObject } from "@/lib/r2";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 
 const R2_DELETE_CONCURRENCY = 8;
@@ -22,7 +22,7 @@ async function removeR2Objects(keys: string[]) {
 }
 
 export type PhotoStore = {
-  uploadPhoto(opts: { key: string; body: Buffer; contentType: string; metadata?: Record<string, string> }): Promise<void>;
+  uploadPhoto(opts: { key: string; body: Buffer; contentType: string; metadata?: Record<string, string>; upsert?: boolean }): Promise<void>;
   removePhotos(keys: string[]): Promise<void>;
   signedGetUrls(keys: string[], seconds?: number): Promise<Map<string, string>>;
   signedDownloadUrl(key: string, filename: string, seconds?: number): Promise<string | null>;
@@ -41,9 +41,9 @@ export function photoStore(): PhotoStore {
 }
 
 const supabasePhotoStore: PhotoStore = {
-  async uploadPhoto({ key, body, contentType, metadata }) {
+  async uploadPhoto({ key, body, contentType, metadata, upsert }) {
     const supabase = await galleryDb();
-    const options: { contentType: string; upsert: boolean; metadata?: Record<string, string> } = { contentType, upsert: false };
+    const options: { contentType: string; upsert: boolean; metadata?: Record<string, string> } = { contentType, upsert: upsert ?? false };
     if (metadata) options.metadata = metadata;
     const { error } = await supabase.storage.from(GALLERY_ASSET_BUCKET).upload(key, body, options);
     if (error) throw new Error("storage-upload-failed");
@@ -92,13 +92,19 @@ const r2PhotoStore: PhotoStore = {
   },
   async signedGetUrls(keys, seconds = CLIENT_SIGNED_URL_SECONDS) {
     const out = new Map<string, string>();
+    const missing: string[] = [];
     for (const key of [...new Set(keys)]) {
-      try {
+      // Presigning does not verify existence, so HEAD first and only fall back
+      // to Supabase when the R2 object is genuinely absent.
+      if (await headObject(key)) {
         out.set(key, await createSignedGetUrl(key, seconds));
-      } catch {
-        const supabaseUrl = (await supabasePhotoStore.signedGetUrls([key], seconds)).get(key);
-        if (supabaseUrl) out.set(key, supabaseUrl);
+      } else {
+        missing.push(key);
       }
+    }
+    if (missing.length) {
+      const supabaseUrls = await supabasePhotoStore.signedGetUrls(missing, seconds);
+      for (const [key, url] of supabaseUrls) out.set(key, url);
     }
     return out;
   },

@@ -530,7 +530,25 @@ export const getSiteContact = cache(
 
 function asBranding(value: unknown): SiteBranding {
   if (!value || typeof value !== "object") return DEFAULT_BRANDING;
-  return { ...DEFAULT_BRANDING, ...(value as Partial<SiteBranding>) };
+
+  const branding = value as Partial<SiteBranding>;
+
+  return {
+    ...DEFAULT_BRANDING,
+    ...branding,
+    brand_name:
+      typeof branding.brand_name === "string" && branding.brand_name.trim()
+        ? branding.brand_name.trim()
+        : DEFAULT_BRANDING.brand_name,
+    short_name:
+      typeof branding.short_name === "string" && branding.short_name.trim()
+        ? branding.short_name.trim()
+        : DEFAULT_BRANDING.short_name,
+    tagline:
+      typeof branding.tagline === "string" && branding.tagline.trim()
+        ? branding.tagline.trim()
+        : DEFAULT_BRANDING.tagline,
+  };
 }
 
 async function loadSiteBranding(): Promise<SiteBrandingResolved> {

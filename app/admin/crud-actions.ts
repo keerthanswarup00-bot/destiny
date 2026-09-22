@@ -1,7 +1,5 @@
 "use server";
 import sharp from "sharp";
-import { readFile } from "node:fs/promises";
-import { join as pathJoin } from "node:path";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
@@ -10,6 +8,8 @@ import { ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES, clientSchema, folderSchema, galle
 import { photoStore } from "@/lib/storage-provider";
 import { createSignedPutUrl, downloadObjectBytes, objectBytes } from "@/lib/r2";
 import { hashGalleryPassword } from "@/lib/gallery-password";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/supabase/database.types";
 const value = (form: FormData, key: string) => String(form.get(key) ?? "");
 async function db() { await requireAdmin(); return adminDb(); }
 async function invalidateTags(...tags: string[]) { await Promise.all(tags.map(tag => revalidateTag(tag))); }
@@ -63,10 +63,9 @@ const isR2Provider = () => process.env.PHOTO_STORAGE_PROVIDER?.trim().toLowerCas
 /* Client Gallery watermarking                                         */
 /* ------------------------------------------------------------------ */
 
-// The Destiny logo used as the watermark source. The owner drops the asset at
-// this exact path; uploads fail closed when it is missing so that no
-// unwatermarked image can ever reach a client.
-const WATERMARK_ASSET_PATH = pathJoin(process.cwd(), "assets", "destiny-watermark.png");
+// The active watermark logo is the admin-managed asset stored in R2 and
+// referenced by site_branding.watermark_path. When no logo is configured the
+// watermark is OFF and uploads produce normal unwatermarked derivatives.
 const WATERMARK_WIDTH_RATIO = 0.12; // ≈12% of image width
 const WATERMARK_MIN_WIDTH = 120;
 const WATERMARK_MAX_WIDTH = 640;
@@ -74,30 +73,41 @@ const WATERMARK_MARGIN_X_RATIO = 0.03; // 3% of width from the right edge
 const WATERMARK_MARGIN_Y_RATIO = 0.025; // 2.5% of height from the bottom edge
 const WATERMARK_MIN_MARGIN = 16;
 
-type WatermarkSource = { buffer: Buffer; width: number; height: number };
-let watermarkSourceCache: WatermarkSource | null | undefined;
+type WatermarkSource = { key: string; buffer: Buffer; width: number; height: number };
+// Keyed by the stored object path so a replaced logo invalidates the cache.
+const watermarkSourceCache = new Map<string, WatermarkSource>();
+const resizedWatermarkCache = new Map<string, Buffer>();
 
-async function watermarkSource(): Promise<WatermarkSource> {
-  if (watermarkSourceCache === undefined) {
-    const buffer = await readFile(WATERMARK_ASSET_PATH);
+async function activeWatermark(supabase: SupabaseClient<Database>): Promise<WatermarkSource | null> {
+  const { data } = await supabase.from("site_branding").select("watermark_path").eq("id", "branding").maybeSingle();
+  const key = (data?.watermark_path as string | null) ?? null;
+  if (!key) return null;
+  const cached = watermarkSourceCache.get(key);
+  if (cached) return cached;
+  const bytes = await photoStore().downloadBytes(key);
+  if (!bytes) return null;
+  try {
+    const buffer = await sharp(bytes).png().toBuffer();
     const info = await sharp(buffer).metadata();
-    if (!info.width || !info.height) throw new Error("watermark-asset-invalid");
-    watermarkSourceCache = { buffer, width: info.width, height: info.height };
+    if (!info.width || !info.height) return null;
+    const source: WatermarkSource = { key, buffer, width: info.width, height: info.height };
+    watermarkSourceCache.set(key, source);
+    return source;
+  } catch {
+    return null;
   }
-  return watermarkSourceCache!;
 }
 
-const resizedWatermarkCache = new Map<number, Buffer>();
-
 async function resizedWatermark(logoWidth: number, source: WatermarkSource): Promise<Buffer> {
-  let cached = resizedWatermarkCache.get(logoWidth);
+  const cacheKey = `${source.key}:${logoWidth}`;
+  let cached = resizedWatermarkCache.get(cacheKey);
   if (!cached) {
     const logoHeight = Math.max(1, Math.round(logoWidth * (source.height / source.width)));
     cached = await sharp(source.buffer)
       .resize({ width: logoWidth, height: logoHeight, fit: "fill" })
       .png()
       .toBuffer();
-    resizedWatermarkCache.set(logoWidth, cached);
+    resizedWatermarkCache.set(cacheKey, cached);
   }
   return cached;
 }
@@ -116,28 +126,35 @@ function withinLongEdge(width: number, height: number, longEdge: number) {
   return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
 }
 
-/** Watermarked WebP at the exact target size; the logo is not distorted. */
-async function watermarkedDerivative(body: Buffer, targetWidth: number, targetHeight: number, quality: number): Promise<Buffer> {
-  const source = await watermarkSource();
-  const logoWidth = Math.min(Math.max(Math.round(targetWidth * WATERMARK_WIDTH_RATIO), WATERMARK_MIN_WIDTH), WATERMARK_MAX_WIDTH);
-  const logoHeight = Math.max(1, Math.round(logoWidth * (source.height / source.width)));
-  const logo = await resizedWatermark(logoWidth, source);
-  const placement = watermarkPlacement(targetWidth, targetHeight, logoWidth, logoHeight);
-  return sharp(body)
-    .resize({ width: targetWidth, height: targetHeight, fit: "fill" })
-    .composite([{ input: logo, left: placement.left, top: placement.top }])
-    .webp({ quality })
-    .toBuffer();
+/** WebP at the exact target size; the logo is not distorted and, when a watermark is set, burned into the pixels. */
+async function watermarkedDerivative(body: Buffer, targetWidth: number, targetHeight: number, quality: number, watermark: WatermarkSource | null): Promise<Buffer> {
+  const pipeline = sharp(body).resize({ width: targetWidth, height: targetHeight, fit: "fill" });
+  if (watermark) {
+    const aspect = watermark.height / watermark.width;
+    const marginX = Math.max(WATERMARK_MIN_MARGIN, Math.round(targetWidth * WATERMARK_MARGIN_X_RATIO));
+    const marginY = Math.max(WATERMARK_MIN_MARGIN, Math.round(targetHeight * WATERMARK_MARGIN_Y_RATIO));
+    const availableWidth = Math.max(1, targetWidth - marginX);
+    const availableHeight = Math.max(1, targetHeight - marginY);
+    let logoWidth = Math.min(Math.max(Math.round(targetWidth * WATERMARK_WIDTH_RATIO), WATERMARK_MIN_WIDTH), WATERMARK_MAX_WIDTH);
+    // A small photo can be smaller than WATERMARK_MIN_WIDTH; the logo must never
+    // be larger than the target image, so shrink it while keeping its aspect.
+    const fit = Math.min(availableWidth / logoWidth, availableHeight / (logoWidth * aspect));
+    if (fit < 1) logoWidth = Math.max(1, Math.floor(logoWidth * fit));
+    const logoHeight = Math.max(1, Math.round(logoWidth * aspect));
+    const logo = await resizedWatermark(logoWidth, watermark);
+    const placement = watermarkPlacement(targetWidth, targetHeight, logoWidth, logoHeight);
+    pipeline.composite([{ input: logo, left: placement.left, top: placement.top }]);
+  }
+  return pipeline.webp({ quality }).toBuffer();
 }
 
 /**
- * Build and store the three watermarked client-facing derivatives.
- * All three must succeed; a photo with no watermarked derivatives is never
- * made visible to a client (previous rows that lost a derivative to a failed
- * upload were a security hole). On partial failure, the created derivatives
- * are removed before the error propagates.
+ * Build and store the three client-facing derivatives (watermarked when a logo
+ * is configured, plain otherwise). A photo with no derivatives is never made
+ * visible to a client; on partial failure the created derivatives are removed
+ * before the error propagates.
  */
-async function storeWatermarkedDerivatives(body: Buffer, paths: { thumbnail: string; preview: string; download: string }): Promise<{ width: number | null; height: number | null; uploaded: string[] }> {
+async function storeWatermarkedDerivatives(body: Buffer, paths: { thumbnail: string; preview: string; download: string }, watermark: WatermarkSource | null): Promise<{ width: number | null; height: number | null; uploaded: string[] }> {
   const metadata = await sharp(body).metadata();
   const width = metadata.width;
   const height = metadata.height;
@@ -150,7 +167,7 @@ async function storeWatermarkedDerivatives(body: Buffer, paths: { thumbnail: str
   const uploaded: string[] = [];
   try {
     for (const job of jobs) {
-      const derivative = await watermarkedDerivative(body, job.size.width, job.size.height, job.quality);
+      const derivative = await watermarkedDerivative(body, job.size.width, job.size.height, job.quality, watermark);
       await photoStore().uploadPhoto({ key: job.key, body: derivative, contentType: "image/webp" });
       uploaded.push(job.key);
     }
@@ -257,13 +274,15 @@ export async function completeClientGalleryUpload(form: FormData): Promise<{ ok:
   let width: number | null = null;
   let height: number | null = null;
   try {
-    const derivatives = await storeWatermarkedDerivatives(body, { thumbnail: paths.thumbnail, preview: paths.preview, download: paths.download });
+    const watermark = await activeWatermark(supabase);
+    const derivatives = await storeWatermarkedDerivatives(body, { thumbnail: paths.thumbnail, preview: paths.preview, download: paths.download }, watermark);
     uploadedPaths.push(...derivatives.uploaded);
     width = derivatives.width;
     height = derivatives.height;
-  } catch {
-    // No client-facing record is created unless a watermarked derivative
-    // exists; the private original is only removed once nothing references it.
+  } catch (error) {
+    console.error(`client-gallery: failed to build client derivatives for ${paths.original}`, error);
+    // No client-facing record is created unless the client derivatives
+    // exist; the private original is only removed once nothing references it.
     try { await photoStore().removePhotos(uploadedPaths); } catch { /* Preserve the original failure. */ }
     return { ok: false, message: "Upload failed: the image could not be processed for delivery." };
   }
@@ -316,6 +335,7 @@ async function runFolderUpload(gallery: string, folderId: string, form: FormData
   if(!folder) return null;
   const { count }=await supabase.from("photos").select("id",{ count:"exact", head:true }).eq("gallery_id",gallery).eq("folder_id",folder.id);
   let sort=count??0;
+  const watermark = await activeWatermark(supabase);
   for (const file of files) {
     if(!(ALLOWED_PHOTO_TYPES as readonly string[]).includes(file.type) || file.size>MAX_PHOTO_BYTES) return null;
     const id=crypto.randomUUID();
@@ -334,13 +354,14 @@ async function runFolderUpload(gallery: string, folderId: string, form: FormData
       return null;
     }
     try {
-      const derivatives = await storeWatermarkedDerivatives(body, { thumbnail: thumbnail_path, preview: preview_path, download: download_path });
+      const derivatives = await storeWatermarkedDerivatives(body, { thumbnail: thumbnail_path, preview: preview_path, download: download_path }, watermark);
       uploadedPaths.push(...derivatives.uploaded);
       width = derivatives.width;
       height = derivatives.height;
-    } catch {
-      // No client-facing record is created unless a watermarked derivative
-      // exists; the private original is only removed once nothing references it.
+    } catch (error) {
+      console.error(`client-gallery: failed to build client derivatives for ${original_path}`, error);
+      // No client-facing record is created unless the client derivatives
+      // exist; the private original is only removed once nothing references it.
       try { await photoStore().removePhotos(uploadedPaths); } catch { /* Preserve the original failure. */ }
       return null;
     }

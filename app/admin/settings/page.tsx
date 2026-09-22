@@ -6,6 +6,7 @@ const sections = [
   { label: "GALLERY", title: "Public website gallery", description: "Manage portfolio galleries and featured work.", href: "/admin/website/gallery" },
   { label: "CONTACT", title: "Contact details", description: "Contact page, WhatsApp, Instagram, and enquiry settings.", href: "/admin/website/contact" },
   { label: "BRANDING", title: "Brand identity", description: "Logo, short name, and social presentation.", href: "/admin/website/branding" },
+  { label: "WATERMARK", title: "Client Gallery watermark", description: "Protect client photos with your logo on upload.", href: "/admin/settings/watermark" },
   { label: "APPEARANCE", title: "Visual theme", description: "Manage the existing public-site visual settings.", href: "/admin/website/appearance" },
 ];
 

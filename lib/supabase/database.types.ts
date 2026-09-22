@@ -347,6 +347,8 @@ export type Database = {
         dark_logo_mime: string | null;
         favicon_path: string | null;
         social_image_path: string | null;
+        watermark_path: string | null;
+        watermark_mime: string | null;
         created_at: string;
         updated_at: string;
       }, {
@@ -362,6 +364,8 @@ export type Database = {
         dark_logo_mime?: string | null;
         favicon_path?: string | null;
         social_image_path?: string | null;
+        watermark_path?: string | null;
+        watermark_mime?: string | null;
         created_at?: string;
         updated_at?: string;
       }>;

@@ -38,19 +38,17 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
     getSiteContact(),
   ]);
 
-  // Keep each published set as a grouped section: ordered by folder.sort_order,
-  // photos within by photo.sort_order. Published sets containing zero photos are
-  // skipped entirely — no empty sections are rendered.
-  const sets = (await Promise.all(folders.map(async folder => {
+  // Folders stay grouped internally (admin organization), but the client-facing
+  // render receives ONE flattened, ordered photo collection. Folders are already
+  // ordered by sort_order (published only) and each folder's photos by
+  // sort_order, so concatenating them preserves the exact existing ordering.
+  const photos = [];
+  for (const folder of folders) {
     const folderPhotos = await galleryFolderPhotos(access.gallery.id, folder.slug);
-    if (!folderPhotos.length) return null;
-    return {
-      id: folder.id,
-      name: folder.name,
-      slug: folder.slug,
-      photos: folderPhotos.map(photo => ({ ...photo, selected: selected.has(photo.id) })),
-    };
-  }))).filter((set): set is NonNullable<typeof set> => set !== null);
+    for (const photo of folderPhotos) {
+      photos.push({ ...photo, selected: selected.has(photo.id) });
+    }
+  }
 
   // Gallery highlight/cover: the first published set that has a configured
   // cover. Selection matches the pre-existing logic — explicit cover_photo_id
@@ -79,7 +77,7 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
         {highlight ? (
           <GalleryHighlight url={highlight.url} width={highlight.width} height={highlight.height} crop={null} />
         ) : null}
-        <GalleryOverview selectedIds={[...selected]} sets={sets} slug={access.gallery.slug} />
+        <GalleryOverview photos={photos} selectedIds={[...selected]} slug={access.gallery.slug} />
       </main>
       <SiteFooter
         brandName={branding.brand_name}

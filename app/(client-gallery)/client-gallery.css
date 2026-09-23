@@ -165,10 +165,6 @@ html{scroll-behavior:smooth}
   .client-gallery .client-topbar{padding-top:6px}
 }
 
-/* Set sections — subtle editorial headings above each justified grid */
-.client-set{margin:0 0 clamp(3rem,7vw,4.5rem)}
-.client-set-title{margin:0 0 24px;font-size:12px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:#999}
-
 /* Client gallery highlight — reuses the Step 1 highlight viewer (public
    GalleryHighlight) but presents the configured cover at its natural aspect
    ratio with no banner shade, label, or crop. */

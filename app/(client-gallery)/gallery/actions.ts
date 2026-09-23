@@ -5,12 +5,15 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { hashIp } from "@/lib/gallery-cookie";
 import { galleryDb } from "@/lib/gallery-db";
-import { ensureViewerKeyHash, grantGalleryAccess, requireGalleryAccess } from "@/lib/gallery-access";
+import { ensureViewerKeyHash, grantGalleryAccess, identifyViewer, requireGalleryAccess, resolveGalleryAccess } from "@/lib/gallery-access";
 import { verifyGalleryPassword } from "@/lib/gallery-password";
 import { downloadFilename } from "@/lib/client-media";
 import { ensurePhotoShareToken, photoFromShareToken, signedDownloadUrl } from "@/lib/photo-share";
 
 export type PasswordState = { error: string | null };
+export type IdentifyState = { ok: boolean; error: string | null };
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 const GENERIC_FAILURE = "Unable to open this gallery.";
 const WINDOW_MS = 15 * 60 * 1000;
@@ -67,6 +70,31 @@ export async function submitGalleryPassword(_: PasswordState, form: FormData): P
   } catch (error) {
     if (typeof error === "object" && error && "digest" in error) throw error;
     return { error: GENERIC_FAILURE };
+  }
+}
+
+/**
+ * Bind the current viewer session to an email so the client's favourites persist
+ * across visits. The email is never stored or echoed — only sealed into the
+ * existing HttpOnly viewer cookie, which already keys the favourites table.
+ */
+export async function identifyGalleryViewer(form: FormData): Promise<IdentifyState> {
+  const slug = String(form.get("slug") ?? "").trim();
+  const email = String(form.get("email") ?? "").trim().toLowerCase();
+
+  if (email.length > 254 || !EMAIL_PATTERN.test(email)) {
+    return { ok: false, error: "Enter a valid email address." };
+  }
+
+  try {
+    const access = await resolveGalleryAccess(slug);
+    if (access.state !== "granted") {
+      return { ok: false, error: "This gallery is unavailable." };
+    }
+    await identifyViewer(email);
+    return { ok: true, error: null };
+  } catch {
+    return { ok: false, error: "Unable to save your email. Try again." };
   }
 }
 

@@ -100,19 +100,23 @@ export function ClientPhotoGrid({
     const busy = busyIds.has(item.id);
     return (
       <div className="client-photo-actions">
-        <button
-          aria-label={item.selected ? "Remove from favourites" : "Add to favourites"}
-          aria-pressed={item.selected}
-          className={`client-photo-action client-heart${item.selected ? " is-selected" : ""}`}
-          disabled={disabled || busy}
-          onClick={() => onToggle(item.id)}
-          title={item.selected ? "Remove from favourites" : "Add to favourites"}
-          type="button"
-        >
-          {item.selected ? <Heart fill="currentColor" size={16} strokeWidth={1.6} /> : <Heart size={16} strokeWidth={1.6} />}
-        </button>
-        <button aria-label="Download photo" className="client-photo-action" disabled={disabled} onClick={() => void downloadPhoto(item.id)} title="Download photo" type="button"><Download size={16} strokeWidth={1.6} /></button>
-        <button aria-label="Share photo" className="client-photo-action" disabled={disabled} onClick={() => void sharePhoto(item.id)} title="Share photo" type="button"><Share2 size={16} strokeWidth={1.6} /></button>
+        <span className={`client-photo-veil${item.selected ? " is-selected" : ""}`}>
+          <button
+            aria-label={item.selected ? "Remove from favourites" : "Add to favourites"}
+            aria-pressed={item.selected}
+            className={`client-photo-action client-heart${item.selected ? " is-selected" : ""}`}
+            disabled={disabled || busy}
+            onClick={() => onToggle(item.id)}
+            title={item.selected ? "Remove from favourites" : "Add to favourites"}
+            type="button"
+          >
+            {item.selected ? <Heart fill="currentColor" size={16} strokeWidth={1.6} /> : <Heart size={16} strokeWidth={1.6} />}
+          </button>
+        </span>
+        <span className="client-photo-veil">
+          <button aria-label="Download photo" className="client-photo-action" disabled={disabled} onClick={() => void downloadPhoto(item.id)} title="Download photo" type="button"><Download size={16} strokeWidth={1.6} /></button>
+          <button aria-label="Share photo" className="client-photo-action" disabled={disabled} onClick={() => void sharePhoto(item.id)} title="Share photo" type="button"><Share2 size={16} strokeWidth={1.6} /></button>
+        </span>
       </div>
     );
   };

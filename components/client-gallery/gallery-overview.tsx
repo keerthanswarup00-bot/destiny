@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { GalleryWorkspace, type WorkspacePhoto } from "@/components/client-gallery/gallery-workspace";
 
 export type GallerySet = {
@@ -14,12 +14,21 @@ export function GalleryOverview({
   slug,
   sets,
   selectedIds,
+  identified,
+  onCountChange,
 }: {
   slug: string;
   sets: GallerySet[];
   selectedIds: string[];
+  identified: boolean;
+  onCountChange?: (count: number) => void;
 }) {
   const [favoriteIds, setFavoriteIds] = useState(() => new Set(selectedIds));
+  const [identifiedState, setIdentifiedState] = useState(identified);
+
+  useEffect(() => {
+    onCountChange?.(favoriteIds.size);
+  }, [favoriteIds, onCountChange]);
 
   // Only sets that actually contain photos are reachable; empty published sets
   // are omitted so navigation never points at an empty grid.
@@ -55,14 +64,16 @@ export function GalleryOverview({
       {active ? (
         <GalleryWorkspace
           folder={active.slug}
-          photos={active.photos.map(photo => ({ ...photo, selected: favoriteIds.has(photo.id) }))}
-          slug={slug}
+          identified={identifiedState}
           onFavoriteChange={(photoId, favorite) => setFavoriteIds(previous => {
             const next = new Set(previous);
             if (favorite) next.add(photoId);
             else next.delete(photoId);
             return next;
           })}
+          onIdentified={() => setIdentifiedState(true)}
+          photos={active.photos.map(photo => ({ ...photo, selected: favoriteIds.has(photo.id) }))}
+          slug={slug}
         />
       ) : null}
     </section>

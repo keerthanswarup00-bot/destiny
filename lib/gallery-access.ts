@@ -8,8 +8,10 @@ import {
   accessCookieName,
   fingerprintPassword,
   hashViewerToken,
+  isIdentifiedViewerToken,
   readGalleryAccess,
   signGalleryAccess,
+  signViewerIdentity,
 } from "@/lib/gallery-cookie";
 import { galleryDb } from "@/lib/gallery-db";
 
@@ -83,4 +85,17 @@ export async function ensureViewerKeyHash() {
     jar.set(VIEWER_COOKIE, token, cookieOptions(VIEWER_MAX_AGE));
   }
   return hashViewerToken(token);
+}
+
+/** Bind this browser to the client's email identity so favourites persist across visits. */
+export async function identifyViewer(email: string) {
+  const jar = await cookies();
+  jar.set(VIEWER_COOKIE, signViewerIdentity(email), cookieOptions(VIEWER_MAX_AGE));
+}
+
+/** True when the current viewer has already identified with an email. */
+export async function viewerIdentified() {
+  const jar = await cookies();
+  const token = jar.get(VIEWER_COOKIE)?.value;
+  return Boolean(token && isIdentifiedViewerToken(token));
 }

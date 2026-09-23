@@ -40,6 +40,32 @@ export function hashViewerToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
+/** Stable viewer token derived from the client's email. Deterministic per email so
+ *  the same client always maps back to the same favourites for a gallery. The email
+ *  itself is never stored — only an HMAC-sealed digest. */
+export function signViewerIdentity(email: string) {
+  const normalized = email.trim().toLowerCase();
+  const digest = createHash("sha256").update(`viewer-email:v1:${normalized}`).digest("base64url");
+  const signature = createHmac("sha256", accessSecret()).update(`viewer-identity:v1:${digest}`).digest("base64url");
+  return `idv1.${digest}.${signature}`;
+}
+
+export function isIdentifiedViewerToken(token: string) {
+  const parts = token.split(".");
+  if (parts.length !== 3 || parts[0] !== "idv1") return false;
+  const [, digest, signature] = parts;
+  if (!digest || !signature) return false;
+  const expected = createHmac("sha256", accessSecret()).update(`viewer-identity:v1:${digest}`).digest("base64url");
+  const actual = Buffer.from(signature);
+  const wanted = Buffer.from(expected);
+  if (actual.length !== wanted.length) return false;
+  try {
+    return timingSafeEqual(actual, wanted);
+  } catch {
+    return false;
+  }
+}
+
 export function photoShareToken(photoId: string) {
   return createHmac("sha256", accessSecret()).update(`photo-share:v1:${photoId}`).digest("base64url");
 }

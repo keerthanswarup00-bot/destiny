@@ -1,12 +1,11 @@
 import { notFound } from "next/navigation";
-
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { Heart, MoreVertical } from "lucide-react";
 import { GalleryGate } from "@/components/client-gallery/gallery-gate";
 import { GalleryOverview, type GallerySet } from "@/components/client-gallery/gallery-overview";
+import { GalleryShell } from "@/components/client-gallery/gallery-shell";
 import { GalleryHighlight } from "@/components/public/gallery-highlight";
-import { resolveGalleryAccess, viewerKeyHash } from "@/lib/gallery-access";
+import { resolveGalleryAccess, viewerIdentified, viewerKeyHash } from "@/lib/gallery-access";
 import { galleryFolders, galleryFolderPhotos, selectedPhotoIds } from "@/lib/gallery-data";
 import { GALLERY_SOCIAL_DESCRIPTION, GALLERY_SOCIAL_IMAGE_LONG_EDGE, galleryCoverImagePath, gallerySocialCover, requestHost, siteOrigin, socialCoverImageSize } from "@/lib/gallery-social";
 import { getSiteBranding, getSiteContact } from "@/lib/site/site-content";
@@ -90,11 +89,12 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
       </>
     );
   }
-  const [folders, selected, branding, contact] = await Promise.all([
+  const [folders, selected, branding, contact, identified] = await Promise.all([
     galleryFolders(access.gallery.id),
     selectedPhotoIds(access.gallery.id, await viewerKeyHash()),
     getSiteBranding(),
     getSiteContact(),
+    viewerIdentified(),
   ]);
 
   // Folders stay grouped — no flattening. Each published set (ordered by
@@ -127,19 +127,14 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
         {highlight ? (
           <GalleryHighlight url={highlight.url} width={highlight.width} height={highlight.height} crop={null} />
         ) : null}
-        <header className="client-topbar">
-          <h1 className="client-topbar-title">{access.gallery.title}</h1>
-          <div className="client-topbar-actions">
-            <button aria-label="Favourites" className="client-topbar-action" title="Favourites" type="button">
-              <Heart size={20} strokeWidth={1.6} />
-            </button>
-            <button aria-label="More options" className="client-topbar-action" title="More options" type="button">
-              <MoreVertical size={20} strokeWidth={1.6} />
-            </button>
-          </div>
-          <p className="client-topbar-brand">{brand}</p>
-        </header>
-        <GalleryOverview sets={sets} selectedIds={[...selected]} slug={access.gallery.slug} />
+        <GalleryShell
+          brand={brand}
+          identified={identified}
+          selectedIds={[...selected]}
+          sets={sets}
+          slug={access.gallery.slug}
+          title={access.gallery.title}
+        />
       </main>
       <SiteFooter
         brandName={branding.brand_name}

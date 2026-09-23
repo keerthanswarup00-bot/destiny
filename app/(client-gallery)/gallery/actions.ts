@@ -174,8 +174,8 @@ export async function downloadGalleryPhoto(form: FormData): Promise<DownloadResu
     const gallery = await requireGalleryAccess(slug);
     const info = await photoDownloadInfo(gallery.id, photoId);
     if (!info) return { url: null, filename: null, error: "That photograph is unavailable." };
-    const url = await signedDownloadUrl(info.filename, info.photo);
-    return url ? { url, filename: info.filename, error: null } : { url: null, filename: info.filename, error: "Download is unavailable right now." };
+    const resolved = await signedDownloadUrl(info.filename, info.photo);
+    return resolved ? { url: resolved.url, filename: resolved.name, error: null } : { url: null, filename: info.filename, error: "Download is unavailable right now." };
   } catch {
     return { url: null, filename: null, error: "Download is unavailable right now." };
   }
@@ -194,8 +194,8 @@ export async function downloadGalleryPhotos(form: FormData): Promise<{ items: Do
         items.push({ url: null, filename: null, error: "That photograph is unavailable." });
         continue;
       }
-      const url = await signedDownloadUrl(info.filename, info.photo);
-      items.push(url ? { url, filename: info.filename, error: null } : { url: null, filename: info.filename, error: "Download is unavailable right now." });
+      const resolved = await signedDownloadUrl(info.filename, info.photo);
+      items.push(resolved ? { url: resolved.url, filename: resolved.name, error: null } : { url: null, filename: info.filename, error: "Download is unavailable right now." });
     }
     return { items, error: null };
   } catch {
@@ -224,8 +224,8 @@ export async function downloadSharedPhoto(form: FormData): Promise<DownloadResul
   if (!shared) return { url: null, filename: null, error: "That photograph is unavailable." };
   const info = await photoDownloadInfo(shared.galleryId, shared.photo.id);
   if (!info) return { url: null, filename: null, error: "That photograph is unavailable." };
-  const url = await signedDownloadUrl(info.filename, info.photo);
-  return url ? { url, filename: info.filename, error: null } : { url: null, filename: info.filename, error: "Download is unavailable right now." };
+  const resolved = await signedDownloadUrl(info.filename, info.photo);
+  return resolved ? { url: resolved.url, filename: resolved.name, error: null } : { url: null, filename: info.filename, error: "Download is unavailable right now." };
 }
 
 export async function clearPhotoSelection(form: FormData) {

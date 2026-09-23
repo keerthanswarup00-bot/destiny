@@ -25,6 +25,7 @@
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-hook-form": "^7.88.0",
+    "sharp": "^0.34.5",
     "typescript": "5.7.2",
     "yet-another-react-lightbox": "^3.32.2",
     "zod": "^4.6.5"

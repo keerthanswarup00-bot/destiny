@@ -6,14 +6,31 @@ import { photoStore } from "@/lib/storage-provider";
 
 type DownloadablePaths = { thumbnail_path: string | null; preview_path: string | null; original_path: string; download_path?: string | null };
 
-export async function signedDownloadUrl(filename: string, paths: DownloadablePaths) {
+/** Extension of the object actually being downloaded (e.g. ".jpg", ".webp"). */
+function assetExtension(path: string): string {
+  const segment = path.split("/").pop() ?? "";
+  const match = segment.match(/\.([a-z0-9]{2,8})$/i);
+  return match ? `.${match[1].toLowerCase()}` : ".jpg";
+}
+
+/**
+ * Rebase the visible download name onto the actual download asset so the saved
+ * file's extension always matches the served bytes (JPEG for new download.jpg
+ * rows, WebP for legacy rows still pointing at download.webp/preview/thumbnail).
+ */
+export function derivativeDownloadName(filename: string, path: string): string {
+  return filename.replace(/\.[a-z0-9]+$/i, "") + assetExtension(path);
+}
+
+export async function signedDownloadUrl(filename: string, paths: DownloadablePaths): Promise<{ url: string; name: string } | null> {
   // Client-facing downloads always serve the watermarked full-resolution
   // derivative (falling back to the watermarked preview/thumbnail for legacy
   // rows). The private original is never eligible for a client download.
   const path = paths.download_path || paths.preview_path || paths.thumbnail_path;
   if (!path) return null;
-  const webpName = filename.replace(/\.[a-z0-9]+$/i, "") + ".webp";
-  return photoStore().signedDownloadUrl(path, safeDownloadName(webpName), DOWNLOAD_SIGNED_URL_SECONDS);
+  const name = safeDownloadName(derivativeDownloadName(filename, path), "photograph.jpg");
+  const url = await photoStore().signedDownloadUrl(path, name, DOWNLOAD_SIGNED_URL_SECONDS);
+  return url ? { url, name } : null;
 }
 
 export async function ensurePhotoShareToken(galleryId: string, photoId: string) {

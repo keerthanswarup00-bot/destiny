@@ -137,20 +137,23 @@ async function storeWatermarkedDerivatives(
   const width = metadata.width;
   const height = metadata.height;
   if (!width || !height) throw new Error("derivative-missing-dimensions");
-  const jobs: { key: string; size: { width: number; height: number }; quality: number }[] = [
-    { key: paths.thumbnail, size: withinLongEdge(width, height, THUMBNAIL_LONG_EDGE), quality: 80 },
-    { key: paths.preview, size: withinLongEdge(width, height, PREVIEW_LONG_EDGE), quality: 85 },
-    { key: paths.download, size: { width, height }, quality: DOWNLOAD_QUALITY },
+  // Display derivatives stay WebP for fast loading; the client-download
+  // derivative is a full-resolution JPEG. Each job's contentType is the exact
+  // MIME of the stored bytes (not a rename of the WebP file).
+  const jobs: { key: string; size: { width: number; height: number }; quality: number; contentType: "image/webp" | "image/jpeg" }[] = [
+    { key: paths.thumbnail, size: withinLongEdge(width, height, THUMBNAIL_LONG_EDGE), quality: 80, contentType: "image/webp" },
+    { key: paths.preview, size: withinLongEdge(width, height, PREVIEW_LONG_EDGE), quality: 85, contentType: "image/webp" },
+    { key: paths.download, size: { width, height }, quality: DOWNLOAD_QUALITY, contentType: "image/jpeg" },
   ];
   const uploaded: string[] = [];
   const protectedKeys = new Set(options?.keepOnFailure ?? []);
   try {
     for (const job of jobs) {
-      const derivative = await watermarkedDerivative(body, job.size.width, job.size.height, job.quality, watermark);
+      const derivative = await watermarkedDerivative(body, job.size.width, job.size.height, job.quality, watermark, job.contentType === "image/jpeg" ? "jpeg" : "webp");
       await photoStore().uploadPhoto({
         key: job.key,
         body: derivative,
-        contentType: "image/webp",
+        contentType: job.contentType,
         upsert: options?.overwrite === true ? true : undefined,
       });
       uploaded.push(job.key);
@@ -198,7 +201,7 @@ function clientPhotoPaths(gallery: string, folder: string, id: string, filename:
     original: `${gallery}/${folder}/${id}/${storageFilename(filename)}`,
     thumbnail: `${gallery}/${folder}/${id}/thumbnail.webp`,
     preview: `${gallery}/${folder}/${id}/preview.webp`,
-    download: `${gallery}/${folder}/${id}/download.webp`,
+    download: `${gallery}/${folder}/${id}/download.jpg`,
   };
 }
 
@@ -347,7 +350,7 @@ async function runFolderUpload(gallery: string, folderId: string, form: FormData
     const original_path=`${gallery}/${folder.id}/${id}/${storageFilename(file.name)}`;
     const thumbnail_path=`${gallery}/${folder.id}/${id}/thumbnail.webp`;
     const preview_path=`${gallery}/${folder.id}/${id}/preview.webp`;
-    const download_path=`${gallery}/${folder.id}/${id}/download.webp`;
+    const download_path=`${gallery}/${folder.id}/${id}/download.jpg`;
     const uploadedPaths: string[] = [];
     const body=Buffer.from(await file.arrayBuffer());
     let width: number | null = null;

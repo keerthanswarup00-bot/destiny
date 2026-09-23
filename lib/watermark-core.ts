@@ -119,12 +119,15 @@ async function fadeWatermarkLogo(logo: Buffer, opacity: number): Promise<Buffer>
   return sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer();
 }
 
+export type DerivativeFormat = "webp" | "jpeg";
+
 export async function watermarkedDerivative(
   body: Buffer,
   targetWidth: number,
   targetHeight: number,
   quality: number,
   watermark: ActiveWatermarkConfig | null,
+  format: DerivativeFormat = "webp",
 ): Promise<Buffer> {
   const pipeline = sharp(body).resize({ width: targetWidth, height: targetHeight, fit: "fill" });
   if (watermark) {
@@ -141,6 +144,11 @@ export async function watermarkedDerivative(
     const logo = await fadeWatermarkLogo(await resizedWatermark(logoWidth, source), settings.opacity);
     const placement = watermarkPlacement(targetWidth, targetHeight, logoWidth, logoHeight, settings);
     pipeline.composite([{ input: logo, left: placement.left, top: placement.top }]);
+  }
+  if (format === "jpeg") {
+    // JPEG cannot carry alpha; flatten transparent sources onto white so the
+    // downloaded photo never ships with an opaque black background.
+    return pipeline.flatten({ background: "#ffffff" }).jpeg({ quality }).toBuffer();
   }
   return pipeline.webp({ quality }).toBuffer();
 }

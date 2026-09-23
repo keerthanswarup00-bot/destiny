@@ -6,7 +6,7 @@ import { GalleryOverview, type GallerySet } from "@/components/client-gallery/ga
 import { GalleryShell } from "@/components/client-gallery/gallery-shell";
 import { GalleryHighlight } from "@/components/public/gallery-highlight";
 import { resolveGalleryAccess, viewerIdentified, viewerKeyHash } from "@/lib/gallery-access";
-import { galleryFolders, galleryFolderPhotos, selectedPhotoIds } from "@/lib/gallery-data";
+import { galleryFolders, galleryFolderPhotos, selectedPhotoIds, viewerSubmission } from "@/lib/gallery-data";
 import { GALLERY_SOCIAL_DESCRIPTION, GALLERY_SOCIAL_IMAGE_LONG_EDGE, galleryCoverImagePath, gallerySocialCover, requestHost, siteOrigin, socialCoverImageSize } from "@/lib/gallery-social";
 import { getSiteBranding, getSiteContact } from "@/lib/site/site-content";
 import { SiteFooter } from "@/components/public/site-footer";
@@ -89,17 +89,18 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
       </>
     );
   }
-  const [folders, selected, branding, contact, identified] = await Promise.all([
+  const [folders, selected, submission, branding, contact, identified] = await Promise.all([
     galleryFolders(access.gallery.id),
     selectedPhotoIds(access.gallery.id, await viewerKeyHash()),
+    viewerSubmission(access.gallery.id, await viewerKeyHash()),
     getSiteBranding(),
     getSiteContact(),
     viewerIdentified(),
   ]);
 
   // Folders stay grouped — no flattening. Each published set (ordered by
-  // sort_order) keeps its own photos (ordered by sort_order) and drives the
-  // set navigation; one set is shown at a time.
+  // sort_order) keeps its own photos (ordered by sort_order) and the gallery
+  // presents every set in one continuous scroll with a set heading.
   const sets: GallerySet[] = [];
   for (const folder of folders) {
     const folderPhotos = await galleryFolderPhotos(access.gallery.id, folder.slug);
@@ -133,6 +134,7 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
           selectedIds={[...selected]}
           sets={sets}
           slug={access.gallery.slug}
+          submitted={Boolean(submission)}
           title={access.gallery.title}
         />
       </main>

@@ -107,6 +107,18 @@ export async function togglePhotoFavorite(form: FormData) {
   const db = galleryDb();
   const viewerHash = await ensureViewerKeyHash();
 
+  // A sent selection is locked: viewers cannot keep editing favourites once
+  // their choice has been submitted. This matches the selection submit guard
+  // in submitPhotoSelection so the grid and the server agree.
+  const { data: submission } = await db.from("selection_submissions").select("id").eq("gallery_id", gallery.id).eq("selection_session_hash", viewerHash).maybeSingle();
+  if (submission) {
+    return {
+      ok: false as const,
+      error: "This selection has already been sent and cannot be changed.",
+      selected: false,
+    };
+  }
+
   const { data: photo } = await db
     .from("photos")
     .select("id")

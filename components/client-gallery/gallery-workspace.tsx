@@ -20,6 +20,7 @@ export function GalleryWorkspace({
   folder,
   photos,
   identified,
+  submitted,
   onIdentified,
   onFavoriteChange,
 }: {
@@ -27,8 +28,8 @@ export function GalleryWorkspace({
   folder?: string;
   photos: WorkspacePhoto[];
   identified: boolean;
+  submitted?: boolean;
   onIdentified?: () => void;
-  submittedInitially?: boolean;
   onFavoriteChange?: (photoId: string, favorite: boolean) => void;
 }) {
   const [pending, setPending] = useState<Record<string, boolean>>({});
@@ -108,6 +109,7 @@ export function GalleryWorkspace({
   }
 
   async function handleToggle(photoId: string) {
+    if (submitted) return;
     const photo = displayed.find(item => item.id === photoId);
     if (!photo) return;
 
@@ -167,7 +169,7 @@ export function GalleryWorkspace({
     <>
       <ClientPhotoGrid
         busyIds={pendingIds}
-        disabled={false}
+        disabled={Boolean(submitted)}
         folder={folder}
         onToggle={handleToggle}
         photos={displayed}

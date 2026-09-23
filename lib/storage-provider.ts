@@ -155,10 +155,6 @@ const supabasePhotoStore: PhotoStore = {
 const R2_HEAD_CONCURRENCY = 8;
 const r2ExistenceCache = new Map<string, boolean>();
 
-function isClientDerivativeKey(key: string): boolean {
-  return key.endsWith("/thumbnail.webp") || key.endsWith("/preview.webp") || key.endsWith("/download.webp");
-}
-
 async function checkR2ObjectsExistence(keys: string[]): Promise<Map<string, boolean>> {
   const results = new Map<string, boolean>();
   const toCheck = keys.filter(k => !r2ExistenceCache.has(k));
@@ -214,55 +210,35 @@ const r2PhotoStore: PhotoStore = {
     const unique = [...new Set(keys.filter(Boolean))];
     if (!unique.length) return out;
 
-    const directR2Keys: string[] = [];
-    const legacyCandidates: string[] = [];
+    // Verify presence before presigning. R2 hosts current client derivatives;
+    // anything absent there is a legacy object that only exists in the Supabase
+    // bucket (pre-R2 uploads) and must fall back to Supabase — otherwise it
+    // gets an R2-signed URL for an object that is genuinely absent. Existence
+    // checks use bounded concurrency and a module cache, so repeated loads
+    // perform no per-photo HEAD requests.
+    const existence = await checkR2ObjectsExistence(unique);
+    const r2KeysToSign: string[] = [];
+    const missing: string[] = [];
 
     for (const key of unique) {
-      if (isClientDerivativeKey(key)) {
-        directR2Keys.push(key);
+      if (existence.get(key)) {
+        r2KeysToSign.push(key);
       } else {
-        legacyCandidates.push(key);
+        missing.push(key);
       }
     }
 
-    // Normal R2 path: newly uploaded client derivatives are guaranteed to
-    // exist in R2; sign them directly in parallel with zero HEAD requests.
-    if (directR2Keys.length) {
+    if (r2KeysToSign.length) {
       await Promise.all(
-        directR2Keys.map(async key => {
+        r2KeysToSign.map(async key => {
           out.set(key, await createSignedGetUrl(key, seconds));
         })
       );
     }
 
-    // Legacy/missing candidates: verify presence before presigning, falling
-    // back to Supabase for objects that predate R2 storage. Checked with
-    // bounded concurrency and cached so no sequential per-photo HEAD loops occur.
-    if (legacyCandidates.length) {
-      const missing: string[] = [];
-      const existence = await checkR2ObjectsExistence(legacyCandidates);
-      const r2KeysToSign: string[] = [];
-
-      for (const key of legacyCandidates) {
-        if (existence.get(key)) {
-          r2KeysToSign.push(key);
-        } else {
-          missing.push(key);
-        }
-      }
-
-      if (r2KeysToSign.length) {
-        await Promise.all(
-          r2KeysToSign.map(async key => {
-            out.set(key, await createSignedGetUrl(key, seconds));
-          })
-        );
-      }
-
-      if (missing.length) {
-        const supabaseUrls = await supabasePhotoStore.signedGetUrls(missing, seconds);
-        for (const [key, url] of supabaseUrls) out.set(key, url);
-      }
+    if (missing.length) {
+      const supabaseUrls = await supabasePhotoStore.signedGetUrls(missing, seconds);
+      for (const [key, url] of supabaseUrls) out.set(key, url);
     }
 
     return out;

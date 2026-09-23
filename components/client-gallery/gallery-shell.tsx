@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Heart, MoreVertical } from "lucide-react";
-import { GalleryOverview, type GallerySet } from "@/components/client-gallery/gallery-overview";
+import { GalleryOverview, type GalleryOverviewHandle, type GallerySet } from "@/components/client-gallery/gallery-overview";
 
 export function GalleryShell({
   slug,
@@ -11,6 +11,7 @@ export function GalleryShell({
   sets,
   selectedIds,
   identified,
+  submitted,
 }: {
   slug: string;
   title: string;
@@ -18,8 +19,10 @@ export function GalleryShell({
   sets: GallerySet[];
   selectedIds: string[];
   identified: boolean;
+  submitted: boolean;
 }) {
   const [count, setCount] = useState(selectedIds.length);
+  const overviewRef = useRef<GalleryOverviewHandle>(null);
 
   return (
     <>
@@ -29,7 +32,8 @@ export function GalleryShell({
           <button
             aria-label={count ? `Favourites, ${count} ${count === 1 ? "photo" : "photos"} selected` : "Favourites"}
             className={`client-topbar-action client-topbar-favorites${count > 0 ? " is-active" : ""}`}
-            title={count ? `${count} ${count === 1 ? "favourite" : "favourites"}` : "Favourites"}
+            onClick={() => overviewRef.current?.openReview()}
+            title={count ? `${count} ${count === 1 ? "favourite" : "favourites"}` : "Review favourites"}
             type="button"
           >
             <Heart size={20} strokeWidth={1.6} />
@@ -44,9 +48,11 @@ export function GalleryShell({
       <GalleryOverview
         identified={identified}
         onCountChange={setCount}
+        ref={overviewRef}
         selectedIds={selectedIds}
         sets={sets}
         slug={slug}
+        submitted={submitted}
       />
     </>
   );

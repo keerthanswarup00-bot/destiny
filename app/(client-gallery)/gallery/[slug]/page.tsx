@@ -1,12 +1,12 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
+import { Heart, MoreVertical } from "lucide-react";
 import { GalleryGate } from "@/components/client-gallery/gallery-gate";
 import { GalleryOverview } from "@/components/client-gallery/gallery-overview";
+import { GalleryHighlight } from "@/components/public/gallery-highlight";
 import { resolveGalleryAccess, viewerKeyHash } from "@/lib/gallery-access";
-import { galleryFolders, galleryFolderPhotos, galleryClient, selectedPhotoIds } from "@/lib/gallery-data";
+import { galleryFolders, galleryFolderPhotos, selectedPhotoIds } from "@/lib/gallery-data";
 import { getSiteBranding, getSiteContact } from "@/lib/site/site-content";
 import { SiteFooter } from "@/components/public/site-footer";
-import { INSTAGRAM_URL } from "@/lib/site/social-links";
 
 export default async function ClientGalleryHome({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -31,59 +31,55 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
       </>
     );
   }
-  const [folders, selected, client, branding, contact] = await Promise.all([
+  const [folders, selected, branding, contact] = await Promise.all([
     galleryFolders(access.gallery.id),
     selectedPhotoIds(access.gallery.id, await viewerKeyHash()),
-    galleryClient(access.gallery.id),
     getSiteBranding(),
     getSiteContact(),
   ]);
-  const sets = await Promise.all(folders.map(async folder => ({
-    id: folder.id,
-    name: folder.name,
-    slug: folder.slug,
-    photos: (await galleryFolderPhotos(access.gallery.id, folder.slug)).map(photo => ({ ...photo, selected: selected.has(photo.id) })),
-  })));
-  const favouritePhotos = sets.flatMap(set => set.photos).filter((photo, index, all) => selected.has(photo.id) && all.findIndex(candidate => candidate.id === photo.id) === index);
-  if (favouritePhotos.length) sets.push({ id: "favourites", name: "Fav", slug: "fav", photos: favouritePhotos });
 
-  const eventLine = client
-    ? [client.name, client.event_date ? new Date(client.event_date).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : null].filter(Boolean).join(" · ")
-    : null;
+  // Keep each published set as a grouped section: ordered by folder.sort_order,
+  // photos within by photo.sort_order. Published sets containing zero photos are
+  // skipped entirely — no empty sections are rendered.
+  const sets = (await Promise.all(folders.map(async folder => {
+    const folderPhotos = await galleryFolderPhotos(access.gallery.id, folder.slug);
+    if (!folderPhotos.length) return null;
+    return {
+      id: folder.id,
+      name: folder.name,
+      slug: folder.slug,
+      photos: folderPhotos.map(photo => ({ ...photo, selected: selected.has(photo.id) })),
+    };
+  }))).filter((set): set is NonNullable<typeof set> => set !== null);
 
-  const hero = folders.find(folder => folder.coverUrl);
-  const heroImage = hero?.coverUrl ?? null;
+  // Gallery highlight/cover: the first published set that has a configured
+  // cover. Selection matches the pre-existing logic — explicit cover_photo_id
+  // within the set, else the set's first photo — with the signed client-facing
+  // URL already provided by galleryFolders.
+  const cover = folders.find(folder => folder.coverUrl) ?? null;
+  const highlight = cover ? { url: cover.coverUrl as string, width: cover.coverWidth, height: cover.coverHeight } : null;
+
+  const brand = branding.short_name || "DESTINY";
 
   return (
     <>
       <main className="client-gallery-frame">
-      {heroImage ? (
-        <header className="client-hero has-cover">
-          {/* Signed preview URL; next/image is a poor fit for short-lived tokens. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img alt="" className="client-hero-image" decoding="async" src={heroImage} width={hero?.coverWidth ?? undefined} height={hero?.coverHeight ?? undefined} />
-          <div className="client-hero-shade" />
-          <div className="client-hero-inner">
-            <p className="client-gallery-brand">DESTINY<span>PRIVATE GALLERY</span></p>
-            <h1>{access.gallery.title}</h1>
-            {eventLine ? <p className="client-event">{eventLine}</p> : null}
-            {access.gallery.description ? <p className="client-hero-lede">{access.gallery.description}</p> : null}
-            {folders.length ? <a className="client-hero-cta" href="#client-gallery-grid">View gallery</a> : null}
+        <header className="client-topbar">
+          <h1 className="client-topbar-title">{access.gallery.title}</h1>
+          <div className="client-topbar-actions">
+            <button aria-label="Favourites" className="client-topbar-action" title="Favourites" type="button">
+              <Heart size={20} strokeWidth={1.6} />
+            </button>
+            <button aria-label="More options" className="client-topbar-action" title="More options" type="button">
+              <MoreVertical size={20} strokeWidth={1.6} />
+            </button>
           </div>
+          <p className="client-topbar-brand">{brand}</p>
         </header>
-      ) : (
-        <header className="client-hero">
-          <p className="client-gallery-brand">DESTINY<span>PRIVATE GALLERY</span></p>
-          <h1>{access.gallery.title}</h1>
-          {eventLine ? <p className="client-event">{eventLine}</p> : null}
-          {access.gallery.description ? <p className="lede">{access.gallery.description}</p> : null}
-        </header>
-      )}
-      <nav className="client-gallery-links" aria-label="Destiny links">
-        <Link href="/">Visit website <span aria-hidden="true">↗</span></Link>
-        <a href={INSTAGRAM_URL} rel="noopener noreferrer" target="_blank">Visit Instagram <span aria-hidden="true">↗</span></a>
-      </nav>
-      <GalleryOverview selectedIds={[...selected]} sets={sets} slug={access.gallery.slug} />
+        {highlight ? (
+          <GalleryHighlight url={highlight.url} width={highlight.width} height={highlight.height} crop={null} />
+        ) : null}
+        <GalleryOverview selectedIds={[...selected]} sets={sets} slug={access.gallery.slug} />
       </main>
       <SiteFooter
         brandName={branding.brand_name}

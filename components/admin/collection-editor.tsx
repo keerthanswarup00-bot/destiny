@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { formatGalleryDate } from "@/lib/format-date";
 import {
   ArrowLeft,
   ArrowRight,
@@ -225,7 +226,7 @@ export function CollectionEditor({
                 </>
               ) : null}
               <span aria-hidden="true">·</span>
-              <span>{new Date(gallery.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</span>
+              <span>{formatGalleryDate(gallery.createdAt)}</span>
             </p>
           </div>
         </div>

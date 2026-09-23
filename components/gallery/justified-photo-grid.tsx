@@ -11,6 +11,7 @@ export type JustifiedPhoto = {
 
 const MIN_ROW_HEIGHT = 180;
 const MAX_ROW_HEIGHT = 460;
+const NARROW_BREAKPOINT = 600;
 
 function ratioOf(photo: JustifiedPhoto) {
   if (photo.width && photo.height && photo.height > 0) return photo.width / photo.height;
@@ -22,7 +23,8 @@ function ratioOf(photo: JustifiedPhoto) {
  *
  * Rows are formed from natural aspect ratios and scaled so the row fills the
  * available width. Every photograph keeps its true proportions — nothing is
- * cropped or distorted.
+ * cropped or distorted. On narrow viewports the photos switch to a single
+ * full-width column that preserves each image's natural aspect ratio.
  */
 export function JustifiedPhotoGrid({
   photos,
@@ -50,6 +52,7 @@ export function JustifiedPhotoGrid({
   }, []);
 
   const gap = width > 760 ? 5 : 4;
+  const singleColumn = width > 0 && width <= NARROW_BREAKPOINT;
 
   const rows = useMemo(() => {
     if (!width || !photos.length) return [];
@@ -78,8 +81,22 @@ export function JustifiedPhotoGrid({
     return out;
   }, [photos, width, gap]);
 
+  function renderImage(item: JustifiedPhoto) {
+    return failed.has(item.id) ? (
+      <span aria-label="Image unavailable" className="justified-fallback" role="img" title="Image unavailable">
+        <span aria-hidden="true" className="justified-fallback-label">Unavailable</span>
+      </span>
+    ) : item.src ? (
+      /* Signed preview URL; next/image is a poor fit for short-lived tokens. */
+      /* eslint-disable-next-line @next/next/no-img-element */
+      <img alt="" decoding="async" loading="lazy" onError={() => setFailed(prev => prev.has(item.id) ? prev : new Set(prev).add(item.id))} src={item.src} />
+    ) : (
+      <span aria-hidden="true" className="justified-fallback" />
+    );
+  }
+
   return (
-    <div className={`justified-grid${className ? ` ${className}` : ""}`} ref={ref}>
+    <div className={`justified-grid${className ? ` ${className}` : ""}${singleColumn ? " justified-grid--column" : ""}`} ref={ref}>
       {width === 0 ? (
         <div aria-hidden="true" className="justified-loading">
           <div className="justified-loading-cell" />
@@ -87,6 +104,20 @@ export function JustifiedPhotoGrid({
           <div className="justified-loading-cell" />
           <div className="justified-loading-cell" />
         </div>
+      ) : singleColumn ? (
+        photos.map((item, index) => (
+          <figure className="justified-cell" key={item.id}>
+            <button
+              aria-label="View photo"
+              className="justified-open"
+              onClick={() => onPhotoClick(index)}
+              type="button"
+            >
+              {renderImage(item)}
+            </button>
+            {overlay ? overlay(item, index) : null}
+          </figure>
+        ))
       ) : (() => {
         let offset = 0;
         return rows.map((row, rowIndex) => {
@@ -107,17 +138,7 @@ export function JustifiedPhotoGrid({
                     style={{ width: row.height * ratioOf(item) }}
                     type="button"
                   >
-                    {failed.has(item.id) ? (
-                      <span aria-label="Image unavailable" className="justified-fallback" role="img" title="Image unavailable">
-                        <span aria-hidden="true" className="justified-fallback-label">Unavailable</span>
-                      </span>
-                    ) : item.src ? (
-                      /* Signed preview URL; next/image is a poor fit for short-lived tokens. */
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img alt="" decoding="async" loading="lazy" onError={() => setFailed(prev => prev.has(item.id) ? prev : new Set(prev).add(item.id))} src={item.src} />
-                    ) : (
-                      <span aria-hidden="true" className="justified-fallback" />
-                    )}
+                    {renderImage(item)}
                   </button>
                   {overlay ? overlay(item, rowStart + i) : null}
                 </figure>

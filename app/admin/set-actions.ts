@@ -32,36 +32,10 @@ export async function setFolderCover(form: FormData) {
   if (!folder) return;
   const cover = coverPhotoId ? (await supabase.from("photos").select("id").eq("id", coverPhotoId).eq("gallery_id", folder.gallery_id).eq("folder_id", id).maybeSingle()).data : null;
   if (coverPhotoId && !cover) return;
-  const crop = cover ? folderCoverCrop(form) : null;
-  await supabase
-    .from("folders")
-    .update({ cover_photo_id: cover?.id ?? null, cover_crop: crop })
-    .eq("id", id)
-    .eq("gallery_id", folder.gallery_id);
+  await supabase.from("folders").update({ cover_photo_id: cover?.id ?? null }).eq("id", id).eq("gallery_id", folder.gallery_id);
   revalidatePath(`/admin/galleries/${folder.gallery_id}`);
   revalidatePath(`/gallery/${(await signedGallerySlug(folder.gallery_id)) ?? ""}`);
   await invalidateTags("site-stories", "site-portfolio");
-}
-
-/**
- * Read the normalized { x, y, zoom } crop from a Set cover form. Absent or
- * malformed values yield null (centered, no-crop cover fit) so the quick
- * highlight actions that only pick a source photo keep working unchanged.
- */
-function folderCoverCrop(form: FormData) {
-  const x = form.get("x");
-  const y = form.get("y");
-  const zoom = form.get("zoom");
-  if (x === null || y === null || zoom === null) return null;
-  const nx = Number(String(x));
-  const ny = Number(String(y));
-  const nz = Number(String(zoom));
-  if (!Number.isFinite(nx) || !Number.isFinite(ny) || !Number.isFinite(nz)) return null;
-  return {
-    x: Math.min(1, Math.max(0, nx)),
-    y: Math.min(1, Math.max(0, ny)),
-    zoom: Math.min(8, Math.max(1, nz)),
-  };
 }
 
 export async function moveFolder(form: FormData) {

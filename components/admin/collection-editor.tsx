@@ -45,6 +45,7 @@ import {
 } from "@/app/admin/set-actions";
 import { uploadClientGalleryFiles } from "@/components/admin/client-gallery-upload";
 import { StagedUploadQueue, type StagedUploadQueueHandle } from "@/components/admin/upload-queue";
+import { ClientGalleryCoverEditor } from "@/components/admin/client-gallery-cover-editor";
 
 type EditorFolder = {
   id: string;
@@ -53,6 +54,7 @@ type EditorFolder = {
   description: string | null;
   published: boolean;
   coverPhotoId: string | null;
+  coverCrop: { x: number; y: number; zoom: number } | null;
 };
 
 type EditorPhoto = {
@@ -109,17 +111,12 @@ export function CollectionEditor({
   const fileInput = useRef<HTMLInputElement>(null);
   const queueRef = useRef<StagedUploadQueueHandle>(null);
   const renameRef = useRef<HTMLDialogElement>(null);
-  const coverRef = useRef<HTMLDialogElement>(null);
   const deleteRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     if (renameFor && renameRef.current && !renameRef.current.open) renameRef.current.showModal();
     else if (!renameFor && renameRef.current?.open) renameRef.current.close();
   }, [renameFor]);
-  useEffect(() => {
-    if (coverFor && coverRef.current && !coverRef.current.open) coverRef.current.showModal();
-    else if (!coverFor && coverRef.current?.open) coverRef.current.close();
-  }, [coverFor]);
   useEffect(() => {
     if (deleteFor && deleteRef.current && !deleteRef.current.open) deleteRef.current.showModal();
     else if (!deleteFor && deleteRef.current?.open) deleteRef.current.close();
@@ -560,32 +557,13 @@ export function CollectionEditor({
         </dialog>
       ) : null}
       {coverFor ? (
-        <dialog className="admin-dialog" onCancel={() => setCoverFor(null)} ref={coverRef}>
-          <form action={setFolderCover} onSubmit={() => { setCoverFor(null); router.refresh(); }}>
-            <h2>Highlight image</h2>
-            <p className="muted">Pick the photo shown on this Set&rsquo;s highlight.</p>
-            {(photosByFolder[coverFor.id] ?? []).length ? (
-              <div className="cover-picker-grid">
-                {(photosByFolder[coverFor.id] ?? []).map(photo => (
-                  <label className="cover-picker-option" key={photo.id}>
-                    {/* Signed admin-only URL; next/image is a poor fit for short-lived tokens. */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img alt="" height={photo.height ?? undefined} loading="lazy" src={photo.src} width={photo.width ?? undefined} />
-                    <input defaultChecked={coverFor.coverPhotoId === photo.id} name="cover_photo_id" type="radio" value={photo.id} />
-                    <span>Highlight</span>
-                  </label>
-                ))}
-              </div>
-            ) : (
-              <p className="empty">No photos in this set yet.</p>
-            )}
-            <input name="id" type="hidden" value={coverFor.id} />
-            <menu>
-              <button onClick={() => setCoverFor(null)} type="button">Cancel</button>
-              <button className="admin-button" disabled={!((photosByFolder[coverFor.id] ?? []).length)} type="submit">Save highlight</button>
-            </menu>
-          </form>
-        </dialog>
+        <ClientGalleryCoverEditor
+          currentCoverPhotoId={coverFor.coverPhotoId}
+          currentCrop={coverFor.coverCrop}
+          folderId={coverFor.id}
+          onClose={() => setCoverFor(null)}
+          photos={photosByFolder[coverFor.id] ?? []}
+        />
       ) : null}
       {deleteFor ? (
         <dialog className="admin-dialog" onCancel={() => setDeleteFor(null)} ref={deleteRef}>

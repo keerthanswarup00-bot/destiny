@@ -97,6 +97,7 @@ export type Database = {
         sort_order: number;
         published: boolean;
         cover_photo_id: string | null;
+        cover_crop: Json | null;
         created_at: string;
         updated_at: string;
       }, {
@@ -109,6 +110,7 @@ export type Database = {
         sort_order?: number;
         published?: boolean;
         cover_photo_id?: string | null;
+        cover_crop?: Json | null;
         created_at?: string;
         updated_at?: string;
       }>;

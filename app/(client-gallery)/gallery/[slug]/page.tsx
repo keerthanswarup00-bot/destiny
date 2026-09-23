@@ -118,16 +118,22 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
   // URLs already provided by galleryFolders. The full-screen viewer uses the
   // high-resolution derivative (coverFullUrl) so it never upscales a thumbnail.
   const cover = folders.find(folder => folder.coverUrl) ?? null;
-  const highlight = cover ? { url: (cover.coverFullUrl ?? cover.coverUrl) as string, width: cover.coverWidth, height: cover.coverHeight } : null;
+  const highlight = cover ? { url: (cover.coverFullUrl ?? cover.coverUrl) as string, width: cover.coverWidth, height: cover.coverHeight, crop: cover.coverCrop } : null;
 
   const brand = branding.short_name || "DESTINY";
 
   return (
     <>
+      {highlight ? (
+        <section className="client-hero">
+          <GalleryHighlight url={highlight.url} width={highlight.width} height={highlight.height} crop={highlight.crop} />
+          <div aria-hidden="true" className="client-hero-caption">
+            <span className="client-hero-title">{access.gallery.title}</span>
+            <span className="client-hero-brand">{brand}</span>
+          </div>
+        </section>
+      ) : null}
       <main className="client-gallery-frame">
-        {highlight ? (
-          <GalleryHighlight url={highlight.url} width={highlight.width} height={highlight.height} crop={null} />
-        ) : null}
         <GalleryShell
           brand={brand}
           identified={identified}

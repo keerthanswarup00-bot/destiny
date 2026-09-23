@@ -3,6 +3,7 @@ import sharp from "sharp";
 import { CLIENT_SIGNED_URL_SECONDS, clientFacingObjectPath } from "@/lib/client-media";
 import { photoStore } from "@/lib/storage-provider";
 import { galleryDb } from "@/lib/gallery-db";
+import { normalizeHighlightCrop, type HighlightCrop } from "@/lib/site/website-gallery";
 
 type PhotoWithPaths = { width: number | null; height: number | null; thumbnail_path: string | null; preview_path: string | null; original_path: string };
 
@@ -40,12 +41,13 @@ export type GalleryFolderCard = {
   coverFullUrl: string | null;
   coverWidth: number | null;
   coverHeight: number | null;
+  coverCrop: HighlightCrop | null;
 };
 
 export async function galleryFolders(galleryId: string): Promise<GalleryFolderCard[]> {
   const db = galleryDb();
   const [{ data: folders }, { data: photos }] = await Promise.all([
-    db.from("folders").select("id,name,slug,sort_order,published,cover_photo_id").eq("gallery_id", galleryId).eq("published", true).order("sort_order").order("id"),
+    db.from("folders").select("id,name,slug,sort_order,published,cover_photo_id,cover_crop").eq("gallery_id", galleryId).eq("published", true).order("sort_order").order("id"),
     db.from("photos").select("id,folder_id,sort_order,thumbnail_path,preview_path,original_path,width,height").eq("gallery_id", galleryId).order("sort_order").order("id"),
   ]);
   const counts = new Map<string, number>();
@@ -79,6 +81,7 @@ export async function galleryFolders(galleryId: string): Promise<GalleryFolderCa
       coverFullUrl: cover ? urls.get(cover.fullPath) ?? null : null,
       coverWidth: cover?.width ?? null,
       coverHeight: cover?.height ?? null,
+      coverCrop: normalizeHighlightCrop(folder.cover_crop),
     };
   });
 }

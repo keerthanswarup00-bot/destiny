@@ -964,10 +964,16 @@ img {
 
 .gallery-highlight {
   position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
   aspect-ratio: 16 / 9;
   max-height: 72vh;
   overflow: hidden;
   background: var(--site-fg);
+  text-align: left;
+  cursor: zoom-in;
 }
 
 .gallery-highlight__img {
@@ -998,6 +1004,49 @@ img {
   letter-spacing: .2em;
   text-transform: uppercase;
   text-shadow: 0 1px 18px rgba(0, 0, 0, .45);
+}
+
+/* Full-screen viewer for the highlight image. The original high-resolution
+   image is shown uncropped and centered on a near-black backdrop with a single
+   close control. */
+.gallery-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+}
+
+.gallery-viewer__img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.gallery-viewer__close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 1001;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, .4);
+  color: #fff;
+  transition: background .2s var(--ease-out);
+}
+
+.gallery-viewer__close:hover {
+  background: rgba(0, 0, 0, .65);
 }
 
 .gallery-filters {

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { Heart, MoreVertical } from "lucide-react";
 import { GalleryGate } from "@/components/client-gallery/gallery-gate";
-import { GalleryOverview } from "@/components/client-gallery/gallery-overview";
+import { GalleryOverview, type GallerySet } from "@/components/client-gallery/gallery-overview";
 import { GalleryHighlight } from "@/components/public/gallery-highlight";
 import { resolveGalleryAccess, viewerKeyHash } from "@/lib/gallery-access";
 import { galleryFolders, galleryFolderPhotos, selectedPhotoIds } from "@/lib/gallery-data";
@@ -38,30 +38,36 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
     getSiteContact(),
   ]);
 
-  // Folders stay grouped internally (admin organization), but the client-facing
-  // render receives ONE flattened, ordered photo collection. Folders are already
-  // ordered by sort_order (published only) and each folder's photos by
-  // sort_order, so concatenating them preserves the exact existing ordering.
-  const photos = [];
+  // Folders stay grouped — no flattening. Each published set (ordered by
+  // sort_order) keeps its own photos (ordered by sort_order) and drives the
+  // set navigation; one set is shown at a time.
+  const sets: GallerySet[] = [];
   for (const folder of folders) {
     const folderPhotos = await galleryFolderPhotos(access.gallery.id, folder.slug);
-    for (const photo of folderPhotos) {
-      photos.push({ ...photo, selected: selected.has(photo.id) });
-    }
+    sets.push({
+      id: folder.id,
+      name: folder.name,
+      slug: folder.slug,
+      photos: folderPhotos.map(photo => ({ ...photo, selected: selected.has(photo.id) })),
+    });
   }
 
   // Gallery highlight/cover: the first published set that has a configured
   // cover. Selection matches the pre-existing logic — explicit cover_photo_id
   // within the set, else the set's first photo — with the signed client-facing
-  // URL already provided by galleryFolders.
+  // URLs already provided by galleryFolders. The full-screen viewer uses the
+  // high-resolution derivative (coverFullUrl) so it never upscales a thumbnail.
   const cover = folders.find(folder => folder.coverUrl) ?? null;
-  const highlight = cover ? { url: cover.coverUrl as string, width: cover.coverWidth, height: cover.coverHeight } : null;
+  const highlight = cover ? { url: (cover.coverFullUrl ?? cover.coverUrl) as string, width: cover.coverWidth, height: cover.coverHeight } : null;
 
   const brand = branding.short_name || "DESTINY";
 
   return (
     <>
       <main className="client-gallery-frame">
+        {highlight ? (
+          <GalleryHighlight url={highlight.url} width={highlight.width} height={highlight.height} crop={null} />
+        ) : null}
         <header className="client-topbar">
           <h1 className="client-topbar-title">{access.gallery.title}</h1>
           <div className="client-topbar-actions">
@@ -74,10 +80,7 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
           </div>
           <p className="client-topbar-brand">{brand}</p>
         </header>
-        {highlight ? (
-          <GalleryHighlight url={highlight.url} width={highlight.width} height={highlight.height} crop={null} />
-        ) : null}
-        <GalleryOverview photos={photos} selectedIds={[...selected]} slug={access.gallery.slug} />
+        <GalleryOverview sets={sets} selectedIds={[...selected]} slug={access.gallery.slug} />
       </main>
       <SiteFooter
         brandName={branding.brand_name}

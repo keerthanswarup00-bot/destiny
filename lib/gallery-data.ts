@@ -9,7 +9,7 @@ type PhotoWithPaths = { width: number | null; height: number | null; thumbnail_p
 const dimensionCache = new Map<string, { width: number; height: number }>();
 
 /** Resolve intrinsic dimensions for photos whose rows predate width/height capture. Reads are cached per object. */
-async function resolvePhotoDimensions(photo: PhotoWithPaths): Promise<{ width: number | null; height: number | null }> {
+export async function resolvePhotoDimensions(photo: PhotoWithPaths): Promise<{ width: number | null; height: number | null }> {
   if (photo.width && photo.height) return { width: photo.width, height: photo.height };
   const objectPath = photo.thumbnail_path ?? photo.preview_path ?? photo.original_path;
   if (!objectPath) return { width: null, height: null };
@@ -37,6 +37,7 @@ export type GalleryFolderCard = {
   slug: string;
   photoCount: number;
   coverUrl: string | null;
+  coverFullUrl: string | null;
   coverWidth: number | null;
   coverHeight: number | null;
 };
@@ -48,7 +49,7 @@ export async function galleryFolders(galleryId: string): Promise<GalleryFolderCa
     db.from("photos").select("id,folder_id,sort_order,thumbnail_path,preview_path,original_path,width,height").eq("gallery_id", galleryId).order("sort_order").order("id"),
   ]);
   const counts = new Map<string, number>();
-  const covers = new Map<string, { path: string; width: number | null; height: number | null }>();
+  const covers = new Map<string, { path: string; fullPath: string; width: number | null; height: number | null }>();
   for (const folder of folders ?? []) {
     const folderPhotos = (photos ?? []).filter(photo => photo.folder_id === folder.id).sort((a, b) => a.sort_order - b.sort_order || 0);
     counts.set(folder.id, folderPhotos.length);
@@ -58,12 +59,15 @@ export async function galleryFolders(galleryId: string): Promise<GalleryFolderCa
     if (chosen) {
       const path = clientFacingObjectPath(chosen, "grid");
       if (path) {
+        // Fullscreen viewer gets the high-resolution derivative; identical URL
+        // to the grid asset when no preview exists.
+        const fullPath = clientFacingObjectPath(chosen, "full") ?? path;
         const dims = await resolvePhotoDimensions(chosen);
-        covers.set(folder.id, { path, width: dims.width, height: dims.height });
+        covers.set(folder.id, { path, fullPath, width: dims.width, height: dims.height });
       }
     }
   }
-  const urls = await signedClientUrls([...covers.values()].map(cover => cover.path));
+  const urls = await signedClientUrls([...new Set([...covers.values()].flatMap(cover => [cover.path, cover.fullPath]))]);
   return (folders ?? []).map(folder => {
     const cover = covers.get(folder.id);
     return {
@@ -72,6 +76,7 @@ export async function galleryFolders(galleryId: string): Promise<GalleryFolderCa
       slug: folder.slug,
       photoCount: counts.get(folder.id) ?? 0,
       coverUrl: cover ? urls.get(cover.path) ?? null : null,
+      coverFullUrl: cover ? urls.get(cover.fullPath) ?? null : null,
       coverWidth: cover?.width ?? null,
       coverHeight: cover?.height ?? null,
     };

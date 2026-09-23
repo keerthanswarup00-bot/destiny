@@ -37,7 +37,6 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     <html lang="en" className={instrument.variable}>
       <head>
         {favicon ? <link rel="icon" href={favicon} sizes="any" /> : null}
-        {branding.socialImageUrl ? <meta content={branding.socialImageUrl} property="og:image" /> : null}
       </head>
       <body>{children}</body>
     </html>

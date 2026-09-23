@@ -1,12 +1,71 @@
 import { notFound } from "next/navigation";
+
+import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Heart, MoreVertical } from "lucide-react";
 import { GalleryGate } from "@/components/client-gallery/gallery-gate";
 import { GalleryOverview, type GallerySet } from "@/components/client-gallery/gallery-overview";
 import { GalleryHighlight } from "@/components/public/gallery-highlight";
 import { resolveGalleryAccess, viewerKeyHash } from "@/lib/gallery-access";
 import { galleryFolders, galleryFolderPhotos, selectedPhotoIds } from "@/lib/gallery-data";
+import { GALLERY_SOCIAL_DESCRIPTION, GALLERY_SOCIAL_IMAGE_LONG_EDGE, galleryCoverImagePath, gallerySocialCover, requestHost, siteOrigin, socialCoverImageSize } from "@/lib/gallery-social";
 import { getSiteBranding, getSiteContact } from "@/lib/site/site-content";
 import { SiteFooter } from "@/components/public/site-footer";
+
+type OgImage = { url: string; width?: number; height?: number; alt?: string };
+
+/**
+ * Social/link-preview metadata (WhatsApp, Facebook, Messenger, iMessage,
+ * Twitter/X, ...) for shared gallery links. og:image always points at the
+ * controlled public cover route serving ONLY the gallery highlight photo — the
+ * private gallery itself is never opened up for the crawler.
+ */
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const headerList = await headers();
+  const origin = siteOrigin(requestHost(headerList));
+  const url = `${origin}/gallery/${slug}`;
+
+  const cover = await gallerySocialCover(slug, "full");
+  const title = (cover?.title?.trim() || slug).trim();
+  const description = GALLERY_SOCIAL_DESCRIPTION;
+
+  let images: OgImage[] | undefined;
+  if (cover?.path) {
+    const size = socialCoverImageSize(cover, GALLERY_SOCIAL_IMAGE_LONG_EDGE);
+    images = [{
+      url: `${origin}${galleryCoverImagePath(slug)}`,
+      width: size?.width,
+      height: size?.height,
+      alt: title,
+    }];
+  } else {
+    const branding = await getSiteBranding();
+    if (branding.socialImageUrl) {
+      images = [{ url: branding.socialImageUrl, width: 1200, height: 630, alt: title }];
+    }
+  }
+
+  return {
+    metadataBase: new URL(origin),
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url,
+      siteName: title,
+      type: "website",
+      images,
+    },
+    twitter: {
+      card: images ? "summary_large_image" : "summary",
+      title,
+      description,
+      images: images ? images.map(image => image.url) : undefined,
+    },
+  };
+}
 
 export default async function ClientGalleryHome({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

@@ -41,11 +41,10 @@ export function ClientPhotoGrid({
     noticeTimer.current = setTimeout(() => setNotice(null), 2600);
   }
 
-  async function shareCurrent() {
-    if (!current) return;
+  async function sharePhoto(photoId: string) {
     const form = new FormData();
     form.set("slug", slug);
-    form.set("photo_id", current.id);
+    form.set("photo_id", photoId);
     const result = await shareGalleryPhoto(form);
     if (!result.url) {
       showNotice(result.error ?? "A share link could not be created.");
@@ -68,11 +67,15 @@ export function ClientPhotoGrid({
     }
   }
 
-  async function downloadCurrent() {
+  function shareCurrent() {
     if (!current) return;
+    void sharePhoto(current.id);
+  }
+
+  async function downloadPhoto(photoId: string) {
     const form = new FormData();
     form.set("slug", slug);
-    form.set("photo_id", current.id);
+    form.set("photo_id", photoId);
     const result = await downloadGalleryPhoto(form);
     if (!result.url || !result.filename) {
       showNotice(result.error ?? "Download is unavailable right now.");
@@ -86,22 +89,31 @@ export function ClientPhotoGrid({
     anchor.remove();
   }
 
+  function downloadCurrent() {
+    if (!current) return;
+    void downloadPhoto(current.id);
+  }
+
   const renderOverlay = (photo: JustifiedPhoto) => {
     const item = photos.find(p => p.id === photo.id);
     if (!item) return null;
     const busy = busyIds.has(item.id);
     return (
-      <button
-        aria-label={item.selected ? "Remove from favourites" : "Add to favourites"}
-        aria-pressed={item.selected}
-        className={`client-heart${item.selected ? " is-selected" : ""}`}
-        disabled={disabled || busy}
-        onClick={() => onToggle(item.id)}
-        title={item.selected ? "Remove from favourites" : "Add to favourites"}
-        type="button"
-      >
-        {item.selected ? <Heart fill="currentColor" size={16} strokeWidth={1.6} /> : <Heart size={16} strokeWidth={1.6} />}
-      </button>
+      <div className="client-photo-actions">
+        <button
+          aria-label={item.selected ? "Remove from favourites" : "Add to favourites"}
+          aria-pressed={item.selected}
+          className={`client-photo-action client-heart${item.selected ? " is-selected" : ""}`}
+          disabled={disabled || busy}
+          onClick={() => onToggle(item.id)}
+          title={item.selected ? "Remove from favourites" : "Add to favourites"}
+          type="button"
+        >
+          {item.selected ? <Heart fill="currentColor" size={16} strokeWidth={1.6} /> : <Heart size={16} strokeWidth={1.6} />}
+        </button>
+        <button aria-label="Download photo" className="client-photo-action" disabled={disabled} onClick={() => void downloadPhoto(item.id)} title="Download photo" type="button"><Download size={16} strokeWidth={1.6} /></button>
+        <button aria-label="Share photo" className="client-photo-action" disabled={disabled} onClick={() => void sharePhoto(item.id)} title="Share photo" type="button"><Share2 size={16} strokeWidth={1.6} /></button>
+      </div>
     );
   };
 

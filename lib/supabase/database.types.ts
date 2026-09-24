@@ -99,6 +99,7 @@ export type Database = {
         sort_order: number;
         published: boolean;
         cover_photo_id: string | null;
+        download_password_hash: string | null;
         created_at: string;
         updated_at: string;
       }, {
@@ -111,6 +112,7 @@ export type Database = {
         sort_order?: number;
         published?: boolean;
         cover_photo_id?: string | null;
+        download_password_hash?: string | null;
         created_at?: string;
         updated_at?: string;
       }>;

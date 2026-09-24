@@ -600,29 +600,56 @@ export function CollectionEditor({
         </dialog>
       ) : null}
       {downloadPasswordFor ? (
-        <dialog className="admin-dialog" onCancel={() => setDownloadPasswordFor(null)} ref={downloadPasswordRef}>
+        <dialog className="admin-dialog ce-download-pin-dialog" onCancel={() => setDownloadPasswordFor(null)} ref={downloadPasswordRef}>
           <form action={setFolderDownloadPassword} onSubmit={() => { setDownloadPasswordFor(null); router.refresh(); }}>
-            <h2>Download PIN</h2>
-            <p className="muted">This PIN is separate from the gallery password and is required to download the complete set as a ZIP of JPEG images.</p>
+            <div className="ce-dialog-heading">
+              <div>
+                <h2>{downloadPasswordFor.hasDownloadPassword ? "Download PIN" : "Set download PIN"}</h2>
+                <p className="muted">Protect this set's ZIP download with a separate PIN. The gallery access password is not used here.</p>
+              </div>
+            </div>
+
             {downloadPasswordFor.downloadPassword ? (
               <div className="ce-pin-reveal">
-                <span className="muted">Current PIN</span>
+                <div className="ce-pin-reveal-head">
+                  <span>Current PIN</span>
+                  <span className="ce-pin-status">PIN set</span>
+                </div>
                 <div className="ce-pin-value">
                   <code>{downloadPasswordFor.downloadPassword}</code>
                   <CopyButton label="Copy PIN" text={downloadPasswordFor.downloadPassword} />
                 </div>
-                <small>Send this PIN to the client for downloads.</small>
+                <small>Share this PIN with the client when they need to download the complete set.</small>
               </div>
-            ) : null}
+            ) : (
+              <div className="ce-pin-empty">
+                <span>Download protection</span>
+                <strong>No PIN set</strong>
+                <small>Clients cannot download the complete set until a PIN is configured.</small>
+              </div>
+            )}
+
             <input name="id" type="hidden" value={downloadPasswordFor.id} />
             <input name="gallery_id" type="hidden" value={gallery.id} />
-            <label>{downloadPasswordFor.hasDownloadPassword ? "Change download PIN" : "Set download PIN"}<input autoFocus minLength={6} name="download_password" placeholder="Enter PIN" required type="password" /></label>
+
+            <label className="ce-pin-input">
+              <span>{downloadPasswordFor.hasDownloadPassword ? "Change PIN" : "Create PIN"}</span>
+              <input autoFocus minLength={6} name="download_password" placeholder="Enter a 6+ character PIN" type="password" />
+            </label>
+
             {downloadPasswordFor.hasDownloadPassword ? (
-              <label className="admin-checkbox"><input name="clear_download_password" type="checkbox" /> Remove download PIN</label>
+              <label className="admin-checkbox ce-pin-remove">
+                <input name="clear_download_password" type="checkbox" />
+                <span>
+                  <strong>Remove download PIN</strong>
+                  <small>Clients will no longer need a PIN to download this set.</small>
+                </span>
+              </label>
             ) : null}
+
             <menu>
               <button onClick={() => setDownloadPasswordFor(null)} type="button">Cancel</button>
-              <button className="admin-button">Save PIN</button>
+              <button className="admin-button" type="submit">{downloadPasswordFor.hasDownloadPassword ? "Save changes" : "Set PIN"}</button>
             </menu>
           </form>
         </dialog>

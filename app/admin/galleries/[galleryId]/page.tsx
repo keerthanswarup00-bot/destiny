@@ -8,6 +8,7 @@ import { adminError } from "@/lib/admin-validation";
 import { photoStore } from "@/lib/storage-provider";
 import { normalizeHighlightCrop } from "@/lib/site/website-gallery";
 import { decryptDownloadPin } from "@/lib/gallery-password";
+import { DownloadZipPreloader } from "@/components/admin/download-zip-preloader";
 
 export default async function GalleryDetail({
   params,
@@ -85,6 +86,7 @@ const highlight = {
 
   return (
     <>
+      <DownloadZipPreloader galleryId={galleryId} folderIds={(folders ?? []).map(folder => folder.id)} />
       <div id="gallery-workspace">
         <CollectionEditor
           error={workspaceError}

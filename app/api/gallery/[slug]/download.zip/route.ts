@@ -25,6 +25,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     const { slug } = await params;
     const gallery = await requireGalleryAccess(slug);
     const form = await request.formData();
+    const setId = String(form.get("set_id") ?? "").trim();
     const setSlug = String(form.get("set_slug") ?? "").trim();
     const pin = String(form.get("pin") ?? "").trim();
     if (!pin) return NextResponse.json({ error: "Enter the set download PIN." }, { status: 400 });
@@ -43,9 +44,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     }
     for (const list of photosByFolder.values()) list.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id.localeCompare(b.id));
 
-    const targetFolder = setSlug ? (folders ?? []).find(folder => folder.slug === setSlug) : null;
+    const targetFolder = setId
+      ? (folders ?? []).find(folder => folder.id === setId)
+      : setSlug
+        ? (folders ?? []).find(folder => folder.slug === setSlug)
+        : null;
     if (!targetFolder) {
-      return NextResponse.json({ error: "A photo set must be selected for download." }, { status: 400 });
+      return NextResponse.json({ error: "This photo set could not be found." }, { status: 400 });
     }
     if (!targetFolder.download_password_hash) {
       return NextResponse.json({ error: "This set is not ready for download yet. Ask the gallery owner to set a download PIN." }, { status: 403 });
@@ -65,11 +70,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       if (url) return NextResponse.redirect(url);
     }
 
-    const scopedFolders = [targetFolder];
-    const folderById = new Map(scopedFolders.map(folder => [folder.id, folder]));
-    const ordered = [...scopedFolders]
-      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id.localeCompare(b.id))
-      .flatMap(folder => photosByFolder.get(folder.id) ?? []);
+    const ordered = photosByFolder.get(targetFolder.id) ?? [];
 
     const entries: { name: string; data: Buffer }[] = [];
     let skipped = 0;
@@ -81,15 +82,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       let jpeg: Buffer;
       try { jpeg = await sharp(data).jpeg({ quality: 92 }).toBuffer(); }
       catch { skipped += 1; continue; }
-      const folder = folderById.get(photo.folder_id);
-      const folderName = safeSegment(folder?.name ?? "Gallery", "Gallery");
       const filename = downloadFilename({
         galleryTitle: gallery.title,
-        folderName: folder?.name ?? "Gallery",
+        folderName: targetFolder.name,
         index: (photosByFolder.get(photo.folder_id) ?? []).findIndex(item => item.id === photo.id) + 1,
         photo,
       }).replace(/\.[a-z0-9]+$/i, ".jpg");
-      entries.push({ name: folderName + "/" + filename, data: jpeg });
+      entries.push({ name: filename, data: jpeg });
     }
 
     if (!entries.length) return NextResponse.json({ error: "This set has no downloadable photos." }, { status: 404 });

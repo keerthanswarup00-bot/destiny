@@ -39,7 +39,6 @@ import {
 } from "@/app/admin/crud-actions";
 import {
   moveFolder,
-  setFolderCover,
   setFolderPublished,
   setGalleryStatus,
   setFolderDownloadPassword,
@@ -106,14 +105,12 @@ export function CollectionEditor({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [moreMenuFor, setMoreMenuFor] = useState<string | null>(null);
   const [renameFor, setRenameFor] = useState<EditorFolder | null>(null);
-  const [coverFor, setCoverFor] = useState<EditorFolder | null>(null);
   const [deleteFor, setDeleteFor] = useState<EditorFolder | null>(null);
   const [downloadPasswordFor, setDownloadPasswordFor] = useState<EditorFolder | null>(null);
   const [toolbarMenuOpen, setToolbarMenuOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const queueRef = useRef<StagedUploadQueueHandle>(null);
   const renameRef = useRef<HTMLDialogElement>(null);
-  const coverRef = useRef<HTMLDialogElement>(null);
   const deleteRef = useRef<HTMLDialogElement>(null);
   const downloadPasswordRef = useRef<HTMLDialogElement>(null);
 
@@ -121,10 +118,6 @@ export function CollectionEditor({
     if (renameFor && renameRef.current && !renameRef.current.open) renameRef.current.showModal();
     else if (!renameFor && renameRef.current?.open) renameRef.current.close();
   }, [renameFor]);
-  useEffect(() => {
-    if (coverFor && coverRef.current && !coverRef.current.open) coverRef.current.showModal();
-    else if (!coverFor && coverRef.current?.open) coverRef.current.close();
-  }, [coverFor]);
   useEffect(() => {
     if (deleteFor && deleteRef.current && !deleteRef.current.open) deleteRef.current.showModal();
     else if (!deleteFor && deleteRef.current?.open) deleteRef.current.close();
@@ -347,21 +340,9 @@ export function CollectionEditor({
                           <button onClick={() => { setRenameFor(folder); setMoreMenuFor(null); }} role="menuitem" type="button">
                             <Pencil size={14} strokeWidth={1.8} /> Rename
                           </button>
-                          <button onClick={() => { setCoverFor(folder); setMoreMenuFor(null); }} role="menuitem" type="button">
-                            <ImagePlus size={14} strokeWidth={1.8} /> Highlight image
-                          </button>
                           <button onClick={() => { setDownloadPasswordFor(folder); setMoreMenuFor(null); }} role="menuitem" type="button">
                             <Download size={14} strokeWidth={1.8} /> Download PIN
                           </button>
-                          {coversByFolder?.[folder.id] ? (
-                            <form action={setFolderCover} onSubmit={() => setMoreMenuFor(null)}>
-                              <input name="id" type="hidden" value={folder.id} />
-                              <input name="cover_photo_id" type="hidden" value="" />
-                              <button role="menuitem" type="submit">
-                                <X size={14} strokeWidth={2} /> Remove highlight
-                              </button>
-                            </form>
-                          ) : null}
                           <form action={setFolderPublished}>
                             <input name="id" type="hidden" value={folder.id} />
                             <input name="published" type="hidden" value={folder.published ? "false" : "true"} />
@@ -489,15 +470,6 @@ export function CollectionEditor({
                           galleryId={gallery.id}
                           photoIds={[...selected]}
                         />
-                        {singleId ? (
-                          <form action={setFolderCover} onSubmit={() => router.refresh()}>
-                            <input name="id" type="hidden" value={activeFolder.id} />
-                            <input name="cover_photo_id" type="hidden" value={singleId} />
-                            <button className="admin-button is-secondary" type="submit">
-                              <ImageIcon size={15} strokeWidth={1.8} /> Highlight image
-                            </button>
-                          </form>
-                        ) : null}
                         <button className="admin-button is-secondary is-danger" onClick={() => setConfirmDelete(true)} type="button">
                           <Trash2 size={15} strokeWidth={1.8} /> Delete
                         </button>
@@ -567,34 +539,6 @@ export function CollectionEditor({
             <menu>
               <button onClick={() => setRenameFor(null)} type="button">Cancel</button>
               <button className="admin-button">Save</button>
-            </menu>
-          </form>
-        </dialog>
-      ) : null}
-      {coverFor ? (
-        <dialog className="admin-dialog" onCancel={() => setCoverFor(null)} ref={coverRef}>
-          <form action={setFolderCover} onSubmit={() => { setCoverFor(null); router.refresh(); }}>
-            <h2>Highlight image</h2>
-            <p className="muted">Pick the photo shown on this set&apos;s highlight.</p>
-            {(photosByFolder[coverFor.id] ?? []).length ? (
-              <div className="cover-picker-grid">
-                {(photosByFolder[coverFor.id] ?? []).map(photo => (
-                  <label className="cover-picker-option" key={photo.id}>
-                    {/* Signed admin-only URL; next/image is a poor fit for short-lived tokens. */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img alt="" height={photo.height ?? undefined} loading="lazy" src={photo.src} width={photo.width ?? undefined} />
-                    <input defaultChecked={coverFor.coverPhotoId === photo.id} name="cover_photo_id" type="radio" value={photo.id} />
-                    <span>Highlight</span>
-                  </label>
-                ))}
-              </div>
-            ) : (
-              <p className="empty">No photos in this set yet.</p>
-            )}
-            <input name="id" type="hidden" value={coverFor.id} />
-            <menu>
-              <button onClick={() => setCoverFor(null)} type="button">Cancel</button>
-              <button className="admin-button" disabled={!((photosByFolder[coverFor.id] ?? []).length)} type="submit">Save highlight</button>
             </menu>
           </form>
         </dialog>

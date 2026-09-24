@@ -11,38 +11,73 @@ export function GalleryDownloadDialog({
   const [error, setError] = useState<string | null>(null);
   const { dialogRef, closing } = useAnimatedDialog({ open: true, onClose });
 
+  async function requestDownload() {
+    const form = new FormData();
+    form.set("pin", pin);
+
+    const response = await fetch(
+      "/api/gallery/" + encodeURIComponent(slug) + "/sets/" + encodeURIComponent(setId) + "/download.zip",
+      { method: "POST", body: form },
+    );
+    const payload = await response.json().catch(() => null) as {
+      status?: "ready" | "preparing";
+      url?: string;
+      filename?: string;
+      error?: string;
+    } | null;
+
+    if (response.status === 202 || payload?.status === "preparing") return null;
+
+    if (!response.ok) {
+      throw new Error(payload?.error || "The set download could not be started. Check the PIN and try again.");
+    }
+
+    if (!payload?.url) {
+      throw new Error(payload?.error || "The set download could not be prepared. Please try again.");
+    }
+
+    return payload;
+  }
+
   async function downloadAll() {
     if (pending) return;
-    if (!pin.trim()) { setError("Enter the download PIN."); return; }
+    if (!pin.trim()) {
+      setError("Enter the download PIN.");
+      return;
+    }
+
     setPending(true);
     setError(null);
+
     try {
-      const form = new FormData();
-      form.set("pin", pin);
-      const response = await fetch(
-        "/api/gallery/" + encodeURIComponent(slug) + "/sets/" + encodeURIComponent(setId) + "/download.zip",
-        { method: "POST", body: form },
-      );
-      if (!response.ok) {
-        const payload = await response.json().catch(() => null) as { error?: string } | null;
-        setError(payload?.error || "The set download could not be started. Check the PIN and try again.");
-        return;
+      let payload = await requestDownload();
+
+      if (!payload) {
+        for (let attempt = 0; attempt < 90; attempt += 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          payload = await requestDownload();
+          if (payload) break;
+        }
       }
-      const payload = await response.json().catch(() => null) as { url?: string; filename?: string; error?: string } | null;
-      if (!payload?.url) {
-        setError(payload?.error || "The set download could not be prepared. Please try again.");
-        return;
+
+      if (!payload) {
+        throw new Error("The set is still being prepared. Please try again in a moment.");
       }
 
       const anchor = document.createElement("a");
-      anchor.href = payload.url;
-      anchor.download = payload.filename || ((title || "gallery").replace(/[^a-z0-9_-]+/gi, "-") + "-" + (setName || "photos").replace(/[^a-z0-9_-]+/gi, "-") + ".zip");
+      anchor.href = payload.url!;
+      anchor.download = payload.filename || (
+        (title || "gallery").replace(/[^a-z0-9_-]+/gi, "-") +
+        "-" +
+        (setName || "photos").replace(/[^a-z0-9_-]+/gi, "-") +
+        ".zip"
+      );
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
       onClose();
-    } catch {
-      setError("The download could not be started. Please try again.");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "The download could not be started. Please try again.");
     } finally {
       setPending(false);
     }
@@ -58,7 +93,9 @@ export function GalleryDownloadDialog({
       <form onSubmit={event => { event.preventDefault(); void downloadAll(); }}>
         <div>
           <h2 id="client-gallery-download-title">Download {setName}</h2>
-          <p id="client-gallery-download-sub">Enter the PIN for this set to download every photo in this set as one ZIP file.</p>
+          <p id="client-gallery-download-sub">
+            Enter the PIN for this set to download every photo in this set as one ZIP file.
+          </p>
         </div>
         <input
           aria-label="Set download PIN"

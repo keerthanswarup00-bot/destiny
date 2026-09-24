@@ -33,6 +33,7 @@ export function ClientPhotoGrid({
 }) {
   const [index, setIndex] = useState(-1);
   const [notice, setNotice] = useState<string | null>(null);
+  const [actionBusy, setActionBusy] = useState<string | null>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { requestIdentity, identified } = useGalleryIdentity();
 
@@ -57,28 +58,34 @@ export function ClientPhotoGrid({
   }
 
   async function sharePhoto(photoId: string) {
-    const form = new FormData();
-    form.set("slug", slug);
-    form.set("photo_id", photoId);
-    const result = await shareGalleryPhoto(form);
-    if (!result.url) {
-      showNotice(result.error ?? "A share link could not be created.");
-      return;
-    }
-    const data = { title: "Destiny gallery photo", text: "A photograph from a Destiny gallery", url: result.url };
-    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
-      try {
-        await navigator.share(data);
-        return;
-      } catch {
-        // User cancelled or share failed; fall back to copying the link.
-      }
-    }
+    if (actionBusy === photoId) return;
+    setActionBusy(photoId);
     try {
-      await navigator.clipboard.writeText(result.url);
-      showNotice("Link copied");
-    } catch {
-      showNotice("Could not copy the link.");
+      const form = new FormData();
+      form.set("slug", slug);
+      form.set("photo_id", photoId);
+      const result = await shareGalleryPhoto(form);
+      if (!result.url) {
+        showNotice(result.error ?? "A share link could not be created.");
+        return;
+      }
+      const data = { title: "Destiny gallery photo", text: "A photograph from a Destiny gallery", url: result.url };
+      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+        try {
+          await navigator.share(data);
+          return;
+        } catch {
+          // User cancelled or share failed; fall back to copying the link.
+        }
+      }
+      try {
+        await navigator.clipboard.writeText(result.url);
+        showNotice("Link copied");
+      } catch {
+        showNotice("Could not copy the link.");
+      }
+    } finally {
+      setActionBusy(null);
     }
   }
 
@@ -88,25 +95,31 @@ export function ClientPhotoGrid({
   }
 
   async function downloadPhoto(photoId: string) {
-    const form = new FormData();
-    form.set("slug", slug);
-    form.set("photo_id", photoId);
-    const result = await downloadGalleryPhoto(form);
-    if (result.needsIdentity) {
-      requestIdentity({ kind: "download-photo", photoId });
-      showNotice("Enter your email to download full-size photos.");
-      return;
+    if (actionBusy === photoId) return;
+    setActionBusy(photoId);
+    try {
+      const form = new FormData();
+      form.set("slug", slug);
+      form.set("photo_id", photoId);
+      const result = await downloadGalleryPhoto(form);
+      if (result.needsIdentity) {
+        requestIdentity({ kind: "download-photo", photoId });
+        showNotice("Enter your email to download full-size photos.");
+        return;
+      }
+      if (!result.url || !result.filename) {
+        showNotice(result.error ?? "Download is unavailable right now.");
+        return;
+      }
+      const anchor = document.createElement("a");
+      anchor.href = result.url;
+      anchor.download = result.filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+    } finally {
+      setActionBusy(null);
     }
-    if (!result.url || !result.filename) {
-      showNotice(result.error ?? "Download is unavailable right now.");
-      return;
-    }
-    const anchor = document.createElement("a");
-    anchor.href = result.url;
-    anchor.download = result.filename;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
   }
 
   function downloadCurrent() {
@@ -149,8 +162,8 @@ export function ClientPhotoGrid({
           </span>
         ) : null}
         <span className="client-photo-veil">
-          <button aria-label="Download photo" className="client-photo-action" disabled={disabled} onClick={() => void downloadPhoto(item.id)} title="Download photo" type="button"><Download size={16} strokeWidth={1.6} /></button>
-          <button aria-label="Share photo" className="client-photo-action" disabled={disabled} onClick={() => void sharePhoto(item.id)} title="Share photo" type="button"><Share2 size={16} strokeWidth={1.6} /></button>
+          <button aria-label="Download photo" className="client-photo-action" disabled={disabled || actionBusy === item.id} onClick={() => void downloadPhoto(item.id)} title="Download photo" type="button"><Download size={16} strokeWidth={1.6} /></button>
+          <button aria-label="Share photo" className="client-photo-action" disabled={disabled || actionBusy === item.id} onClick={() => void sharePhoto(item.id)} title="Share photo" type="button"><Share2 size={16} strokeWidth={1.6} /></button>
         </span>
       </div>
     );
@@ -211,8 +224,8 @@ export function ClientPhotoGrid({
                 {current.clientSelected ? <Check fill="currentColor" size={18} strokeWidth={2} /> : <Check size={18} strokeWidth={2} />}
               </button>,
             ] : []),
-            <button aria-label="Download photo" className="client-lightbox-action yarl__button" disabled={!current} key="download" onClick={() => void downloadCurrent()} title="Download photo" type="button"><Download size={17} strokeWidth={1.6} /></button>,
-            <button aria-label="Share photo" className="client-lightbox-action yarl__button" disabled={!current} key="share" onClick={() => void shareCurrent()} title="Share photo" type="button"><Share2 size={17} strokeWidth={1.6} /></button>,
+            <button aria-label="Download photo" className="client-lightbox-action yarl__button" disabled={!current || actionBusy === current?.id} key="download" onClick={() => void downloadCurrent()} title="Download photo" type="button"><Download size={17} strokeWidth={1.6} /></button>,
+            <button aria-label="Share photo" className="client-lightbox-action yarl__button" disabled={!current || actionBusy === current?.id} key="share" onClick={() => void shareCurrent()} title="Share photo" type="button"><Share2 size={17} strokeWidth={1.6} /></button>,
             "slideshow",
             "fullscreen",
             "close",

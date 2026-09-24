@@ -1,9 +1,10 @@
 "use client";
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from "react";
 import { Download, ExternalLink, Heart } from "lucide-react";
 import { downloadGalleryPhotos } from "@/app/(client-gallery)/gallery/actions";
 import { consumePendingAction, useGalleryIdentity } from "@/components/client-gallery/profile-identity";
+import { useAnimatedDialog } from "@/components/client-gallery/use-animated-dialog";
 import type { WorkspacePhoto } from "@/components/client-gallery/gallery-workspace";
 
 export type FavoritesReviewHandle = { download: () => void };
@@ -20,32 +21,21 @@ export const FavoritesReview = forwardRef<FavoritesReviewHandle, {
   onToggle: (photoId: string) => void;
   onClear?: () => void;
 }>(function FavoritesReview({ photos, slug, open, onClose, onToggle, onClear }, ref) {
-  const dialog = useRef<HTMLDialogElement>(null);
   const [downloading, setDownloading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [status, setStatus] = useState<{ kind: "info" | "error"; text: string } | null>(null);
   const { requestIdentity, identified } = useGalleryIdentity();
   const selected = photos.filter(photo => photo.selected);
-
-  useEffect(() => {
-    const node = dialog.current;
-    if (!node) return;
-    if (open && !node.open) node.showModal();
-    else if (!open && node.open) node.close();
-  }, [open]);
-
-  useEffect(() => {
-    const node = dialog.current;
-    if (!node) return;
-    const handle = () => onClose();
-    node.addEventListener("close", handle);
-    return () => node.removeEventListener("close", handle);
-  }, [onClose]);
+  const { dialogRef, closing } = useAnimatedDialog({ open, onClose });
 
   const download = useCallback(async () => {
-    if (!selected.length || downloading) return;
+    if (downloading) return;
+    if (!selected.length) {
+      setStatus({ kind: "info", text: "Add a few favourites first, then download them here." });
+      return;
+    }
     const photoIds = selected.map(photo => photo.id);
     setDownloading(true);
-    setMessage(null);
+    setStatus(null);
     const form = new FormData();
     form.set("slug", slug);
     for (const id of photoIds) form.append("photo_id", id);
@@ -53,11 +43,11 @@ export const FavoritesReview = forwardRef<FavoritesReviewHandle, {
     setDownloading(false);
     if (result.needsIdentity) {
       requestIdentity({ kind: "download-favorites" });
-      setMessage("Enter your email to download your favourites.");
+      setStatus({ kind: "info", text: "Enter your email to download your favourites." });
       return;
     }
     if (result.error || !result.items.length) {
-      setMessage(result.error ?? "The download could not be started.");
+      setStatus({ kind: "error", text: result.error ?? "The download could not be started." });
       return;
     }
     let failures = 0;
@@ -80,7 +70,9 @@ export const FavoritesReview = forwardRef<FavoritesReviewHandle, {
         window.open(item.url, "_blank", "noopener");
       }
     }
-    setMessage(failures ? `${failures} ${failures === 1 ? "download" : "downloads"} could not be started.` : `${result.items.length} ${result.items.length === 1 ? "photo" : "photos"} downloaded.`);
+    setStatus(failures
+      ? { kind: "error", text: `${failures} ${failures === 1 ? "download" : "downloads"} could not be started.` }
+      : { kind: "info", text: `${result.items.length} ${result.items.length === 1 ? "photo" : "photos"} downloaded.` });
   }, [downloading, requestIdentity, selected, slug]);
 
   useImperativeHandle(ref, () => ({ download }), [download]);
@@ -93,7 +85,7 @@ export const FavoritesReview = forwardRef<FavoritesReviewHandle, {
   }, [identified, slug]);
 
   return (
-    <dialog className="client-review" ref={dialog}>
+    <dialog className={`client-review${closing ? " is-closing" : ""}`} ref={dialogRef}>
       <div className="client-review-body">
         <header className="client-review-head">
           <div>
@@ -134,9 +126,15 @@ export const FavoritesReview = forwardRef<FavoritesReviewHandle, {
             </footer>
           </>
         ) : (
-          <p className="client-empty">No favourites yet in this gallery.</p>
+          <div className="client-review-empty">
+            <span aria-hidden="true" className="client-review-empty-icon"><Heart size={22} strokeWidth={1.4} /></span>
+            <p className="client-review-empty-title">No favourites yet</p>
+            <p className="client-review-empty-sub">Tap the heart on any photo to save it here.</p>
+          </div>
         )}
-        {message ? <p aria-live="polite" className="client-bar-error is-ok" role="status">{message}</p> : null}
+        {status ? (
+          <p aria-live="polite" className={`client-bar-error${status.kind === "info" ? " is-ok" : ""}`} role="status">{status.text}</p>
+        ) : null}
       </div>
     </dialog>
   );

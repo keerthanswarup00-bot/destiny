@@ -6,6 +6,7 @@ import { GalleryOverview, type GallerySet } from "@/components/client-gallery/ga
 import { GalleryShell } from "@/components/client-gallery/gallery-shell";
 import { resolveGalleryAccess } from "@/lib/gallery-access";
 import { currentProfile } from "@/lib/gallery-profile";
+import { recordGalleryView } from "@/lib/gallery-views";
 import { galleryClient, galleryClientHighlight, galleryFolders, galleryFolderPhotos, selectedPhotoIds, viewerSubmission, clientSelectedPhotoIds } from "@/lib/gallery-data";
 import { GALLERY_SOCIAL_DESCRIPTION, GALLERY_SOCIAL_IMAGE_LONG_EDGE, galleryCoverImagePath, gallerySocialCover, requestHost, siteOrigin, socialCoverImageSize } from "@/lib/gallery-social";
 import { getSiteBranding, getSiteContact } from "@/lib/site/site-content";
@@ -98,6 +99,11 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
     galleryClient(access.gallery.id),
     galleryClientHighlight(access.gallery.id),
   ]);
+
+  // ONE gallery overview view is recorded per page load (admin-only analytics).
+  // Never for set switches, lightbox or dialogs; failures are swallowed so the
+  // gallery render is never affected.
+  await recordGalleryView(access.gallery.id, profileId);
 
   // Client-tier data only loads for CLIENT sessions: the official selection and
   // its submission state are never exposed to viewer sessions.

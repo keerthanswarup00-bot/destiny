@@ -31,6 +31,7 @@ export function GalleryShell({
 }) {
   const [count, setCount] = useState(selectedIds.length);
   const [shareNote, setShareNote] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
   const overviewRef = useRef<GalleryOverviewHandle>(null);
   const shareTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -40,38 +41,44 @@ export function GalleryShell({
   // admin "Share link" field) — no new URL/token system. Web Share API when
   // available, otherwise copy the link for pasting anywhere.
   async function shareGallery() {
-    const url = window.location.href;
-    const data = { title: title || "Destiny gallery", url };
-    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
-      try {
-        await navigator.share(data);
-        return;
-      } catch {
-        // User cancelled; fall back to copying the link.
-      }
-    }
+    if (sharing) return;
+    setSharing(true);
     try {
-      await navigator.clipboard.writeText(url);
-      setShareNote("Link copied");
-    } catch {
-      setShareNote("Could not copy the link.");
+      const url = window.location.href;
+      const data = { title: title || "Destiny gallery", url };
+      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+        try {
+          await navigator.share(data);
+          return;
+        } catch {
+          // User cancelled; fall back to copying the link.
+        }
+      }
+      try {
+        await navigator.clipboard.writeText(url);
+        setShareNote("Link copied");
+      } catch {
+        setShareNote("Could not copy the link.");
+      }
+      if (shareTimer.current) clearTimeout(shareTimer.current);
+      shareTimer.current = setTimeout(() => setShareNote(null), 2200);
+    } finally {
+      setSharing(false);
     }
-    if (shareTimer.current) clearTimeout(shareTimer.current);
-    shareTimer.current = setTimeout(() => setShareNote(null), 2200);
   }
 
   return (
     <>
       <header className="client-topbar">
-        <h1 className="client-topbar-title">{title}</h1>
-        <div className="client-topbar-actions">
+        <div className="client-topbar-head">
+          <h1 className="client-topbar-title">{title}</h1>
           {role === "client" ? (
-            <span className="client-client-badge" title="Full client access">
-              Client
-            </span>
+            <span className="client-client-badge" title="Full client access">Client</span>
           ) : null}
+        </div>
+        <div className="client-topbar-actions">
           <button
-            aria-label={count ? `Favourites, ${count} ${count === 1 ? "photo" : "photos"} selected` : "Favourites"}
+            aria-label={count ? `Favourites, ${count} ${count === 1 ? "photo" : "photos"} saved` : "Your favourites"}
             className={`client-topbar-action client-topbar-favorites${count > 0 ? " is-active" : ""}`}
             onClick={() => overviewRef.current?.openReview()}
             title={count ? `${count} ${count === 1 ? "favourite" : "favourites"}` : "Review favourites"}
@@ -91,6 +98,7 @@ export function GalleryShell({
           </button>
           <button
             aria-label="Share the gallery"
+            aria-busy={sharing}
             className="client-topbar-action"
             onClick={() => void shareGallery()}
             title="Share the gallery"
@@ -99,8 +107,12 @@ export function GalleryShell({
             <Share2 size={20} strokeWidth={1.6} />
           </button>
           {shareNote ? <span aria-live="polite" className="client-topbar-note" role="status">{shareNote}</span> : null}
-          {role !== "client" && clientGate ? <ClientAccessDialog slug={slug} /> : null}
         </div>
+        {role !== "client" && clientGate ? (
+          <div className="client-topbar-gate">
+            <ClientAccessDialog slug={slug} />
+          </div>
+        ) : null}
         <p className="client-topbar-brand">{brand}</p>
       </header>
       <GalleryIdentityProvider initiallyIdentified={identified} slug={slug}>

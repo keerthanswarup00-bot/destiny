@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { identifyGalleryProfile } from "@/app/(client-gallery)/gallery/actions";
+import { useAnimatedDialog } from "@/components/client-gallery/use-animated-dialog";
 
 /**
  * Lightweight PROFILE identity. Entering an email creates or finds a profile and
@@ -79,50 +80,38 @@ export function GalleryIdentityProvider({ slug, initiallyIdentified, children }:
 }
 
 function ProfileIdentityDialog({ open, onClose, onIdentified }: { open: boolean; onClose: () => void; onIdentified: () => void }) {
-  const dialog = useRef<HTMLDialogElement>(null);
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [identifying, setIdentifying] = useState(false);
-
-  useEffect(() => {
-    const node = dialog.current;
-    if (!node) return;
-    if (open && !node.open) node.showModal();
-    else if (!open && node.open) node.close();
-  }, [open]);
-
-  useEffect(() => {
-    const node = dialog.current;
-    if (!node) return;
-    const handleClose = () => onClose();
-    node.addEventListener("close", handleClose);
-    return () => node.removeEventListener("close", handleClose);
-  }, [onClose]);
+  const { dialogRef, closing } = useAnimatedDialog({ open, onClose });
 
   async function identify() {
-    if (identifying) return;
+    if (identifying || !email.trim()) return;
     setIdentifying(true);
     setError(null);
     const form = new FormData();
     form.set("email", email);
     const result = await identifyGalleryProfile(form);
-    setIdentifying(false);
     if (!result.ok) {
+      setIdentifying(false);
       setError(result.error);
       return;
     }
+    // Success: the profile cookie is set server-side; close automatically and
+    // let the provider replay the original action that asked for the email.
     onIdentified();
   }
 
   return (
-    <dialog aria-labelledby="client-gallery-identity-title" className="client-favorites-dialog" ref={dialog}>
+    <dialog aria-describedby="client-gallery-identity-sub" aria-labelledby="client-gallery-identity-title" className={`client-favorites-dialog${closing ? " is-closing" : ""}`} ref={dialogRef}>
       <form onSubmit={event => { event.preventDefault(); void identify(); }}>
         <h2 id="client-gallery-identity-title">Save your photos</h2>
-        <p>Enter your email so your favourites follow you on any device. Your email is never used for access &mdash; just to find your saved photos.</p>
+        <p id="client-gallery-identity-sub">Enter your email so your favourites follow you on any device. Your email is used for identification only &mdash; it never grants access to your gallery.</p>
         <input
           aria-label="Your email"
           autoComplete="email"
           autoFocus
+          disabled={identifying}
           inputMode="email"
           name="email"
           onChange={event => setEmail(event.target.value)}
@@ -136,8 +125,8 @@ function ProfileIdentityDialog({ open, onClose, onIdentified }: { open: boolean;
           </p>
         ) : null}
         <div className="client-favorites-actions">
-          <button className="client-clear-button" onClick={onClose} type="button">Cancel</button>
-          <button className="client-submit-button" disabled={identifying} type="submit">{identifying ? "Saving…" : "Continue"}</button>
+          <button className="client-clear-button" disabled={identifying} onClick={onClose} type="button">Cancel</button>
+          <button className="client-submit-button" disabled={identifying || !email.trim()} type="submit">{identifying ? "Saving…" : "Continue"}</button>
         </div>
       </form>
     </dialog>

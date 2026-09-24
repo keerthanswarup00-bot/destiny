@@ -293,3 +293,15 @@ html{scroll-behavior:smooth}
   .client-topbar-action,.client-photo-action,.client-submit-button,.client-review-button{transition:none}
   .client-topbar-action:active,.client-photo-action:active,.client-submit-button:active,.client-review-button:active{transform:none}
 }
+
+/* Favourites review: grouped by gallery set while keeping one global favourites count. */
+.client-review-groups{overflow-y:auto;padding:0 24px 18px}
+.client-review-groups .client-review-group{margin:0 0 24px}
+.client-review-groups .client-review-group:last-child{margin-bottom:0}
+.client-review-group-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 0 10px}
+.client-review-group-head h3{margin:0;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#111}
+.client-review-group-head span{font-size:11px;color:#999}
+.client-review-groups .client-review-grid{overflow:visible;padding:0}
+@media(max-width:560px){
+  .client-review-groups{padding:0 18px 14px}
+}

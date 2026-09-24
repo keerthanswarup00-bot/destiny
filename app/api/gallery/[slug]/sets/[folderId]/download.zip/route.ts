@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { after } from "next/server";
 import { requireGalleryAccess } from "@/lib/gallery-access";
 import { galleryDb } from "@/lib/gallery-db";
 import { verifyGalleryPassword } from "@/lib/gallery-password";
@@ -56,19 +55,18 @@ export async function POST(
       await photoStore().objectExists(zipPath!);
 
     if (!cachedReady) {
-      after(async () => {
-        try {
-          await prepareSetDownload(gallery.id, folderId);
-        } catch (error) {
-          console.error("[set-download] background preparation failed", {
-            galleryId: gallery.id,
-            folderId,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
+      console.info("[set-download] preparing ZIP on demand", {
+        galleryId: gallery.id,
+        folderId,
       });
-
-      return NextResponse.json({ status: "preparing" }, { status: 202 });
+      const preparation = await prepareSetDownload(gallery.id, folderId);
+      if (preparation.status === "empty") {
+        return NextResponse.json({ error: "This set has no downloadable photos." }, { status: 400 });
+      }
+      if (preparation.status !== "ready" || !preparation.path) {
+        return NextResponse.json({ status: "preparing" }, { status: 202 });
+      }
+      zipPath = preparation.path;
     }
 
     const archiveName =
@@ -77,6 +75,7 @@ export async function POST(
       safeSegment(folder.name, "photos") +
       ".zip";
 
+    console.info("[set-download] signing prepared ZIP", { galleryId: gallery.id, folderId, zipPath });
     const url = await photoStore().signedDownloadUrl(
       zipPath!,
       archiveName,

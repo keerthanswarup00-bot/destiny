@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ImageIcon, Trash2 } from "lucide-react";
+import { Crop, ImageIcon, Trash2 } from "lucide-react";
 import { setGalleryHighlight } from "@/app/admin/set-actions";
+import { GalleryHighlightCropEditor } from "@/components/admin/gallery-highlight-crop-editor";
 
 type HighlightPhoto = { id: string; filename: string; src: string; width: number | null; height: number | null };
+type HighlightCrop = { x: number; y: number; zoom: number };
 
 export function GalleryHighlightEditor({
   galleryId,
@@ -16,9 +18,10 @@ export function GalleryHighlightEditor({
   galleryId: string;
   folders: { id: string; name: string }[];
   photosByFolder: Record<string, HighlightPhoto[]>;
-  highlight: { id: string | null; src: string | null };
+  highlight: { id: string | null; src: string | null; crop: HighlightCrop | null };
 }) {
   const [open, setOpen] = useState(false);
+  const [openCrop, setOpenCrop] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const router = useRouter();
 
@@ -53,6 +56,11 @@ export function GalleryHighlightEditor({
             {highlight.id ? "Change highlight" : "Choose highlight"}
           </button>
           {highlight.id ? (
+            <button className="admin-button is-secondary" onClick={() => setOpenCrop(true)} type="button">
+              <Crop size={14} strokeWidth={1.8} /> Crop hero
+            </button>
+          ) : null}
+          {highlight.id ? (
             <form action={setGalleryHighlight} onSubmit={() => router.refresh()}>
               <input name="id" type="hidden" value={galleryId} />
               <input name="photo_id" type="hidden" value="" />
@@ -64,6 +72,16 @@ export function GalleryHighlightEditor({
         </div>
         <span className="hint">Pick any photo from any set — it becomes the full-screen cover on the client landing page.</span>
       </div>
+
+      {openCrop && highlight.id && highlight.src ? (
+        <GalleryHighlightCropEditor
+          crop={highlight.crop}
+          galleryId={galleryId}
+          onClose={() => setOpenCrop(false)}
+          photoId={highlight.id}
+          url={highlight.src}
+        />
+      ) : null}
 
       {open ? (
         <dialog className="admin-dialog" onCancel={() => setOpen(false)} ref={dialogRef}>

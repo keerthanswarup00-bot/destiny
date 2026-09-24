@@ -3,9 +3,10 @@ import { headers } from "next/headers";
 import { CollectionEditor } from "@/components/admin/collection-editor";
 import { GallerySettings } from "@/components/admin/gallery-settings";
 import { adminDb } from "@/lib/admin-data";
-import { galleryViewStats, relativeTimeLabel } from "@/lib/admin-analytics";
+import { galleryEmails, galleryViewStats, relativeTimeLabel } from "@/lib/admin-analytics";
 import { adminError } from "@/lib/admin-validation";
 import { photoStore } from "@/lib/storage-provider";
+import { normalizeHighlightCrop } from "@/lib/site/website-gallery";
 
 export default async function GalleryDetail({
   params,
@@ -21,17 +22,18 @@ export default async function GalleryDetail({
   const host = headerList.get("x-forwarded-host") || headerList.get("host") || "localhost:3000";
   const proto = headerList.get("x-forwarded-proto") || "http";
   const db = await adminDb();
-  const { data: gallery } = await db.from("galleries").select("id,title,slug,description,status,client_id,password_hash,client_password_hash,highlight_photo_id,created_at").eq("id", galleryId).maybeSingle();
+  const { data: gallery } = await db.from("galleries").select("id,title,slug,description,status,client_id,password_hash,client_password_hash,highlight_photo_id,highlight_crop,created_at").eq("id", galleryId).maybeSingle();
   if (!gallery) notFound();
   const shareUrl = `${proto}://${host}/gallery/${gallery.slug}`;
 
-  const [{ data: client }, { data: clients }, { data: folders }, { data: photos }, { data: branding }, insights] = await Promise.all([
+  const [{ data: client }, { data: clients }, { data: folders }, { data: photos }, { data: branding }, insights, emails] = await Promise.all([
     db.from("clients").select("id,name").eq("id", gallery.client_id).maybeSingle(),
     db.from("clients").select("id,name").order("name"),
     db.from("folders").select("id,name,slug,parent_folder_id,sort_order,published,cover_photo_id,description").eq("gallery_id", galleryId).order("sort_order").order("id"),
     db.from("photos").select("id,filename,folder_id,thumbnail_path,preview_path,original_path,width,height,sort_order").eq("gallery_id", galleryId).order("sort_order").order("id"),
     db.from("site_branding").select("watermark_path,watermark_enabled").eq("id", "branding").maybeSingle(),
     galleryViewStats(galleryId),
+    galleryEmails(galleryId),
   ]);
   const watermarkEnabled = Boolean(branding?.watermark_path && branding.watermark_enabled !== false);
 
@@ -67,9 +69,10 @@ for (const folder of folders ?? []) {
 // any photo in the gallery regardless of set; null until one is configured.
 const highlightPhoto = (photos ?? []).find(photo => photo.id === gallery.highlight_photo_id);
 const highlight = {
-  id: gallery.highlight_photo_id,
-  src: highlightPhoto ? (urlByPath.get(highlightPhoto.thumbnail_path || highlightPhoto.preview_path || highlightPhoto.original_path) ?? null) : null,
-};
+    id: gallery.highlight_photo_id,
+    src: highlightPhoto ? (urlByPath.get(highlightPhoto.thumbnail_path || highlightPhoto.preview_path || highlightPhoto.original_path) ?? null) : null,
+    crop: highlightPhoto ? normalizeHighlightCrop(gallery.highlight_crop) : null,
+  };
 
   const galleryError = error === "invalid-gallery" ? message : null;
   const folderError =
@@ -134,6 +137,7 @@ const highlight = {
           totalViews: insights.totalViews,
           firstViewedLabel: relativeTimeLabel(insights.firstViewedAt),
           lastViewedLabel: relativeTimeLabel(insights.lastViewedAt),
+          emails,
         }}
       />
     </>

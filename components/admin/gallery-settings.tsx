@@ -56,7 +56,7 @@ export function GallerySettings({
   error?: string | null;
   folders: { id: string; name: string }[];
   photosByFolder: Record<string, { id: string; filename: string; src: string; width: number | null; height: number | null }[]>;
-  highlight: { id: string | null; src: string | null };
+  highlight: { id: string | null; src: string | null; crop: { x: number; y: number; zoom: number } | null };
   insights?: GalleryInsightsValue;
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);

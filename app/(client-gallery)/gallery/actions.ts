@@ -125,7 +125,8 @@ export async function identifyGalleryProfile(form: FormData): Promise<{ ok: bool
   if (!isValidProfileEmail(email)) {
     return { ok: false, error: "Enter a valid email address." };
   }
-  const profile = await upsertProfile(email);
+  const marketingOptin = ["true", "on", "1"].includes(String(form.get("marketing_optin") ?? "").trim().toLowerCase());
+  const profile = await upsertProfile(email, marketingOptin);
   if (!profile) return { ok: false, error: "Unable to save your email. Try again." };
   await setProfileCookie(profile.id);
   await claimLegacyProfileRows(profile);

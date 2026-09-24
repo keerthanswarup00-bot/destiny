@@ -101,9 +101,9 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
   ]);
 
   // ONE gallery overview view is recorded per page load (admin-only analytics).
-  // Never for set switches, lightbox or dialogs; failures are swallowed so the
-  // gallery render is never affected.
-  await recordGalleryView(access.gallery.id, profileId);
+  // Never for set switches, lightbox or dialogs. Fire-and-forget: a slow or
+  // failing analytics write must never block gallery rendering.
+  void recordGalleryView(access.gallery.id, profileId);
 
   // Client-tier data only loads for CLIENT sessions: the official selection and
   // its submission state are never exposed to viewer sessions.
@@ -134,7 +134,18 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
   // hero for the entire gallery — every set shares it. Folder-level covers are
   // never used as a client-facing hero; the full-screen hero uses the
   // high-resolution derivative so it never upscales a thumbnail.
-  const highlight = highlightResult ? { url: (highlightResult.fullUrl ?? highlightResult.url) as string, width: highlightResult.width, height: highlightResult.height } : null;
+  const highlight = highlightResult ? { url: (highlightResult.fullUrl ?? highlightResult.url) as string, width: highlightResult.width, height: highlightResult.height, crop: highlightResult.crop } : null;
+
+  // Non-destructive crop: same normalized {x,y,zoom} formula as the public
+  // Website Gallery Highlight, replayed over the cover-fit hero image with a
+  // CSS transform (transform-origin top-left; scale applies first, then
+  // translate). The source image is never modified.
+  const heroStyle = highlight?.crop && highlight.crop.zoom >= 1
+    ? {
+        transform: `translate(${(0.5 - highlight.crop.x * highlight.crop.zoom) * 100}%, ${(0.5 - highlight.crop.y * highlight.crop.zoom) * 100}%) scale(${highlight.crop.zoom})`,
+        transformOrigin: "0 0" as const,
+      }
+    : undefined;
 
   const brand = branding.short_name || "DESTINY";
 
@@ -150,6 +161,7 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
             fetchPriority="high"
             height={highlight.height ?? undefined}
             src={highlight.url}
+            style={heroStyle}
             width={highlight.width ?? undefined}
           />
           <div aria-hidden="true" className="client-hero-scrim" />

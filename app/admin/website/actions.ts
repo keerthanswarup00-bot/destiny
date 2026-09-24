@@ -36,12 +36,18 @@ async function getHomeRow(supabase: Awaited<ReturnType<typeof db>>) {
   return (data ?? {}) as Record<string, unknown>;
 }
 
-async function patchHome(section: string, patch: Record<string, unknown>, redirectTo: string) {
+async function patchHome(section: string, patch: Record<string, unknown>, redirectTo: string, obsolete: string[] = []) {
   const supabase = await db();
   const row = await getHomeRow(supabase);
   const previous = row[section] ?? {};
   const merged = { ...(previous as Record<string, unknown>), ...patch };
   await supabase.from("site_home").upsert({ id: "home", ...row, [section]: merged }, { onConflict: "id" });
+  // The DB now references the new asset (or none). Purge the replaced objects
+  // best-effort — a failure here only leaves stale objects for the storage
+  // audit, never a broken reference.
+  for (const key of obsolete) {
+    try { await photoStore().removePhotos([key]); } catch { /* stale object is harmless */ }
+  }
   revalidate();
   await invalidateTags("site-home");
   redirect(`${redirectTo}?saved=1`);
@@ -131,13 +137,14 @@ export async function completeWebsiteGalleryUpload(form: FormData): Promise<{ ok
   return { ok: true };
 }
 
-async function receiveAsset(form: FormData, field: string, previous: Record<string, unknown>): Promise<Record<string, unknown>> {
+async function receiveAsset(form: FormData, field: string, previous: Record<string, unknown>): Promise<{ patch: Record<string, unknown>; obsolete: string[] }> {
   const file = form.get(field);
+  const obsolete: string[] = [];
   let patch: Record<string, unknown> = {};
   if (checked(form, `remove_${field}`)) {
     if (typeof previous.image_path === "string" || typeof previous[`${field}_path`] === "string") {
       const old = (previous.image_path ?? previous[`${field}_path`]) as string;
-      await photoStore().removePhotos([old]);
+      obsolete.push(old);
     }
     patch = { image_path: null, image_mime: null, image_bytes: null, [`${field}_path`]: null, [`${field}_mime`]: null, [`${field}_bytes`]: null };
   } else if (file instanceof File && file.size > 0) {
@@ -148,10 +155,10 @@ async function receiveAsset(form: FormData, field: string, previous: Record<stri
     const old = (previous.image_path ?? previous[`${field}_path`]) as string | null;
     const key = `website/${crypto.randomUUID()}.${ext}`;
     await photoStore().uploadPhoto({ key, body: Buffer.from(await file.arrayBuffer()), contentType: file.type });
-    if (old) await photoStore().removePhotos([old]);
+    if (old) obsolete.push(old);
     patch = { image_path: key, image_mime: file.type, image_bytes: file.size, [`${field}_path`]: key, [`${field}_mime`]: file.type, [`${field}_bytes`]: file.size };
   }
-  return patch;
+  return { patch, obsolete };
 }
 
 /* -------------------------------- home: hero ------------------------------- */
@@ -159,7 +166,7 @@ async function receiveAsset(form: FormData, field: string, previous: Record<stri
 export async function saveHomeHero(form: FormData) {
   const previous = await getHomeRow(await db());
   const hero = { ...(previous.hero as Record<string, unknown>) };
-  const asset = await receiveAsset(form, "image", hero);
+  const { patch: asset, obsolete } = await receiveAsset(form, "image", hero);
   await patchHome(
     "hero",
     {
@@ -173,6 +180,7 @@ export async function saveHomeHero(form: FormData) {
       ...asset,
     },
     "/admin/website/home",
+    obsolete,
   );
 }
 
@@ -202,7 +210,7 @@ export async function saveStoriesConfig(form: FormData) {
 export async function saveApproach(form: FormData) {
   const previous = await getHomeRow(await db());
   const approach = { ...(previous.approach as Record<string, unknown>) };
-  const asset = await receiveAsset(form, "image", approach);
+  const { patch: asset, obsolete } = await receiveAsset(form, "image", approach);
   const count = Math.min(12, Math.max(0, Number(value(form, "principle_count")) || 0));
   const principles: { label: string; description: string }[] = [];
   for (let index = 0; index < count; index += 1) {
@@ -212,6 +220,7 @@ export async function saveApproach(form: FormData) {
     "approach",
     { enabled: checked(form, "enabled"), label: value(form, "label").trim().slice(0, 120), heading: value(form, "heading").trim().slice(0, 500), body: value(form, "body").trim().slice(0, 2000), principles, ...asset },
     "/admin/website/home",
+    obsolete,
   );
 }
 
@@ -537,11 +546,12 @@ export async function saveBranding(form: FormData) {
   const supabase = await db();
   const { data: existing } = await supabase.from("site_branding").select("*").eq("id", "branding").maybeSingle();
   const patch: Record<string, unknown> = {};
+  const obsolete: string[] = [];
   for (const field of brandingFields) {
     const previous = existing?.[`${field}_path`] as string | null | undefined;
     const file = form.get(field);
     if (checked(form, `remove_${field}`)) {
-      if (previous) await photoStore().removePhotos([previous]);
+      if (previous) obsolete.push(previous);
       patch[`${field}_path`] = null;
       patch[`${field}_mime`] = null;
     } else if (file instanceof File && file.size > 0) {
@@ -551,7 +561,7 @@ export async function saveBranding(form: FormData) {
       const ext = extByMime[file.type] ?? "png";
       const key = `website/${field}/${crypto.randomUUID()}.${ext}`;
       await photoStore().uploadPhoto({ key, body: Buffer.from(await file.arrayBuffer()), contentType: file.type });
-      if (previous) await photoStore().removePhotos([previous]);
+      if (previous) obsolete.push(previous);
       patch[`${field}_path`] = key;
       patch[`${field}_mime`] = file.type;
     }
@@ -566,6 +576,10 @@ export async function saveBranding(form: FormData) {
     },
     { onConflict: "id" },
   );
+  // DB now references the new paths; purge replaced objects best-effort.
+  for (const key of obsolete) {
+    try { await photoStore().removePhotos([key]); } catch { /* stale object is harmless */ }
+  }
   revalidate();
   await invalidateTags("site-branding");
   redirect("/admin/website/branding?saved=1");

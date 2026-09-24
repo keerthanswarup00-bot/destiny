@@ -158,11 +158,13 @@ export type Database = {
       profiles: Table<{
         id: string;
         email: string;
+        marketing_optin: boolean;
         created_at: string;
         updated_at: string;
       }, {
         id?: string;
         email: string;
+        marketing_optin?: boolean;
         created_at?: string;
         updated_at?: string;
       }>;

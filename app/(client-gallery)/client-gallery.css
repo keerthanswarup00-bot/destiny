@@ -183,6 +183,9 @@ html{scroll-behavior:smooth}
 .client-favorites-dialog input:focus{outline:2px solid #111;outline-offset:2px}
 .client-favorites-error{margin:0;color:#B00020;font-size:13px}
 .client-favorites-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:2px}
+.client-optin{display:flex;align-items:flex-start;gap:10px;margin:0;font-size:13px;line-height:1.5;color:#444;cursor:pointer}
+.client-optin input{margin-top:3px;width:auto;flex:none}
+.client-optin strong{display:block;color:#111;letter-spacing:.03em}
 
 /* Mobile: single-column, full-width photos that keep their natural ratio */
 .justified-grid--column .justified-cell{margin:0 0 6px}

@@ -81,6 +81,7 @@ export function GalleryIdentityProvider({ slug, initiallyIdentified, children }:
 
 function ProfileIdentityDialog({ open, onClose, onIdentified }: { open: boolean; onClose: () => void; onIdentified: () => void }) {
   const [email, setEmail] = useState("");
+  const [optIn, setOptIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [identifying, setIdentifying] = useState(false);
   const { dialogRef, closing } = useAnimatedDialog({ open, onClose });
@@ -91,6 +92,7 @@ function ProfileIdentityDialog({ open, onClose, onIdentified }: { open: boolean;
     setError(null);
     const form = new FormData();
     form.set("email", email);
+    form.set("marketing_optin", optIn ? "true" : "false");
     const result = await identifyGalleryProfile(form);
     if (!result.ok) {
       setIdentifying(false);
@@ -124,6 +126,10 @@ function ProfileIdentityDialog({ open, onClose, onIdentified }: { open: boolean;
             {error}
           </p>
         ) : null}
+        <label className="client-optin">
+          <input checked={optIn} name="marketing_optin" onChange={event => setOptIn(event.target.checked)} type="checkbox" />
+          <span><strong>Keep me updated</strong> You can email me when my selection is ready.</span>
+        </label>
         <div className="client-favorites-actions">
           <button className="client-clear-button" disabled={identifying} onClick={onClose} type="button">Cancel</button>
           <button className="client-submit-button" disabled={identifying || !email.trim()} type="submit">{identifying ? "Saving…" : "Continue"}</button>

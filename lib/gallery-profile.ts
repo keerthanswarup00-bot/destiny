@@ -46,13 +46,18 @@ export async function currentProfile(): Promise<GalleryProfile | null> {
   }
 }
 
-/** Create or fetch the lightweight profile for a normalized email. */
-export async function upsertProfile(email: string): Promise<GalleryProfile | null> {
+/** Create or fetch the lightweight profile for a normalized email. When the
+ *  visitor opts in to be contacted, the flag is stored on create and set true
+ *  on existing rows too (sticky — it is never cleared automatically). */
+export async function upsertProfile(email: string, marketingOptin = false): Promise<GalleryProfile | null> {
   try {
     const db = galleryDb();
     const { data: existing } = await db.from("profiles").select("id,email").eq("email", email).maybeSingle();
-    if (existing) return { id: existing.id, email: existing.email };
-    const { data, error } = await db.from("profiles").insert({ email }).select("id,email").maybeSingle();
+    if (existing) {
+      if (marketingOptin) await db.from("profiles").update({ marketing_optin: true }).eq("id", existing.id);
+      return { id: existing.id, email: existing.email };
+    }
+    const { data, error } = await db.from("profiles").insert({ email, marketing_optin: marketingOptin }).select("id,email").maybeSingle();
     if (!error && data) return { id: data.id, email: data.email };
     // Unique-race: another request created the profile first.
     const { data: existingAfter } = await db.from("profiles").select("id,email").eq("email", email).maybeSingle();

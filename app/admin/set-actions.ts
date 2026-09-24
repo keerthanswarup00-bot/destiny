@@ -2,6 +2,7 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { adminDb } from "@/lib/admin-data";
 import { requireAdmin } from "@/lib/auth";
+import { HIGHLIGHT_MAX_ZOOM, normalizeHighlightCrop } from "@/lib/site/website-gallery";
 
 function v(form: FormData, key: string) { return String(form.get(key) ?? ""); }
 
@@ -57,10 +58,35 @@ export async function setGalleryHighlight(form: FormData) {
     const { data: photo } = await supabase.from("photos").select("id").eq("id", photoId).eq("gallery_id", id).maybeSingle();
     if (!photo) return;
   }
-  await supabase.from("galleries").update({ highlight_photo_id: photoId || null }).eq("id", id);
+  await supabase.from("galleries").update({ highlight_photo_id: photoId || null, highlight_crop: null }).eq("id", id);
   revalidatePath(`/admin/galleries/${id}`);
   revalidatePath(`/gallery/${(await signedGallerySlug(id)) ?? ""}`);
   await invalidateTags("site-stories", "site-portfolio");
+}
+
+/**
+ * Save the normalized 16/9 crop for the current gallery highlight. Mirrors the
+ * Website Gallery crop editor: pure {x,y,zoom} metadata in galleries.highlight_crop,
+ * replayed by the client hero as a CSS transform — no image is ever rewritten.
+ * Only allowed when the gallery already has a highlight photo selected.
+ */
+export async function saveGalleryHighlightCrop(form: FormData) {
+  await requireAdmin();
+  const id = v(form, "id");
+  const crop = normalizeHighlightCrop({ x: Number(v(form, "x")), y: Number(v(form, "y")), zoom: Number(v(form, "zoom")) });
+  if (!id || !crop) return;
+  const supabase = await adminDb();
+  const { data: gallery } = await supabase.from("galleries").select("highlight_photo_id").eq("id", id).maybeSingle();
+  if (!gallery?.highlight_photo_id) return;
+  const rounded = {
+    x: Math.round(crop.x * 10000) / 10000,
+    y: Math.round(crop.y * 10000) / 10000,
+    zoom: Math.round(Math.min(HIGHLIGHT_MAX_ZOOM, Math.max(1, crop.zoom)) * 100) / 100,
+  };
+  const { error } = await supabase.from("galleries").update({ highlight_crop: rounded }).eq("id", id);
+  if (error) return;
+  revalidatePath(`/admin/galleries/${id}`);
+  revalidatePath(`/gallery/${(await signedGallerySlug(id)) ?? ""}`);
 }
 
 export async function moveFolder(form: FormData) {

@@ -25,6 +25,7 @@ export default async function AdminOverview() {
     ["Photos", counts[2]],
     ["Selections", counts[3]],
     ["Gallery views", counts[4]],
+    ["Emails captured", counts[5]],
   ];
 
   return (

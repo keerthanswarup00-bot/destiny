@@ -3,6 +3,7 @@ import sharp from "sharp";
 import { CLIENT_SIGNED_URL_SECONDS, clientFacingObjectPath } from "@/lib/client-media";
 import { photoStore } from "@/lib/storage-provider";
 import { galleryDb } from "@/lib/gallery-db";
+import { normalizeHighlightCrop, type HighlightCrop } from "@/lib/site/website-gallery";
 
 type PhotoWithPaths = { width: number | null; height: number | null; thumbnail_path: string | null; preview_path: string | null; original_path: string };
 
@@ -88,6 +89,7 @@ export type GalleryClientHighlight = {
   fullUrl: string | null;
   width: number | null;
   height: number | null;
+  crop: HighlightCrop | null;
 };
 
 /**
@@ -98,11 +100,13 @@ export type GalleryClientHighlight = {
  * but only ever for its own system-managed gallery row, so client galleries
  * can use it safely as their hero source. Resolves any photo in the gallery
  * (any set, published or not) and signs the watermarked client derivatives;
- * returns null when no highlight is configured or it no longer resolves.
+ * returns null when no highlight is configured or it no longer resolves. An
+ * optional normalized {x,y,zoom} crop (galleries.highlight_crop) is replayed by
+ * the hero with a CSS transform — the image file itself is never modified.
  */
 export async function galleryClientHighlight(galleryId: string): Promise<GalleryClientHighlight | null> {
   const db = galleryDb();
-  const { data: gallery } = await db.from("galleries").select("highlight_photo_id").eq("id", galleryId).maybeSingle();
+  const { data: gallery } = await db.from("galleries").select("highlight_photo_id,highlight_crop").eq("id", galleryId).maybeSingle();
   if (!gallery?.highlight_photo_id) return null;
 
   const { data: photo } = await db
@@ -125,6 +129,7 @@ export async function galleryClientHighlight(galleryId: string): Promise<Gallery
     fullUrl: urls.get(full) ?? null,
     width: dims.width,
     height: dims.height,
+    crop: normalizeHighlightCrop(gallery.highlight_crop),
   };
 }
 

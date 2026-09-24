@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, type Ref } from "react";
-import { Download, Heart, Share2 } from "lucide-react";
+import { Download, Heart, Play, Share2 } from "lucide-react";
 import { GalleryOverview, type GalleryOverviewHandle, type GallerySet } from "@/components/client-gallery/gallery-overview";
 import { ClientAccessDialog } from "@/components/client-gallery/client-access-dialog";
 import { GalleryIdentityProvider, useGalleryIdentity } from "@/components/client-gallery/profile-identity";
@@ -34,6 +34,7 @@ export function GalleryShell({
   const [count, setCount] = useState(selectedIds.length);
   const [shareOpen, setShareOpen] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
+  const [slideshowRequest, setSlideshowRequest] = useState(0);
   const [downloadSet, setDownloadSet] = useState<{ id: string; slug: string; name: string } | null>(() => {
     const firstSet = sets.find(set => set.photos.length > 0);
     return firstSet ? { id: firstSet.id, slug: firstSet.slug, name: firstSet.name } : null;
@@ -71,6 +72,15 @@ export function GalleryShell({
             <Download size={20} strokeWidth={1.6} />
           </button>
           <button
+            aria-label="Start slideshow"
+            className="client-topbar-action"
+            onClick={() => setSlideshowRequest(previous => previous + 1)}
+            title="Start slideshow"
+            type="button"
+          >
+            <Play size={18} strokeWidth={1.6} />
+          </button>
+          <button
             aria-label="Share the gallery"
             className="client-topbar-action"
             onClick={() => setShareOpen(true)}
@@ -93,6 +103,7 @@ export function GalleryShell({
           clientSelectedIds={clientSelectedIds}
           onCountChange={setCount}
           onActiveSetChange={setDownloadSet}
+          slideshowRequest={slideshowRequest}
           ref={overviewRef}
           selectedIds={selectedIds}
           sets={sets}

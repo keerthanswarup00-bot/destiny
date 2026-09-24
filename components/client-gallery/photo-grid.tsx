@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import Lightbox, { isImageSlide } from "yet-another-react-lightbox";
 import Slideshow from "yet-another-react-lightbox/plugins/slideshow";
 import { Check, Download, Heart, Share2 } from "lucide-react";
@@ -9,6 +9,8 @@ import { JustifiedPhotoGrid, type JustifiedPhoto } from "@/components/gallery/ju
 import { ClientZoomableSlide } from "@/components/client-gallery/zoomable-slide";
 import { consumePendingAction, useGalleryIdentity } from "@/components/client-gallery/profile-identity";
 import type { WorkspacePhoto } from "@/components/client-gallery/gallery-workspace";
+
+export type ClientPhotoGridHandle = { openSlideshow: () => void };
 
 export function ClientPhotoGrid({
   slug,
@@ -20,6 +22,8 @@ export function ClientPhotoGrid({
   disabled,
   clientMode,
   clientSubmitted,
+  slideshowRequest,
+  ref,
 }: {
   slug: string;
   folder?: string;
@@ -30,15 +34,22 @@ export function ClientPhotoGrid({
   disabled: boolean;
   clientMode?: boolean;
   clientSubmitted?: boolean;
+  slideshowRequest?: number;
+  ref?: Ref<ClientPhotoGridHandle>;
 }) {
   const [index, setIndex] = useState(-1);
   const [notice, setNotice] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { requestIdentity, identified } = useGalleryIdentity();
+  useImperativeHandle(ref, () => ({ openSlideshow: () => setIndex(0) }), []);
 
   const current = index >= 0 ? photos[index] : null;
   const slides = photos.map(photo => ({ src: photo.fullSrc || photo.src, width: photo.width ?? undefined, height: photo.height ?? undefined, alt: "" }));
+
+  useEffect(() => {
+    if (slideshowRequest && photos.length > 0) setIndex(0);
+  }, [slideshowRequest, photos.length]);
 
   useEffect(() => () => {
     if (noticeTimer.current) clearTimeout(noticeTimer.current);
@@ -192,7 +203,7 @@ export function ClientPhotoGrid({
             <ClientZoomableSlide rect={rect} slide={slide} slideOffset={offset} />
           ) : undefined,
         }}
-        slideshow={{ autoplay: false, delay: 3500 }}
+        slideshow={{ autoplay: index >= 0 && slideshowRequest > 0, delay: 3500 }}
         slides={slides}
         toolbar={{
           buttons: [

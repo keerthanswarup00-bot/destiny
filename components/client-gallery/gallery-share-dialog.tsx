@@ -55,14 +55,14 @@ export function GalleryShareDialog({
 
   return (
     <dialog
-      aria-labelledby="client-gallery-share-title"
+      aria-describedby="client-gallery-share-sub" aria-labelledby="client-gallery-share-title"
       className={"client-favorites-dialog" + (closing ? " is-closing" : "")}
       ref={dialogRef}
     >
       <form method="dialog" onSubmit={(event) => event.preventDefault()}>
         <div>
           <h2 id="client-gallery-share-title">Share this gallery</h2>
-          <p>Send this gallery link to family, friends, or anyone you want to share the photos with.</p>
+          <p id="client-gallery-share-sub">Send this gallery link to family, friends, or anyone you want to share the photos with.</p>
         </div>
 
         <div className="client-share-link">

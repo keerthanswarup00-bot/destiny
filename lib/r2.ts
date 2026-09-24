@@ -140,80 +140,70 @@ export async function uploadMultipartObject(
   contentType: string,
 ) {
   const partSize = 8 * 1024 * 1024;
-  const iterator = parts[Symbol.asyncIterator]();
-  let pending = Buffer.alloc(0);
-  const first = await iterator.next();
-
-  if (first.done) {
-    await uploadObject({ key, body: Buffer.alloc(0), contentType });
-    return;
-  }
-
-  pending = Buffer.from(first.value);
-
-  async function nextPart(): Promise<Buffer | null> {
-    while (pending.length < partSize) {
-      const next = await iterator.next();
-      if (next.done) break;
-      pending = Buffer.concat([pending, Buffer.from(next.value)]);
-    }
-    if (!pending.length) return null;
-    const out = pending.length > partSize ? pending.subarray(0, partSize) : pending;
-    pending = pending.subarray(out.length);
-    return out;
-  }
-
-  const firstPart = await nextPart();
-  if (!firstPart) return;
-
-  const next = await iterator.next();
-  if (next.done && firstPart.length < partSize) {
-    await uploadObject({ key, body: firstPart, contentType });
-    return;
-  }
-
-  if (!next.done) pending = Buffer.concat([pending, Buffer.from(next.value)]);
-
-  const multipart = await r2().send(new CreateMultipartUploadCommand({
-    Bucket: R2_BUCKET(),
-    Key: key,
-    ContentType: contentType,
-  }));
-  if (!multipart.UploadId) throw new Error("R2 multipart upload did not return an upload ID.");
-
+  let buffer = Buffer.alloc(0);
+  let uploadId: string | undefined;
   const uploaded: CompletedPart[] = [];
   let partNumber = 1;
 
-  try {
-    let part = firstPart;
-    while (part) {
+  const flush = async (force = false) => {
+    while (buffer.length >= partSize || (force && buffer.length > 0)) {
+      const size = buffer.length >= partSize ? partSize : buffer.length;
+      const part = buffer.subarray(0, size);
+      buffer = buffer.subarray(size);
+
+      if (!uploadId) {
+        const created = await r2().send(new CreateMultipartUploadCommand({
+          Bucket: R2_BUCKET(),
+          Key: key,
+          ContentType: contentType,
+        }));
+        uploadId = created.UploadId;
+        if (!uploadId) throw new Error("R2 multipart upload did not return an upload ID.");
+      }
+
       const response = await r2().send(new UploadPartCommand({
         Bucket: R2_BUCKET(),
         Key: key,
-        UploadId: multipart.UploadId,
+        UploadId: uploadId,
         PartNumber: partNumber,
         Body: part,
         ContentLength: part.length,
       }));
       uploaded.push({ PartNumber: partNumber, ETag: response.ETag });
       partNumber += 1;
-      part = await nextPart();
     }
+  };
+
+  try {
+    for await (const chunk of parts) {
+      if (!chunk.length) continue;
+      buffer = Buffer.concat([buffer, chunk]);
+      await flush(false);
+    }
+
+    if (!uploadId) {
+      await uploadObject({ key, body: buffer, contentType });
+      return;
+    }
+
+    await flush(true);
 
     await r2().send(new CompleteMultipartUploadCommand({
       Bucket: R2_BUCKET(),
       Key: key,
-      UploadId: multipart.UploadId,
+      UploadId: uploadId,
       MultipartUpload: { Parts: uploaded },
     }));
   } catch (error) {
-    try {
-      await r2().send(new AbortMultipartUploadCommand({
-        Bucket: R2_BUCKET(),
-        Key: key,
-        UploadId: multipart.UploadId,
-      }));
-    } catch {}
+    if (uploadId) {
+      try {
+        await r2().send(new AbortMultipartUploadCommand({
+          Bucket: R2_BUCKET(),
+          Key: key,
+          UploadId: uploadId,
+        }));
+      } catch {}
+    }
     throw error;
   }
 }

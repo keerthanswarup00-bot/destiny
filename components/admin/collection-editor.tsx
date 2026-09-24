@@ -105,7 +105,6 @@ export function CollectionEditor({
   const [search, setSearch] = useState("");
   const [uploading, setUploading] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [dragOver, setDragOver] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [moreMenuFor, setMoreMenuFor] = useState<string | null>(null);
   const [renameFor, setRenameFor] = useState<EditorFolder | null>(null);
@@ -226,7 +225,6 @@ export function CollectionEditor({
     if (!files.length || !activeFolder) return;
     setUploading(files.length);
     setUploadError(null);
-    setDragOver(false);
     try {
       const result = await uploadClientGalleryFiles(files, { galleryId: gallery.id, folderId: activeFolder.id });
       if (!result.ok) setUploadError(result.message);
@@ -461,24 +459,13 @@ export function CollectionEditor({
                 </div>
               ) : null}
               {uploadError ? <p className="form-error" role="alert">{uploadError}</p> : null}
-              {!uploading && dragOver ? (
-                <div
-                  className="upload-zone is-dragging"
-                  onDragLeave={() => setDragOver(false)}
-                  onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-                  onDrop={e => { e.preventDefault(); setDragOver(false); stageFiles(e.dataTransfer.files); }}
-                >
-                  <strong>Drop photos here to upload</strong>
-                </div>
-              ) : null}
-
-              {!uploading ? (
-                <StagedUploadQueue
-                  onCommit={commitPending}
-                  ref={queueRef}
-                  uploading={uploading > 0}
-                />
-              ) : null}
+              <StagedUploadQueue
+                onBrowse={() => fileInput.current?.click()}
+                onCommit={commitPending}
+                onError={setUploadError}
+                ref={queueRef}
+                uploading={uploading > 0}
+              />
 
               {photos.length ? (
                 <>

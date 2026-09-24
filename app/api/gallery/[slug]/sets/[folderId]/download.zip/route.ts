@@ -98,33 +98,43 @@ export async function POST(
     ) {
       const entries: { name: string; data: Buffer }[] = [];
 
-      for (const photo of ordered) {
-        const path = photo.download_path || photo.preview_path || photo.thumbnail_path;
-        if (!path) continue;
+      const concurrency = 8;
+      let nextIndex = 0;
+      const workers = Array.from({ length: Math.min(concurrency, ordered.length) }, async () => {
+        while (nextIndex < ordered.length) {
+          const index = nextIndex++;
+          const photo = ordered[index];
+          const path = photo.download_path || photo.preview_path || photo.thumbnail_path;
+          if (!path) continue;
 
-        const data = await photoStore().downloadBytes(path);
-        if (!data) continue;
+          const data = await photoStore().downloadBytes(path);
+          if (!data) continue;
 
-        try {
-          const jpeg = await sharp(data).jpeg({ quality: 92 }).toBuffer();
-          const filename = downloadFilename({
-            galleryTitle: gallery.title,
-            folderName: folder.name,
-            index: ordered.findIndex(item => item.id === photo.id) + 1,
-            photo,
-          }).replace(/\.[a-z0-9]+$/i, ".jpg");
+          try {
+            const lowerPath = path.toLowerCase();
+            const jpeg = /\\.(jpe?g)$/.test(lowerPath)
+              ? data
+              : await sharp(data).jpeg({ quality: 92 }).toBuffer();
+            const filename = downloadFilename({
+              galleryTitle: gallery.title,
+              folderName: folder.name,
+              index: index + 1,
+              photo,
+            }).replace(/\\.[a-z0-9]+$/i, ".jpg");
 
-          entries.push({ name: filename, data: jpeg });
-        } catch {
-          // Skip an individual unreadable source rather than failing the set.
+            entries[index] = { name: filename, data: jpeg };
+          } catch {
+            // Skip an individual unreadable source rather than failing the set.
+          }
         }
-      }
+      });
+      await Promise.all(workers);
 
-      if (!entries.length) {
+      const readyEntries = entries.filter(Boolean);\n      if (!readyEntries.length) {
         return NextResponse.json({ error: "This set has no downloadable photos." }, { status: 404 });
       }
 
-      const zip = createStoredZip(entries);
+      const zip = createStoredZip(readyEntries);
       zipPath = `gallery-downloads/${gallery.id}/${folder.id}/${signature}.zip`;
 
       await photoStore().uploadPhoto({

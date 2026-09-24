@@ -127,3 +127,26 @@ async function signedGallerySlug(galleryId: string) {
   const { data } = await supabase.from("galleries").select("slug").eq("id", galleryId).maybeSingle();
   return data?.slug ?? "";
 }
+
+
+export async function setFolderDownloadPassword(form: FormData) {
+  const id = String(form.get("id") ?? "").trim();
+  const galleryId = String(form.get("gallery_id") ?? "").trim();
+  const password = String(form.get("download_password") ?? "").trim();
+  const clear = String(form.get("clear_download_password") ?? "") === "on";
+  if (!id || !galleryId) return;
+  await requireAdmin();
+  const db = await adminDb();
+  const { data: folder } = await db.from("folders").select("id").eq("id", id).eq("gallery_id", galleryId).maybeSingle();
+  if (!folder) return;
+  if (clear) {
+    await db.from("folders").update({ download_password_hash: null }).eq("id", id).eq("gallery_id", galleryId);
+  } else if (password) {
+    if (password.length < 6) {
+      redirect(`/admin/galleries/${galleryId}?error=invalid-download-password`);
+    }
+    const hash = await hashGalleryPassword(password);
+    await db.from("folders").update({ download_password_hash: hash }).eq("id", id).eq("gallery_id", galleryId);
+  }
+  revalidatePath(`/admin/galleries/${galleryId}`);
+}

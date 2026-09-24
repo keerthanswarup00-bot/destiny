@@ -352,6 +352,31 @@
   from{opacity:0;transform:translateY(-6px)}
   to{opacity:1;transform:none}
 }
+@media(max-width:760px){
+  .ws-selection-toolbar{
+    top:8px;
+    align-items:flex-start;
+    flex-direction:column;
+    gap:9px;
+    padding:10px 10px 10px 14px;
+  }
+  .ws-selection-actions{
+    width:100%;
+    justify-content:flex-start;
+  }
+  .ws-selection-toolbar .ws-move-form{
+    flex:1 1 100%;
+    min-width:0;
+  }
+  .ws-selection-toolbar .ws-move-select{
+    min-width:0;
+    flex:1;
+    max-width:none;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  .ws-selection-toolbar{animation:none}
+}
 .ws-selected-count{font-size:14px;letter-spacing:-.01em;margin-right:8px}
 .ws-toolbar .admin-button,.ws-toolbar form{display:inline-flex}
 .ws-toolbar .upload-progress{flex-basis:100%}

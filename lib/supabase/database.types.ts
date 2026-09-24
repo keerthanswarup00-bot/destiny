@@ -59,6 +59,7 @@ export type Database = {
         event_date: string | null;
         status: "draft" | "published" | "archived";
         password_hash: string | null;
+        client_password_hash: string | null;
         category: string | null;
         location: string | null;
         show_in_portfolio: boolean;
@@ -77,6 +78,7 @@ export type Database = {
         event_date?: string | null;
         status?: "draft" | "published" | "archived";
         password_hash?: string | null;
+        client_password_hash?: string | null;
         category?: string | null;
         location?: string | null;
         show_in_portfolio?: boolean;
@@ -153,12 +155,24 @@ export type Database = {
         created_at?: string;
         updated_at?: string;
       }>;
+      profiles: Table<{
+        id: string;
+        email: string;
+        created_at: string;
+        updated_at: string;
+      }, {
+        id?: string;
+        email: string;
+        created_at?: string;
+        updated_at?: string;
+      }>;
       selections: Table<{
         id: string;
         gallery_id: string;
         photo_id: string;
         viewer_name: string;
-        viewer_key_hash: string;
+        viewer_key_hash: string | null;
+        profile_id: string | null;
         created_at: string;
         updated_at: string;
       }, {
@@ -166,7 +180,8 @@ export type Database = {
         gallery_id: string;
         photo_id: string;
         viewer_name?: string;
-        viewer_key_hash: string;
+        viewer_key_hash?: string | null;
+        profile_id?: string | null;
         created_at?: string;
         updated_at?: string;
       }>;
@@ -192,17 +207,32 @@ export type Database = {
       selection_submissions: Table<{
         id: string;
         gallery_id: string;
-        selection_session_hash: string;
+        selection_session_hash: string | null;
+        profile_id: string | null;
         photo_count: number;
         status: "submitted";
         submitted_at: string;
       }, {
         id?: string;
         gallery_id: string;
-        selection_session_hash: string;
+        selection_session_hash?: string | null;
+        profile_id?: string | null;
         photo_count: number;
         status?: "submitted";
         submitted_at?: string;
+      }>;
+      client_selection_photos: Table<{
+        id: string;
+        gallery_id: string;
+        photo_id: string;
+        profile_id: string;
+        created_at: string;
+      }, {
+        id?: string;
+        gallery_id: string;
+        photo_id: string;
+        profile_id: string;
+        created_at?: string;
       }>;
       access_attempts: Table<{
         id: string;

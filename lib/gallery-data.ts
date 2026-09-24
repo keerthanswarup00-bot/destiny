@@ -192,14 +192,21 @@ export async function galleryClient(galleryId: string) {
   return client;
 }
 
-export async function selectedPhotoIds(galleryId: string, viewerKeyHash: string | null) {
-  if (!viewerKeyHash) return new Set<string>();
-  const { data } = await galleryDb().from("selections").select("photo_id").eq("gallery_id", galleryId).eq("viewer_key_hash", viewerKeyHash);
+export async function selectedPhotoIds(galleryId: string, profileId: string | null) {
+  if (!profileId) return new Set<string>();
+  const { data } = await galleryDb().from("selections").select("photo_id").eq("gallery_id", galleryId).eq("profile_id", profileId);
   return new Set((data ?? []).map(row => row.photo_id));
 }
 
-export async function viewerSubmission(galleryId: string, viewerKeyHash: string | null) {
-  if (!viewerKeyHash) return null;
-  const { data } = await galleryDb().from("selection_submissions").select("id,photo_count,submitted_at,status").eq("gallery_id", galleryId).eq("selection_session_hash", viewerKeyHash).maybeSingle();
+/** Official client selection for an identified profile: distinct from favourites. */
+export async function clientSelectedPhotoIds(galleryId: string, profileId: string | null) {
+  if (!profileId) return new Set<string>();
+  const { data } = await galleryDb().from("client_selection_photos").select("photo_id").eq("gallery_id", galleryId).eq("profile_id", profileId);
+  return new Set((data ?? []).map(row => row.photo_id));
+}
+
+export async function viewerSubmission(galleryId: string, profileId: string | null) {
+  if (!profileId) return null;
+  const { data } = await galleryDb().from("selection_submissions").select("id,photo_count,submitted_at,status").eq("gallery_id", galleryId).eq("profile_id", profileId).maybeSingle();
   return data;
 }

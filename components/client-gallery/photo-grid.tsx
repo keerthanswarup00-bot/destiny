@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import Lightbox, { isImageSlide } from "yet-another-react-lightbox";
 import Slideshow from "yet-another-react-lightbox/plugins/slideshow";
-import { Download, Heart, Share2 } from "lucide-react";
+import { Check, Download, Heart, Share2 } from "lucide-react";
 import { downloadGalleryPhoto, shareGalleryPhoto } from "@/app/(client-gallery)/gallery/actions";
 import { JustifiedPhotoGrid, type JustifiedPhoto } from "@/components/gallery/justified-photo-grid";
 import { ClientZoomableSlide } from "@/components/client-gallery/zoomable-slide";
+import { consumePendingAction, useGalleryIdentity } from "@/components/client-gallery/profile-identity";
 import type { WorkspacePhoto } from "@/components/client-gallery/gallery-workspace";
 
 export function ClientPhotoGrid({
@@ -14,19 +15,26 @@ export function ClientPhotoGrid({
   folder,
   photos,
   onToggle,
+  onClientToggle,
   busyIds,
   disabled,
+  clientMode,
+  clientSubmitted,
 }: {
   slug: string;
   folder?: string;
   photos: WorkspacePhoto[];
   onToggle: (photoId: string) => void;
+  onClientToggle?: (photoId: string) => void;
   busyIds: Set<string>;
   disabled: boolean;
+  clientMode?: boolean;
+  clientSubmitted?: boolean;
 }) {
   const [index, setIndex] = useState(-1);
   const [notice, setNotice] = useState<string | null>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { requestIdentity, identified } = useGalleryIdentity();
 
   const current = index >= 0 ? photos[index] : null;
   const slides = photos.map(photo => ({ src: photo.fullSrc || photo.src, width: photo.width ?? undefined, height: photo.height ?? undefined, alt: "" }));
@@ -34,6 +42,13 @@ export function ClientPhotoGrid({
   useEffect(() => () => {
     if (noticeTimer.current) clearTimeout(noticeTimer.current);
   }, []);
+
+  // Re-run a download that prompted the email entry once the profile is identified.
+  useEffect(() => {
+    const action = consumePendingAction(slug, ["download-photo"]);
+    if (action && action.kind === "download-photo") void downloadPhoto(action.photoId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identified, slug]);
 
   function showNotice(text: string) {
     setNotice(text);
@@ -77,6 +92,11 @@ export function ClientPhotoGrid({
     form.set("slug", slug);
     form.set("photo_id", photoId);
     const result = await downloadGalleryPhoto(form);
+    if (result.needsIdentity) {
+      requestIdentity({ kind: "download-photo", photoId });
+      showNotice("Enter your email to download full-size photos.");
+      return;
+    }
     if (!result.url || !result.filename) {
       showNotice(result.error ?? "Download is unavailable right now.");
       return;
@@ -105,7 +125,7 @@ export function ClientPhotoGrid({
             aria-label={item.selected ? "Remove from favourites" : "Add to favourites"}
             aria-pressed={item.selected}
             className={`client-photo-action client-heart${item.selected ? " is-selected" : ""}`}
-            disabled={disabled || busy}
+            disabled={busy}
             onClick={() => onToggle(item.id)}
             title={item.selected ? "Remove from favourites" : "Add to favourites"}
             type="button"
@@ -113,6 +133,21 @@ export function ClientPhotoGrid({
             {item.selected ? <Heart fill="currentColor" size={16} strokeWidth={1.6} /> : <Heart size={16} strokeWidth={1.6} />}
           </button>
         </span>
+        {clientMode ? (
+          <span className={`client-photo-veil${item.clientSelected ? " is-selected" : ""}`}>
+            <button
+              aria-label={item.clientSelected ? "Remove from client selection" : "Add to client selection"}
+              aria-pressed={item.clientSelected}
+              className={`client-photo-action client-photo-select${item.clientSelected ? " is-selected" : ""}`}
+              disabled={busy || Boolean(clientSubmitted)}
+              onClick={() => onClientToggle?.(item.id)}
+              title={item.clientSelected ? "Remove from client selection" : "Add to client selection"}
+              type="button"
+            >
+              {item.clientSelected ? <Check fill="currentColor" size={16} strokeWidth={2} /> : <Check size={16} strokeWidth={2} />}
+            </button>
+          </span>
+        ) : null}
         <span className="client-photo-veil">
           <button aria-label="Download photo" className="client-photo-action" disabled={disabled} onClick={() => void downloadPhoto(item.id)} title="Download photo" type="button"><Download size={16} strokeWidth={1.6} /></button>
           <button aria-label="Share photo" className="client-photo-action" disabled={disabled} onClick={() => void sharePhoto(item.id)} title="Share photo" type="button"><Share2 size={16} strokeWidth={1.6} /></button>
@@ -154,7 +189,7 @@ export function ClientPhotoGrid({
               aria-label={current?.selected ? "Remove from favourites" : "Add to favourites"}
               aria-pressed={current?.selected}
               className={`client-lightbox-action yarl__button${current?.selected ? " is-selected" : ""}`}
-              disabled={disabled || Boolean(current && busyIds.has(current.id))}
+              disabled={Boolean(current && busyIds.has(current.id))}
               key="select"
               onClick={() => { if (current) onToggle(current.id); }}
               title={current?.selected ? "Remove from favourites" : "Add to favourites"}
@@ -162,6 +197,20 @@ export function ClientPhotoGrid({
             >
               {current?.selected ? <Heart fill="currentColor" size={18} strokeWidth={1.6} /> : <Heart size={18} strokeWidth={1.6} />}
             </button>,
+            ...(clientMode && current ? [
+              <button
+                aria-label={current.clientSelected ? "Remove from client selection" : "Add to client selection"}
+                aria-pressed={current.clientSelected}
+                className={`client-lightbox-action client-lightbox-select yarl__button${current.clientSelected ? " is-selected" : ""}`}
+                disabled={Boolean(clientSubmitted)}
+                key="client-select"
+                onClick={() => { if (current) onClientToggle?.(current.id); }}
+                title={current.clientSelected ? "Remove from client selection" : "Add to client selection"}
+                type="button"
+              >
+                {current.clientSelected ? <Check fill="currentColor" size={18} strokeWidth={2} /> : <Check size={18} strokeWidth={2} />}
+              </button>,
+            ] : []),
             <button aria-label="Download photo" className="client-lightbox-action yarl__button" disabled={!current} key="download" onClick={() => void downloadCurrent()} title="Download photo" type="button"><Download size={17} strokeWidth={1.6} /></button>,
             <button aria-label="Share photo" className="client-lightbox-action yarl__button" disabled={!current} key="share" onClick={() => void shareCurrent()} title="Share photo" type="button"><Share2 size={17} strokeWidth={1.6} /></button>,
             "slideshow",

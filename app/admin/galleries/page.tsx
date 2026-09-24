@@ -8,8 +8,7 @@ export default async function Galleries({ searchParams }: { searchParams: Promis
   const { error } = await searchParams;
   const db = await adminDb();
 
-  let query = db.from("galleries").select("id,title,slug,status,client_id,created_at,password_hash").order("created_at", { ascending: false });
-  const { data: galleries } = await query;
+  const { data: galleries } = await db.from("galleries").select("id,title,slug,status,client_id,created_at,password_hash,client_password_hash").order("created_at", { ascending: false });
 
   const [{ data: clients }, overviews] = await Promise.all([
     db.from("clients").select("id,name").order("name"),
@@ -26,7 +25,7 @@ export default async function Galleries({ searchParams }: { searchParams: Promis
       status: gallery.status,
       clientName: clientNames.get(gallery.client_id) ?? null,
       photoCount: overview?.photoCount ?? 0,
-      hasPassword: Boolean(gallery.password_hash),
+      hasPassword: Boolean(gallery.password_hash || gallery.client_password_hash),
     };
   });
 

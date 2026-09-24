@@ -5,8 +5,9 @@ import { GalleryGate } from "@/components/client-gallery/gallery-gate";
 import { GalleryOverview, type GallerySet } from "@/components/client-gallery/gallery-overview";
 import { GalleryShell } from "@/components/client-gallery/gallery-shell";
 import { GalleryHighlight } from "@/components/public/gallery-highlight";
-import { resolveGalleryAccess, viewerIdentified, viewerKeyHash } from "@/lib/gallery-access";
-import { galleryFolders, galleryFolderPhotos, selectedPhotoIds, viewerSubmission } from "@/lib/gallery-data";
+import { resolveGalleryAccess } from "@/lib/gallery-access";
+import { currentProfile } from "@/lib/gallery-profile";
+import { galleryFolders, galleryFolderPhotos, selectedPhotoIds, viewerSubmission, clientSelectedPhotoIds } from "@/lib/gallery-data";
 import { GALLERY_SOCIAL_DESCRIPTION, GALLERY_SOCIAL_IMAGE_LONG_EDGE, galleryCoverImagePath, gallerySocialCover, requestHost, siteOrigin, socialCoverImageSize } from "@/lib/gallery-social";
 import { getSiteBranding, getSiteContact } from "@/lib/site/site-content";
 import { SiteFooter } from "@/components/public/site-footer";
@@ -89,14 +90,22 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
       </>
     );
   }
-  const [folders, selected, submission, branding, contact, identified] = await Promise.all([
+  const profile = await currentProfile();
+  const profileId = profile?.id ?? null;
+
+  const [folders, selected] = await Promise.all([
     galleryFolders(access.gallery.id),
-    selectedPhotoIds(access.gallery.id, await viewerKeyHash()),
-    viewerSubmission(access.gallery.id, await viewerKeyHash()),
-    getSiteBranding(),
-    getSiteContact(),
-    viewerIdentified(),
+    selectedPhotoIds(access.gallery.id, profileId),
   ]);
+
+  // Client-tier data only loads for CLIENT sessions: the official selection and
+  // its submission state are never exposed to viewer sessions.
+  const client = access.role === "client" && profile ? {
+    selected: await clientSelectedPhotoIds(access.gallery.id, profile.id),
+    submission: await viewerSubmission(access.gallery.id, profile.id),
+  } : { selected: new Set<string>(), submission: null };
+
+  const [branding, contact] = await Promise.all([getSiteBranding(), getSiteContact()]);
 
   // Folders stay grouped — no flattening. Each published set (ordered by
   // sort_order) keeps its own photos (ordered by sort_order) and the gallery
@@ -108,7 +117,7 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
       id: folder.id,
       name: folder.name,
       slug: folder.slug,
-      photos: folderPhotos.map(photo => ({ ...photo, selected: selected.has(photo.id) })),
+      photos: folderPhotos.map(photo => ({ ...photo, selected: selected.has(photo.id), clientSelected: client.selected.has(photo.id) })),
     });
   }
 
@@ -136,11 +145,14 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
       <main className="client-gallery-frame">
         <GalleryShell
           brand={brand}
-          identified={identified}
+          clientGate={access.clientGate}
+          clientSelectedIds={[...client.selected]}
+          identified={Boolean(profile)}
+          role={access.role}
           selectedIds={[...selected]}
           sets={sets}
           slug={access.gallery.slug}
-          submitted={Boolean(submission)}
+          submitted={Boolean(client.submission)}
           title={access.gallery.title}
         />
       </main>

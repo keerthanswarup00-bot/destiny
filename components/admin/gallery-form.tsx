@@ -53,10 +53,13 @@ export function GalleryForm({
       ) : (
         <input name="status" type="hidden" value="draft" />
       )}
-      <label>Gallery password{gallery?.passwordProtected ? " (currently set)" : " (optional)"}
+      <label>Viewer password{gallery?.passwordProtected ? " (currently set)" : " (optional)"}
         <input autoComplete="new-password" minLength={6} name="password" type="password" />
       </label>
-      {gallery?.passwordProtected ? <label className="switch-row"><span>Remove password<small>Makes the published gallery open without a password.</small></span><input name="clear_password" type="checkbox" /></label> : null}
+      {gallery?.passwordProtected ? <label className="switch-row"><span>Remove viewer password<small>Makes the published gallery open without a viewer password.</small></span><input name="clear_password" type="checkbox" /></label> : null}
+      <label>Client password (optional)
+        <input autoComplete="new-password" minLength={6} name="client_password" type="password" />
+      </label>
       <div className="gallery-form-actions">
         {modal ? <button className="subtle-button" onClick={onCancel} type="button">Cancel</button> : null}
         <button className="admin-button">{editing ? "Save gallery" : "Create Gallery"}</button>

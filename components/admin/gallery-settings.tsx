@@ -16,6 +16,7 @@ type GallerySettingsValue = {
   clientName: string | null;
   status: string;
   passwordProtected: boolean;
+  clientPasswordProtected: boolean;
 };
 
 function SaveButton() {
@@ -144,7 +145,7 @@ export function GallerySettings({
               </fieldset>
 
               <div className="gs-password">
-                <label htmlFor="gs-password">Gallery password</label>
+                <label htmlFor="gs-password">Viewer password</label>
                 <input
                   autoComplete="new-password"
                   id="gs-password"
@@ -153,17 +154,42 @@ export function GallerySettings({
                   placeholder={gallery.passwordProtected ? "Enter a new password to replace the current one" : "Optional password"}
                   type="password"
                 />
-                <span className="hint">Leave empty if this gallery should be accessible without a password.</span>
+                <span className="hint">Anyone with this password can browse, favourite, and download. Leave empty for open viewer access.</span>
                 {gallery.passwordProtected ? (
                   <div className="gs-password-state">
                     <Lock size={13} strokeWidth={2} />
-                    <span><strong>Password protection is on.</strong> The current password is never displayed. Enter a new password above to change it.</span>
+                    <span><strong>Viewer protection is on.</strong> The current password is never displayed. Enter a new password above to change it.</span>
                   </div>
                 ) : null}
                 {gallery.passwordProtected ? (
                   <label className="gs-clear-password">
                     <input name="clear_password" type="checkbox" />
-                    <span>Remove password<small>Makes the published gallery open without a password.</small></span>
+                    <span>Remove viewer password<small>Makes the published gallery open without a viewer password.</small></span>
+                  </label>
+                ) : null}
+              </div>
+
+              <div className="gs-password">
+                <label htmlFor="gs-client-password">Client password</label>
+                <input
+                  autoComplete="new-password"
+                  id="gs-client-password"
+                  minLength={6}
+                  name="client_password"
+                  placeholder={gallery.clientPasswordProtected ? "Enter a new password to replace the current one" : "Optional password"}
+                  type="password"
+                />
+                <span className="hint">Optional. Clients who enter this password can mark and submit the official photo selection.</span>
+                {gallery.clientPasswordProtected ? (
+                  <div className="gs-password-state">
+                    <Lock size={13} strokeWidth={2} />
+                    <span><strong>Client access is on.</strong> The current password is never displayed. Enter a new password above to change it.</span>
+                  </div>
+                ) : null}
+                {gallery.clientPasswordProtected ? (
+                  <label className="gs-clear-password">
+                    <input name="clear_client_password" type="checkbox" />
+                    <span>Remove client password<small>Disables the official selection workflow for this gallery.</small></span>
                   </label>
                 ) : null}
               </div>
@@ -191,7 +217,7 @@ export function GallerySettings({
               </Link>
             </div>
             <div className="gs-share-meta">
-              <span>{gallery.passwordProtected ? <><Lock size={12} strokeWidth={2} /> A password is required to open this gallery.</> : "No password is set — the link opens directly."}</span>
+              <span>{gallery.passwordProtected ? <><Lock size={12} strokeWidth={2} /> A viewer password is required to open this gallery.</> : gallery.clientPasswordProtected ? <><Lock size={12} strokeWidth={2} /> Open to viewers; client access uses its own password.</> : "No password is set — the link opens directly."}</span>
               <span>{published ? "The link is live and ready to share." : "Publish the gallery when you are ready to make the link live."}</span>
             </div>
           </div>

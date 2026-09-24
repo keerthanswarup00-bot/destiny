@@ -20,7 +20,7 @@ export default async function GalleryDetail({
   const host = headerList.get("x-forwarded-host") || headerList.get("host") || "localhost:3000";
   const proto = headerList.get("x-forwarded-proto") || "http";
   const db = await adminDb();
-  const { data: gallery } = await db.from("galleries").select("id,title,slug,description,status,client_id,password_hash,created_at").eq("id", galleryId).maybeSingle();
+  const { data: gallery } = await db.from("galleries").select("id,title,slug,description,status,client_id,password_hash,client_password_hash,created_at").eq("id", galleryId).maybeSingle();
   if (!gallery) notFound();
   const shareUrl = `${proto}://${host}/gallery/${gallery.slug}`;
 
@@ -112,6 +112,7 @@ for (const folder of folders ?? []) {
           clientName: client?.name ?? null,
           status: gallery.status,
           passwordProtected: Boolean(gallery.password_hash),
+          clientPasswordProtected: Boolean(gallery.client_password_hash),
         }}
         shareUrl={shareUrl}
       />

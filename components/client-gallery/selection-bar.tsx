@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Download } from "lucide-react";
 import { downloadGalleryPhotos, submitPhotoSelection } from "@/app/(client-gallery)/gallery/actions";
+import { consumePendingAction, useGalleryIdentity } from "@/components/client-gallery/profile-identity";
 
 export function SelectionBar({
   slug,
@@ -31,6 +32,14 @@ export function SelectionBar({
   const [downloading, setDownloading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const { requestIdentity, identified } = useGalleryIdentity();
+
+  // Re-run a group download that prompted the email entry once the profile is identified.
+  useEffect(() => {
+    const action = consumePendingAction(slug, ["download-selection"]);
+    if (action) void download();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identified, slug]);
 
   function submit() {
     const form = new FormData();
@@ -64,6 +73,11 @@ export function SelectionBar({
     for (const id of photoIds) form.append("photo_id", id);
     const result = await downloadGalleryPhotos(form);
     setDownloading(false);
+    if (result.needsIdentity) {
+      requestIdentity({ kind: "download-selection" });
+      setNotice("Enter your email to download full-size photos.");
+      return;
+    }
     if (result.error || !result.items.length) {
       setNotice(result.error ?? "The download could not be started.");
       return;

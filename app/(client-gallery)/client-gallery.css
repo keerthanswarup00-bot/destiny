@@ -201,3 +201,22 @@ html{scroll-behavior:smooth}
    gallery-wide selection bar. */
 .client-set{margin:0 0 clamp(3rem,7vw,4.5rem)}
 .client-set-title{margin:0 0 24px;font-size:12px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:#999}
+
+/* Client accounts + viewer/client roles.
+   The viewer tier browses, favourites and downloads. The client tier adds the
+   official selection workflow. The client badge and the in-gallery client
+   access dialog appear only for galleries that opt into a client password. */
+.client-gallery .client-topbar .client-client-badge{grid-area:auto;align-self:center;margin-right:4px;padding:5px 10px;border:1px solid #111;border-radius:999px;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#111}
+.client-gallery .client-access-button{width:auto;min-width:42px;padding:0 14px;border-radius:999px;display:flex;align-items:center;gap:7px;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#111}
+.client-gallery .client-access-button span{white-space:nowrap}
+.client-access-dialog{border:1px solid #111;padding:26px 24px;background:#FAFAF8;color:#111;width:min(calc(100% - 32px),380px)}
+.client-access-dialog::backdrop{background:rgba(17,17,17,.45)}
+.client-access-dialog form{display:grid;gap:14px}
+.client-access-dialog h2{margin:0;font-size:18px;letter-spacing:.06em;font-weight:700;color:#111}
+.client-access-dialog p{margin:0;color:#777;font-size:14px;line-height:1.55}
+.client-access-dialog input{width:100%;box-sizing:border-box;border:1px solid #111;padding:13px 14px;background:#fff;color:#111;font-size:15px}
+.client-access-dialog input:focus{outline:2px solid #111;outline-offset:2px}
+.client-access-dialog .client-favorites-actions{margin-top:2px}
+.client-photo-action.client-photo-select.is-selected{background:#0f7a3d;color:#FAFAF8}
+.client-photo-action.client-photo-select:not(.is-selected){background:#111;color:#FAFAF8}
+.client-lightbox-select.is-selected{color:#0f7a3d}

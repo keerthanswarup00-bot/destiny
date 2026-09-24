@@ -110,8 +110,9 @@ export async function downloadObjectBytes(key: string): Promise<Buffer | null> {
     const get = await r2().send(new GetObjectCommand({ Bucket: R2_BUCKET(), Key: key }));
     if (!get.Body) return null;
     return Buffer.from(await get.Body.transformToByteArray());
-  } catch {
-    return null;
+  } catch (error) {
+    if (isObjectMissing(error)) return null;
+    throw error;
   }
 }
 

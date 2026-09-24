@@ -99,6 +99,7 @@ export function CollectionEditor({
   const [activeId, setActiveId] = useState<string>(folders[0]?.id ?? "");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectionAnchor, setSelectionAnchor] = useState<string | null>(null);
+  const selectionAnchorRef = useRef<string | null>(null);
   const [search, setSearch] = useState("");
   const [uploading, setUploading] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -142,43 +143,56 @@ export function CollectionEditor({
   const single = selected.size === 1;
   const singleId = single ? [...selected][0] : null;
   const allVisibleSelected = visible.length > 0 && visible.every(photo => selected.has(photo.id));
+  const setAnchor = (id: string | null) => {
+    selectionAnchorRef.current = id;
+    setSelectionAnchor(id);
+  };
+
   const selectAllVisible = () => {
     setSelected(new Set(visible.map(photo => photo.id)));
-    setSelectionAnchor(null);
+    setAnchor(null);
   };
   const deselectAllVisible = () => {
     const ids = new Set(visible.map(photo => photo.id));
     setSelected(prev => new Set([...prev].filter(id => !ids.has(id))));
-    setSelectionAnchor(null);
+    setAnchor(null);
   };
 
   const switchSet = (id: string) => {
     setActiveId(id);
     setSelected(new Set());
-    setSelectionAnchor(null);
+    setAnchor(null);
     setSearch("");
     setMoreMenuFor(null);
   };
 
   const toggle = (id: string, shiftKey = false, additive = false) => {
     const clickedIndex = visible.findIndex(photo => photo.id === id);
+    const anchorId = selectionAnchorRef.current;
+
+    if (shiftKey && anchorId && clickedIndex >= 0) {
+      const anchorIndex = visible.findIndex(photo => photo.id === anchorId);
+
+      if (anchorIndex >= 0) {
+        const start = Math.min(anchorIndex, clickedIndex);
+        const end = Math.max(anchorIndex, clickedIndex);
+        const rangeIds = visible.slice(start, end + 1).map(photo => photo.id);
+
+        setSelected(prev => {
+          if (!additive) return new Set(rangeIds);
+          const next = new Set(prev);
+          for (const rangeId of rangeIds) next.add(rangeId);
+          return next;
+        });
+
+        // The most recent shift-click becomes the new range anchor.
+        setAnchor(id);
+        return;
+      }
+    }
 
     setSelected(prev => {
       const next = new Set(prev);
-
-      if (shiftKey && selectionAnchor && clickedIndex >= 0) {
-        const anchorIndex = visible.findIndex(photo => photo.id === selectionAnchor);
-        if (anchorIndex >= 0) {
-          const start = Math.min(anchorIndex, clickedIndex);
-          const end = Math.max(anchorIndex, clickedIndex);
-          const rangeIds = visible.slice(start, end + 1).map(photo => photo.id);
-
-          if (!additive) next.clear();
-          for (const rangeId of rangeIds) next.add(rangeId);
-          return next;
-        }
-      }
-
       if (additive) {
         if (next.has(id)) next.delete(id);
         else next.add(id);
@@ -187,16 +201,15 @@ export function CollectionEditor({
       } else {
         next.add(id);
       }
-
       return next;
     });
 
-    setSelectionAnchor(id);
+    setAnchor(id);
   };
 
   const clear = () => {
     setSelected(new Set());
-    setSelectionAnchor(null);
+    setAnchor(null);
   };
 
   function stageFiles(files: FileList | null | File[]) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Check, Copy, Share2 } from "lucide-react";
 import { useAnimatedDialog } from "@/components/client-gallery/use-animated-dialog";
 
@@ -15,14 +15,13 @@ export function GalleryShareDialog({
 }) {
   const [copied, setCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
-  const { dialogRef, closing } = useAnimatedDialog({ open, onClose });
+  function handleClose() {
+    setCopied(false);
+    setSharing(false);
+    onClose();
+  }
 
-  useEffect(() => {
-    if (!open) {
-      setCopied(false);
-      setSharing(false);
-    }
-  }, [open]);
+  const { dialogRef, closing } = useAnimatedDialog({ open, onClose: handleClose });
 
   async function copyLink() {
     try {
@@ -43,7 +42,7 @@ export function GalleryShareDialog({
         title: title || "Destiny gallery",
         url: window.location.href,
       });
-      onClose();
+      handleClose();
     } catch {
       // Keep the modal open when the native share sheet is cancelled.
     } finally {
@@ -82,7 +81,7 @@ export function GalleryShareDialog({
         </div>
 
         <div className="client-favorites-actions">
-          <button className="client-clear-button" onClick={onClose} type="button">
+          <button className="client-clear-button" onClick={handleClose} type="button">
             Cancel
           </button>
           {canNativeShare ? (

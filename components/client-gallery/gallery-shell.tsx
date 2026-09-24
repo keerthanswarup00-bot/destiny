@@ -34,9 +34,9 @@ export function GalleryShell({
   const [count, setCount] = useState(selectedIds.length);
   const [shareOpen, setShareOpen] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
-  const [downloadSet, setDownloadSet] = useState<{ id: string; slug: string; name: string } | null>(() => {
+  const [downloadSet, setDownloadSet] = useState<{ slug: string; name: string } | null>(() => {
     const firstSet = sets.find(set => set.photos.length > 0);
-    return firstSet ? { id: firstSet.id, slug: firstSet.slug, name: firstSet.name } : null;
+    return firstSet ? { slug: firstSet.slug, name: firstSet.name } : null;
   });
   const overviewRef = useRef<GalleryOverviewHandle>(null);
 
@@ -103,7 +103,6 @@ export function GalleryShell({
       {downloadOpen && downloadSet ? (
         <GalleryDownloadDialog
           onClose={() => setDownloadOpen(false)}
-          setId={downloadSet.id}
           setSlug={downloadSet.slug}
           setName={downloadSet.name}
           slug={slug}
@@ -137,7 +136,7 @@ function GalleryInner({
   submitted: boolean;
   clientMode?: boolean;
   onCountChange?: (count: number) => void;
-  onActiveSetChange?: (set: { id: string; slug: string; name: string }) => void;
+  onActiveSetChange?: (set: { slug: string; name: string }) => void;
   ref?: Ref<GalleryOverviewHandle>;
 }) {
   const { identified } = useGalleryIdentity();

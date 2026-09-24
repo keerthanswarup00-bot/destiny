@@ -42,6 +42,7 @@ import {
   setFolderCover,
   setFolderPublished,
   setGalleryStatus,
+  setFolderDownloadPassword,
 } from "@/app/admin/set-actions";
 import { uploadClientGalleryFiles } from "@/components/admin/client-gallery-upload";
 import { StagedUploadQueue, type StagedUploadQueueHandle } from "@/components/admin/upload-queue";
@@ -53,6 +54,7 @@ type EditorFolder = {
   description: string | null;
   published: boolean;
   coverPhotoId: string | null;
+  hasDownloadPassword: boolean;
 };
 
 type EditorPhoto = {
@@ -105,12 +107,14 @@ export function CollectionEditor({
   const [renameFor, setRenameFor] = useState<EditorFolder | null>(null);
   const [coverFor, setCoverFor] = useState<EditorFolder | null>(null);
   const [deleteFor, setDeleteFor] = useState<EditorFolder | null>(null);
+  const [downloadPasswordFor, setDownloadPasswordFor] = useState<EditorFolder | null>(null);
   const [toolbarMenuOpen, setToolbarMenuOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const queueRef = useRef<StagedUploadQueueHandle>(null);
   const renameRef = useRef<HTMLDialogElement>(null);
   const coverRef = useRef<HTMLDialogElement>(null);
   const deleteRef = useRef<HTMLDialogElement>(null);
+  const downloadPasswordRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     if (renameFor && renameRef.current && !renameRef.current.open) renameRef.current.showModal();
@@ -124,6 +128,10 @@ export function CollectionEditor({
     if (deleteFor && deleteRef.current && !deleteRef.current.open) deleteRef.current.showModal();
     else if (!deleteFor && deleteRef.current?.open) deleteRef.current.close();
   }, [deleteFor]);
+  useEffect(() => {
+    if (downloadPasswordFor && downloadPasswordRef.current && !downloadPasswordRef.current.open) downloadPasswordRef.current.showModal();
+    else if (!downloadPasswordFor && downloadPasswordRef.current?.open) downloadPasswordRef.current.close();
+  }, [downloadPasswordFor]);
 
   const activeFolder = folders.find(folder => folder.id === activeId) ?? folders[0] ?? null;
   const isPublished = gallery.status === "published";
@@ -340,6 +348,9 @@ export function CollectionEditor({
                           </button>
                           <button onClick={() => { setCoverFor(folder); setMoreMenuFor(null); }} role="menuitem" type="button">
                             <ImagePlus size={14} strokeWidth={1.8} /> Highlight image
+                          </button>
+                          <button onClick={() => { setDownloadPasswordFor(folder); setMoreMenuFor(null); }} role="menuitem" type="button">
+                            <Download size={14} strokeWidth={1.8} /> Download PIN
                           </button>
                           {coversByFolder?.[folder.id] ? (
                             <form action={setFolderCover} onSubmit={() => setMoreMenuFor(null)}>
@@ -583,6 +594,24 @@ export function CollectionEditor({
             <menu>
               <button onClick={() => setCoverFor(null)} type="button">Cancel</button>
               <button className="admin-button" disabled={!((photosByFolder[coverFor.id] ?? []).length)} type="submit">Save highlight</button>
+            </menu>
+          </form>
+        </dialog>
+      ) : null}
+      {downloadPasswordFor ? (
+        <dialog className="admin-dialog" onCancel={() => setDownloadPasswordFor(null)} ref={downloadPasswordRef}>
+          <form action={setFolderDownloadPassword} onSubmit={() => { setDownloadPasswordFor(null); router.refresh(); }}>
+            <h2>Set download PIN</h2>
+            <p className="muted">This PIN is separate from the gallery password and is required to download the complete set as a ZIP of JPEG images.</p>
+            <input name="id" type="hidden" value={downloadPasswordFor.id} />
+            <input name="gallery_id" type="hidden" value={gallery.id} />
+            <label>New download PIN<input autoFocus minLength={6} name="download_password" placeholder="Enter PIN" required type="password" /></label>
+            {downloadPasswordFor.hasDownloadPassword ? (
+              <label className="admin-checkbox"><input name="clear_download_password" type="checkbox" /> Remove download PIN</label>
+            ) : null}
+            <menu>
+              <button onClick={() => setDownloadPasswordFor(null)} type="button">Cancel</button>
+              <button className="admin-button">Save PIN</button>
             </menu>
           </form>
         </dialog>

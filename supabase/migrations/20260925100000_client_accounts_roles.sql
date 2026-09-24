@@ -28,7 +28,7 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-create trigger if not exists profiles_set_updated_at before update on public.profiles
+create trigger profiles_set_updated_at before update on public.profiles
   for each row execute procedure public.set_updated_at();
 alter table public.profiles enable row level security;
 create policy "admin manages profiles" on public.profiles

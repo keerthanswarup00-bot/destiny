@@ -686,32 +686,26 @@
   font-weight: 500;
   letter-spacing: 0.02em;
 }
-.ce-pin-reveal {
-  margin: 1rem 0 1.1rem;
-  padding: 0.8rem 0.9rem;
-  border: 1px solid var(--admin-border, #e6e6e6);
-  border-radius: 10px;
-  background: var(--admin-surface-subtle, #fafafa);
-}
-.ce-pin-reveal > .muted {
-  display: block;
-  margin-bottom: 0.35rem;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-.ce-pin-value {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-.ce-pin-value code {
-  font-size: 1rem;
-  letter-spacing: 0.12em;
-}
-.ce-pin-reveal small {
-  display: block;
-  margin-top: 0.45rem;
-  color: var(--admin-muted, #7d7d7d);
+.ce-download-pin-dialog form{gap:18px}
+.ce-dialog-heading{display:grid;gap:5px}
+.ce-dialog-heading .muted{margin:0;line-height:1.5}
+.ce-pin-reveal,.ce-pin-empty{padding:14px;border:1px solid #e6e6e4;background:#fafaf8}
+.ce-pin-reveal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+.ce-pin-status{color:#2e7d32}
+.ce-pin-value{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ce-pin-value code{font-size:17px;letter-spacing:.14em;color:#111}
+.ce-pin-reveal small,.ce-pin-empty small{display:block;margin-top:7px;color:#777;line-height:1.45}
+.ce-pin-empty{display:grid;gap:3px}
+.ce-pin-empty span{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#777}
+.ce-pin-empty strong{font-size:14px}
+.ce-pin-input{display:grid!important;gap:7px!important}
+.ce-pin-input>span{font-size:13px;color:#111}
+.ce-pin-remove{display:grid!important;grid-template-columns:auto 1fr;align-items:start;gap:10px!important;margin-top:-3px}
+.ce-pin-remove input{margin-top:3px}
+.ce-pin-remove span{display:grid;gap:2px}
+.ce-pin-remove strong{font-size:13px;font-weight:600}
+.ce-pin-remove small{color:#777;font-size:12px;line-height:1.4}
+@media(max-width:520px){
+  .ce-download-pin-dialog{width:min(480px,calc(100% - 24px))}
+  .ce-download-pin-dialog form{padding:22px}
 }

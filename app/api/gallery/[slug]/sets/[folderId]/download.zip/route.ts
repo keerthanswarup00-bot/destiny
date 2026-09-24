@@ -57,7 +57,7 @@ export async function POST(
         .maybeSingle(),
       db
         .from("photos")
-        .select("id,filename,folder_id,sort_order,download_path,preview_path,thumbnail_path")
+        .select("id,filename,folder_id,original_path,sort_order,download_path,preview_path,thumbnail_path")
         .eq("gallery_id", gallery.id)
         .eq("folder_id", folderId)
         .order("sort_order")

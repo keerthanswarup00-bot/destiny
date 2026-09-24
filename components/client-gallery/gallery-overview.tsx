@@ -247,7 +247,10 @@ export function GalleryOverview({
                 aria-current={isActive ? "true" : undefined}
                 className={`client-set-nav-item${isActive ? " is-active" : ""}`}
                 key={set.id}
-                onClick={() => setActiveSetId(set.id)}
+                onClick={() => {
+                  setActiveSetId(set.id);
+                  onActiveSetChange?.({ id: set.id, slug: set.slug, name: set.name });
+                }}
                 type="button"
               >
                 {set.name}

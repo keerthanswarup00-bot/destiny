@@ -223,12 +223,20 @@ html{scroll-behavior:smooth}
 /* Sets — lightweight category selector. Only the ACTIVE set's photos render;
    switching sets swaps the grid in place instead of stacking sets vertically.
    Selection is shared across sets via the gallery-wide selection bar. */
-.client-set-nav{display:flex;align-items:center;gap:clamp(18px,3.5vw,38px);margin:0 0 26px;padding:0 2px 0 0;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.client-set-nav{display:flex;align-items:center;gap:clamp(18px,3.5vw,38px);margin:0 0 26px;padding:0 2px 2px 0;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none;scroll-snap-type:x proximity}
 .client-set-nav::-webkit-scrollbar{display:none}
-.client-set-nav-item{flex:none;border:0;border-bottom:2px solid transparent;background:transparent;padding:8px 2px;font:inherit;font-size:13px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#777;cursor:pointer;transition:color .15s ease,border-color .15s ease}
+.client-set-nav-item{position:relative;flex:none;border:0;background:transparent;padding:8px 2px;font:inherit;font-size:13px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#777;cursor:pointer;scroll-snap-align:start;transition:color .2s ease,transform .18s ease}
+.client-set-nav-item::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:#111;transform:scaleX(0);transform-origin:center;transition:transform .22s cubic-bezier(.22,.8,.24,1)}
 .client-set-nav-item:hover{color:#111}
-.client-set-nav-item.is-active{color:#111;font-weight:700;border-bottom-color:#111}
-.client-set{margin:0;animation:client-reveal .45s ease both}
+.client-set-nav-item:active{transform:scale(.98)}
+.client-set-nav-item.is-active{color:#111;font-weight:700}
+.client-set-nav-item.is-active::after{transform:scaleX(1)}
+.client-set{margin:0;animation:client-set-swap .32s cubic-bezier(.22,.8,.24,1) both}
+@keyframes client-set-swap{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media(max-width:600px){
+  .client-set-nav{gap:22px;margin-right:-2px;padding-right:18px}
+  .client-set-nav-item{font-size:11px;letter-spacing:.12em}
+}
 
 /* Client accounts + viewer/client roles.
    The viewer tier browses, favourites and downloads. The client tier adds the

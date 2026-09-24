@@ -173,12 +173,12 @@ html{scroll-behavior:smooth}
 .client-topbar-note{position:absolute;top:100%;right:0;margin:6px 0 0;padding:6px 12px;background:#111;color:#FAFAF8;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;border-radius:3px;white-space:nowrap;pointer-events:none;animation:client-reveal .18s ease both}
 
 /* Favourites email modal — first-time identifiers enter their email once. */
-.client-favorites-dialog{border:1px solid #111;padding:26px 24px;background:#FAFAF8;color:#111;width:min(calc(100% - 32px),380px)}
+.client-favorites-dialog{border:1px solid #111;padding:26px 24px;background:#FAFAF8;color:#111;width:min(calc(100% - 32px),380px);box-sizing:border-box;max-width:380px}
 .client-favorites-dialog::backdrop{background:rgba(17,17,17,.45)}
 .client-favorites-dialog form{display:grid;gap:14px}
 .client-favorites-dialog h2{margin:0;font-size:18px;letter-spacing:.06em;font-weight:700;color:#111}
 .client-favorites-dialog p{margin:0;color:#777;font-size:14px;line-height:1.55}
-.client-favorites-dialog input{width:100%;box-sizing:border-box;border:1px solid #111;padding:13px 14px;background:#fff;color:#111;font-size:15px}
+.client-favorites-dialog input{width:100%;box-sizing:border-box;border:1px solid #111;padding:13px 14px;background:#fff;color:#111;font-size:15px;min-width:0}
 .client-favorites-dialog input::placeholder{color:#9a9a9a}
 .client-favorites-dialog input:focus{outline:2px solid #111;outline-offset:2px}
 .client-favorites-error{margin:0;color:#B00020;font-size:13px}
@@ -307,7 +307,13 @@ html{scroll-behavior:smooth}
 }
 
 .client-share-link{display:flex;align-items:stretch;width:100%}
-.client-share-link input{min-width:0;flex:1;padding-right:44px}
-.client-share-copy{width:44px;min-width:44px;margin-left:-45px;border:0;background:transparent;color:#111;display:grid;place-items:center;cursor:pointer;z-index:1}
+.client-share-link input{min-width:0;flex:1;padding-right:44px;overflow:hidden;text-overflow:ellipsis}
+.client-share-copy{width:44px;min-width:44px;margin-left:-45px;border:0;background:#fff;color:#111;display:grid;place-items:center;cursor:pointer;z-index:1}
 .client-share-copy:hover{background:#EDEDE9}
 .client-share-copy:focus-visible{outline:2px solid #111;outline-offset:-2px}
+@media(max-width:600px){
+  .client-favorites-dialog{padding:22px 20px;width:min(calc(100% - 24px),380px)}
+  .client-favorites-dialog h2{font-size:17px}
+  .client-favorites-dialog p{font-size:13px}
+  .client-favorites-actions{gap:4px}
+}

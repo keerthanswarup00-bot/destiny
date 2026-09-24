@@ -4,7 +4,7 @@ import { requireGalleryAccess } from "@/lib/gallery-access";
 import { galleryDb } from "@/lib/gallery-db";
 import { verifyGalleryPassword } from "@/lib/gallery-password";
 import { photoStore } from "@/lib/storage-provider";
-import { downloadFilename } from "@/lib/client-media";
+import { DOWNLOAD_SIGNED_URL_SECONDS, downloadFilename } from "@/lib/client-media";
 import { createStoredZip } from "@/lib/stored-zip";
 import { createHash } from "node:crypto";
 

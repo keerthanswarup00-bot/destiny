@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import sharp from "sharp";
-import { isValidProfileEmail, normalizeProfileEmail, setProfileCookie, upsertProfile } from "@/lib/gallery-profile";
 import { requireGalleryAccess } from "@/lib/gallery-access";
 import { galleryDb } from "@/lib/gallery-db";
 import { verifyGalleryPassword } from "@/lib/gallery-password";
@@ -17,30 +16,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   try {
     const { slug } = await params;
     const gallery = await requireGalleryAccess(slug);
-    const { data: credentials } = await galleryDb()
-      .from("galleries")
-      .select("password_hash,client_password_hash")
-      .eq("id", gallery.id)
-      .maybeSingle();
     const form = await request.formData();
     const setSlug = String(form.get("set_slug") ?? "").trim();
-    const email = normalizeProfileEmail(String(form.get("email") ?? ""));
-    const pin = String(form.get("pin") ?? "");
-    if (!isValidProfileEmail(email) || !pin) return NextResponse.json({ error: "Enter your email and PIN." }, { status: 400 });
-
-    const pinValid =
-      (credentials?.password_hash ? await verifyGalleryPassword(pin, credentials.password_hash) : false) ||
-      (credentials?.client_password_hash ? await verifyGalleryPassword(pin, credentials.client_password_hash) : false);
-    if (!pinValid) return NextResponse.json({ error: "The email or PIN is incorrect." }, { status: 401 });
-
-    const profile = await upsertProfile(email, false);
-    if (!profile) return NextResponse.json({ error: "Unable to save your email. Try again." }, { status: 500 });
-    await setProfileCookie(profile.id);
+    const pin = String(form.get("pin") ?? "").trim();
+    if (!pin) return NextResponse.json({ error: "Enter the set download PIN." }, { status: 400 });
 
     const db = galleryDb();
     const [{ data: photos }, { data: folders }] = await Promise.all([
       db.from("photos").select("id,folder_id,filename,sort_order,thumbnail_path,preview_path,download_path,original_path").eq("gallery_id", gallery.id),
-      db.from("folders").select("id,name,slug,sort_order").eq("gallery_id", gallery.id),
+      db.from("folders").select("id,name,slug,sort_order,download_password_hash").eq("gallery_id", gallery.id),
     ]);
 
     const photosByFolder = new Map<string, NonNullable<typeof photos>>();
@@ -52,10 +36,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     for (const list of photosByFolder.values()) list.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id.localeCompare(b.id));
 
     const targetFolder = setSlug ? (folders ?? []).find(folder => folder.slug === setSlug) : null;
-    if (setSlug && !targetFolder) {
-      return NextResponse.json({ error: "That photo set could not be found." }, { status: 404 });
+    if (!targetFolder) {
+      return NextResponse.json({ error: "A photo set must be selected for download." }, { status: 400 });
     }
-    const scopedFolders = targetFolder ? [targetFolder] : (folders ?? []);
+    if (!targetFolder.download_password_hash) {
+      return NextResponse.json({ error: "This set is not ready for download yet. Ask the gallery owner to set a download PIN." }, { status: 403 });
+    }
+    const pinValid = await verifyGalleryPassword(pin, targetFolder.download_password_hash);
+    if (!pinValid) {
+      return NextResponse.json({ error: "The download PIN is incorrect." }, { status: 401 });
+    }
+    const scopedFolders = [targetFolder];
     const folderById = new Map(scopedFolders.map(folder => [folder.id, folder]));
     const ordered = [...scopedFolders]
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id.localeCompare(b.id))

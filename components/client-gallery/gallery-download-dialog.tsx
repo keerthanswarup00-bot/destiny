@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useAnimatedDialog } from "@/components/client-gallery/use-animated-dialog";
 
 export function GalleryDownloadDialog({
-  slug, title, setSlug, setName, onClose,
-}: { slug: string; title: string; setSlug: string; setName: string; onClose: () => void }) {
+  slug, title, setId, setName, onClose,
+}: { slug: string; title: string; setId: string; setName: string; onClose: () => void }) {
   const [pin, setPin] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,25 +19,27 @@ export function GalleryDownloadDialog({
     try {
       const form = new FormData();
       form.set("pin", pin);
-      form.set("set_slug", setSlug);
-      const response = await fetch("/api/gallery/" + encodeURIComponent(slug) + "/download.zip", { method: "POST", body: form });
+      const response = await fetch(
+        "/api/gallery/" + encodeURIComponent(slug) + "/sets/" + encodeURIComponent(setId) + "/download.zip",
+        { method: "POST", body: form },
+      );
       if (!response.ok) {
         const payload = await response.json().catch(() => null) as { error?: string } | null;
         setError(payload?.error || "The set download could not be started. Check the PIN and try again.");
         return;
       }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const disposition = response.headers.get("Content-Disposition") || "";
-      const match = disposition.match(/filename="([^"]+)"/i);
-      const filename = match?.[1] || ((title || "gallery").replace(/[^a-z0-9_-]+/gi, "-") + "-" + (setName || "photos").replace(/[^a-z0-9_-]+/gi, "-") + ".zip");
+      const payload = await response.json().catch(() => null) as { url?: string; filename?: string; error?: string } | null;
+      if (!payload?.url) {
+        setError(payload?.error || "The set download could not be prepared. Please try again.");
+        return;
+      }
+
       const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = filename;
+      anchor.href = payload.url;
+      anchor.download = payload.filename || ((title || "gallery").replace(/[^a-z0-9_-]+/gi, "-") + "-" + (setName || "photos").replace(/[^a-z0-9_-]+/gi, "-") + ".zip");
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
-      URL.revokeObjectURL(url);
       onClose();
     } catch {
       setError("The download could not be started. Please try again.");

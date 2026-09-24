@@ -34,7 +34,10 @@ export function GalleryShell({
   const [count, setCount] = useState(selectedIds.length);
   const [shareOpen, setShareOpen] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
-  const [downloadSet, setDownloadSet] = useState<{ id: string; slug: string; name: string } | null>(sets[0] ? { id: sets[0].id, slug: sets[0].slug, name: sets[0].name } : null);
+  const [downloadSet, setDownloadSet] = useState<{ id: string; slug: string; name: string } | null>(() => {
+    const firstSet = sets.find(set => set.photos.length > 0);
+    return firstSet ? { id: firstSet.id, slug: firstSet.slug, name: firstSet.name } : null;
+  });
   const overviewRef = useRef<GalleryOverviewHandle>(null);
 
   return (

@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type Ref } from "react";
+import { useState, useRef, type Ref } from "react";
 import { Download, Heart, Share2 } from "lucide-react";
 import { GalleryOverview, type GalleryOverviewHandle, type GallerySet } from "@/components/client-gallery/gallery-overview";
 import { ClientAccessDialog } from "@/components/client-gallery/client-access-dialog";
 import { GalleryIdentityProvider, useGalleryIdentity } from "@/components/client-gallery/profile-identity";
 import { GalleryDownloadDialog } from "@/components/client-gallery/gallery-download-dialog";
+import { GalleryShareDialog } from "@/components/client-gallery/gallery-share-dialog";
 
 export function GalleryShell({
   slug,
@@ -31,44 +32,10 @@ export function GalleryShell({
   clientGate: boolean;
 }) {
   const [count, setCount] = useState(selectedIds.length);
-  const [shareNote, setShareNote] = useState<string | null>(null);
-  const [sharing, setSharing] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [downloadSet, setDownloadSet] = useState<{ slug: string; name: string } | null>(sets[0] ? { slug: sets[0].slug, name: sets[0].name } : null);
   const overviewRef = useRef<GalleryOverviewHandle>(null);
-  const shareTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => () => { if (shareTimer.current) clearTimeout(shareTimer.current); }, []);
-
-  // Reuses the existing gallery share link (the gallery page URL shown in the
-  // admin "Share link" field) — no new URL/token system. Web Share API when
-  // available, otherwise copy the link for pasting anywhere.
-  async function shareGallery() {
-    if (sharing) return;
-    setSharing(true);
-    try {
-      const url = window.location.href;
-      const data = { title: title || "Destiny gallery", url };
-      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
-        try {
-          await navigator.share(data);
-          return;
-        } catch {
-          // User cancelled; fall back to copying the link.
-        }
-      }
-      try {
-        await navigator.clipboard.writeText(url);
-        setShareNote("Link copied");
-      } catch {
-        setShareNote("Could not copy the link.");
-      }
-      if (shareTimer.current) clearTimeout(shareTimer.current);
-      shareTimer.current = setTimeout(() => setShareNote(null), 2200);
-    } finally {
-      setSharing(false);
-    }
-  }
 
   return (
     <>
@@ -101,15 +68,13 @@ export function GalleryShell({
           </button>
           <button
             aria-label="Share the gallery"
-            aria-busy={sharing}
             className="client-topbar-action"
-            onClick={() => void shareGallery()}
+            onClick={() => setShareOpen(true)}
             title="Share the gallery"
             type="button"
           >
             <Share2 size={20} strokeWidth={1.6} />
           </button>
-          {shareNote ? <span aria-live="polite" className="client-topbar-note" role="status">{shareNote}</span> : null}
         </div>
         {role !== "client" && clientGate ? (
           <div className="client-topbar-gate">
@@ -140,6 +105,11 @@ export function GalleryShell({
           title={title}
         />
       ) : null}
+      <GalleryShareDialog
+        onClose={() => setShareOpen(false)}
+        open={shareOpen}
+        title={title}
+      />
     </>
   );
 }

@@ -38,6 +38,7 @@ export function ClientPhotoGrid({
   ref?: Ref<ClientPhotoGridHandle>;
 }) {
   const [index, setIndex] = useState(-1);
+  const [slideshowActive, setSlideshowActive] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -47,8 +48,16 @@ export function ClientPhotoGrid({
   const current = index >= 0 ? photos[index] : null;
   const slides = photos.map(photo => ({ src: photo.fullSrc || photo.src, width: photo.width ?? undefined, height: photo.height ?? undefined, alt: "" }));
 
+  const lastSlideshowRequest = useRef(slideshowRequest ?? 0);
   useEffect(() => {
-    if (slideshowRequest && photos.length > 0) setIndex(0);
+    const request = slideshowRequest ?? 0;
+    if (request > lastSlideshowRequest.current && photos.length > 0) {
+      lastSlideshowRequest.current = request;
+      setSlideshowActive(true);
+      setIndex(0);
+      return;
+    }
+    lastSlideshowRequest.current = request;
   }, [slideshowRequest, photos.length]);
 
   useEffect(() => () => {
@@ -185,7 +194,10 @@ export function ClientPhotoGrid({
       <JustifiedPhotoGrid onPhotoClick={setIndex} overlay={renderOverlay} photos={photos} />
       <Lightbox
         className="gallery-lightbox"
-        close={() => setIndex(-1)}
+        close={() => {
+          setIndex(-1);
+          setSlideshowActive(false);
+        }}
         index={index}
         labels={{
           Close: "Close",
@@ -194,7 +206,11 @@ export function ClientPhotoGrid({
           "Photo gallery": "Photo gallery",
           "{index} of {total}": "{index} of {total}",
         }}
-        on={{ view: ({ index: nextIndex }) => setIndex(nextIndex) }}
+        on={{
+          view: ({ index: nextIndex }) => setIndex(nextIndex),
+          slideshowStart: () => setSlideshowActive(true),
+          slideshowStop: () => setSlideshowActive(false),
+        }}
         open={index >= 0}
         plugins={[Slideshow]}
         render={{
@@ -203,7 +219,7 @@ export function ClientPhotoGrid({
             <ClientZoomableSlide rect={rect} slide={slide} slideOffset={offset} />
           ) : undefined,
         }}
-        slideshow={{ autoplay: index >= 0 && slideshowRequest > 0, delay: 3500 }}
+        slideshow={{ autoplay: index >= 0 && slideshowActive, delay: 3500 }}
         slides={slides}
         toolbar={{
           buttons: [

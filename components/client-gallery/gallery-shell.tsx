@@ -34,6 +34,7 @@ export function GalleryShell({
   const [shareNote, setShareNote] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
+  const [downloadSet, setDownloadSet] = useState<{ slug: string; name: string } | null>(null);
   const overviewRef = useRef<GalleryOverviewHandle>(null);
   const shareTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -122,6 +123,7 @@ export function GalleryShell({
           clientMode={role === "client"}
           clientSelectedIds={clientSelectedIds}
           onCountChange={setCount}
+          onActiveSetChange={setDownloadSet}
           ref={overviewRef}
           selectedIds={selectedIds}
           sets={sets}
@@ -129,6 +131,15 @@ export function GalleryShell({
           submitted={submitted}
         />
       </GalleryIdentityProvider>
+      {downloadOpen && downloadSet ? (
+        <GalleryDownloadDialog
+          onClose={() => setDownloadOpen(false)}
+          setSlug={downloadSet.slug}
+          setName={downloadSet.name}
+          slug={slug}
+          title={title}
+        />
+      ) : null}
     </>
   );
 }
@@ -150,6 +161,7 @@ function GalleryInner({
   submitted: boolean;
   clientMode?: boolean;
   onCountChange?: (count: number) => void;
+  onActiveSetChange?: (set: { slug: string; name: string }) => void;
   ref?: Ref<GalleryOverviewHandle>;
 }) {
   const { identified } = useGalleryIdentity();
@@ -158,6 +170,7 @@ function GalleryInner({
       clientMode={clientMode}
       identified={identified}
       onCountChange={onCountChange}
+      onActiveSetChange={onActiveSetChange}
       ref={ref}
       clientSelectedIds={clientSelectedIds}
       selectedIds={selectedIds}

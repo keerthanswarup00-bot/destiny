@@ -430,19 +430,22 @@ export function CollectionEditor({
 
               {photos.length ? (
                 <>
-                  <div className="ws-toolbar" aria-live="polite">
-                    {none ? (
-                      <>
-                        {visible.length ? (
-                          <button className="admin-button is-secondary" onClick={selectAllVisible} type="button">Select All</button>
-                        ) : null}
-                        {visible.length !== photos.length ? (
-                          <span className="ce-filtered-hint">{visible.length} of {photos.length} shown</span>
-                        ) : null}
-                      </>
-                    ) : (
-                      <>
-                        <strong className="ws-selected-count">{selected.size} selected</strong>
+                  {none ? (
+                    <div className="ws-toolbar" aria-live="polite">
+                      {visible.length ? (
+                        <button className="admin-button is-secondary" onClick={selectAllVisible} type="button">Select All</button>
+                      ) : null}
+                      {visible.length !== photos.length ? (
+                        <span className="ce-filtered-hint">{visible.length} of {photos.length} shown</span>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="ws-selection-toolbar" aria-live="polite">
+                      <div className="ws-selection-summary">
+                        <strong>{selected.size}</strong>
+                        <span>{selected.size === 1 ? "photo selected" : "photos selected"}</span>
+                      </div>
+                      <div className="ws-selection-actions">
                         {allVisibleSelected ? (
                           <button className="admin-button is-secondary" onClick={deselectAllVisible} type="button">Deselect All</button>
                         ) : (
@@ -476,9 +479,9 @@ export function CollectionEditor({
                         <button aria-label="Clear selection" className="icon-button" onClick={clear} type="button">
                           <X size={16} />
                         </button>
-                      </>
-                    )}
-                  </div>
+                      </div>
+                    </div>
+                  )}
 
                   {visible.length ? (
                     <div className="ws-photo-grid ce-photo-grid">

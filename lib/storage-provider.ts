@@ -250,9 +250,19 @@ const r2PhotoStore: PhotoStore = {
     return out;
   },
   async signedDownloadUrl(key, filename, seconds = DOWNLOAD_SIGNED_URL_SECONDS) {
-    const supabaseUrl = await supabasePhotoStore.signedDownloadUrl(key, filename, seconds);
-    if (!(await objectExists(key))) return supabaseUrl;
-    return createSignedGetUrl(key, seconds, filename).catch(() => null);
+    const existsInR2 = await objectExists(key);
+    if (existsInR2) {
+      try {
+        return await createSignedGetUrl(key, seconds, filename);
+      } catch (error) {
+        console.error("[storage] R2 signed download URL failed", {
+          key,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return null;
+      }
+    }
+    return supabasePhotoStore.signedDownloadUrl(key, filename, seconds);
   },
   async downloadBytes(key) {
     return (await downloadObjectBytes(key)) ?? (await supabasePhotoStore.downloadBytes(key));

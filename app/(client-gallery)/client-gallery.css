@@ -492,20 +492,137 @@ html{scroll-behavior:smooth}
   .client-share-option-icon{width:32px;height:32px}
 }
 
-/* Share dialog: dedicated sizing and stronger visual hierarchy. */
-.client-share-dialog{width:min(calc(100% - 32px),460px);padding:32px 30px 22px;box-shadow:0 28px 80px rgba(17,17,17,.18)}
-.client-share-dialog form{gap:20px}
-.client-share-dialog h2{font-size:21px;letter-spacing:-.04em}
-.client-share-dialog p{font-size:12px;line-height:1.6;max-width:46ch}
-.client-share-dialog .client-share-options{gap:8px;margin-top:2px}
-.client-share-dialog .client-share-option-icon{width:38px;height:38px}
-.client-share-dialog .client-share-link{margin-top:2px}
-.client-share-dialog .client-clear-button{font-size:10px;letter-spacing:.16em}
+/* Share dialog: premium, spacious share sheet. */
+.client-share-dialog{
+  width:min(520px,calc(100vw - 40px)) !important;
+  max-width:none !important;
+  margin:auto;
+  padding:34px 34px 26px !important;
+  border:1px solid #D9D9D4;
+  border-radius:4px;
+  background:#FAFAF8;
+  box-shadow:0 30px 90px rgba(17,17,17,.18);
+}
+.client-share-dialog form{gap:22px}
+.client-share-dialog h2{margin:0;font-size:24px;line-height:1.05;letter-spacing:-.045em;font-weight:650}
+.client-share-dialog p{margin:0;color:#777;font-size:12px;line-height:1.6;max-width:46ch}
+.client-share-dialog .client-share-options{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:0;
+  margin:2px 0 0;
+  border-top:1px solid #E3E3DE;
+  border-bottom:1px solid #E3E3DE;
+}
+.client-share-dialog .client-share-option{
+  position:relative;
+  min-height:112px;
+  padding:18px 8px 16px;
+  border:0;
+  border-right:1px solid #E3E3DE;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  gap:11px;
+  font-size:9px;
+  font-weight:650;
+  letter-spacing:.11em;
+  color:#333;
+}
+.client-share-dialog .client-share-option:last-child{border-right:0}
+.client-share-dialog .client-share-option::after{
+  content:"";
+  position:absolute;
+  left:18px;
+  right:18px;
+  bottom:0;
+  height:2px;
+  background:#111;
+  transform:scaleX(0);
+  transform-origin:center;
+  transition:transform .2s ease;
+}
+.client-share-dialog .client-share-option:hover{
+  background:#F3F3EF;
+  border-color:#E3E3DE;
+  transform:none;
+  box-shadow:none;
+}
+.client-share-dialog .client-share-option:hover::after{transform:scaleX(1)}
+.client-share-dialog .client-share-option:active{transform:none;background:#ECECE8}
+.client-share-dialog .client-share-option-icon{
+  width:42px;
+  height:42px;
+  border:1px solid #D4D4CE;
+  background:#fff;
+  border-radius:50%;
+  font-size:12px;
+  color:#111;
+  transition:transform .2s ease,border-color .2s ease,background .2s ease;
+}
+.client-share-dialog .client-share-option:hover .client-share-option-icon{
+  transform:translateY(-2px);
+  border-color:#111;
+  background:#fff;
+}
+.client-share-dialog .client-share-option-whatsapp{font-size:14px;font-weight:700}
+.client-share-dialog .client-share-option-instagram{font-size:10px;font-weight:700;letter-spacing:-.04em}
+.client-share-dialog .client-share-option-facebook{font-family:Arial,sans-serif;font-size:17px;font-weight:700;letter-spacing:-.08em}
+.client-share-dialog .client-share-link{
+  display:grid;
+  gap:8px;
+  margin:0;
+}
+.client-share-dialog .client-share-link::before{
+  content:"GALLERY LINK";
+  display:block;
+  font-size:9px;
+  font-weight:700;
+  letter-spacing:.16em;
+  color:#999;
+}
+.client-share-dialog .client-share-link input{
+  min-height:46px;
+  padding:12px 50px 12px 14px;
+  border:1px solid #D4D4CE !important;
+  background:#fff;
+  color:#444;
+  font-size:12px;
+  letter-spacing:.01em;
+}
+.client-share-dialog .client-share-copy{
+  right:1px;
+  top:25px;
+  width:46px;
+  height:44px;
+  background:#fff;
+  border-left:1px solid #E3E3DE;
+}
+.client-share-dialog .client-share-copy:hover{background:#F3F3EF}
+.client-share-dialog .client-share-status{margin:-8px 0 0;font-size:11px;color:#666}
+.client-share-dialog .client-favorites-actions{
+  justify-content:flex-end;
+  margin-top:-6px;
+  padding-top:2px;
+}
+.client-share-dialog .client-clear-button{
+  padding:8px 0;
+  font-size:10px;
+  letter-spacing:.16em;
+  color:#999;
+}
+.client-share-dialog .client-clear-button:hover{color:#111}
+
 @media(max-width:600px){
-  .client-share-dialog{width:min(calc(100% - 24px),400px);padding:26px 20px 20px}
-  .client-share-dialog h2{font-size:19px}
+  .client-share-dialog{
+    width:calc(100vw - 24px) !important;
+    padding:26px 20px 20px !important;
+  }
+  .client-share-dialog h2{font-size:20px}
+  .client-share-dialog .client-share-option{min-height:92px;padding-left:4px;padding-right:4px}
+  .client-share-dialog .client-share-option::after{left:10px;right:10px}
 }
 @media(max-width:420px){
-  .client-share-dialog .client-share-options{gap:5px}
-  .client-share-dialog .client-share-option{min-height:78px}
+  .client-share-dialog .client-share-option{min-height:84px;font-size:8px;letter-spacing:.08em}
+  .client-share-dialog .client-share-option-icon{width:36px;height:36px}
 }

@@ -54,7 +54,7 @@ export function GalleryDownloadDialog({ slug, title, onClose }: { slug: string; 
   }
 
   return (
-    <dialog className="client-download-dialog" open>
+    <dialog className="client-favorites-dialog" open>
       <form
         onSubmit={event => {
           event.preventDefault();

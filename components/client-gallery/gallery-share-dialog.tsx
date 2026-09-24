@@ -47,7 +47,7 @@ export function GalleryShareDialog({
     const url = typeof window !== "undefined" ? window.location.href : "";
     if (!url || typeof window === "undefined") return;
 
-    const text = title ? `${title} — Destiny gallery` : "Destiny gallery";
+    const text = title ? `${title} - Destiny gallery` : "Destiny gallery";
     const encodedUrl = encodeURIComponent(url);
     const encodedText = encodeURIComponent(`${text}\n${url}`);
 

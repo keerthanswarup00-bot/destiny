@@ -187,6 +187,148 @@ html{scroll-behavior:smooth}
 .client-optin input{margin-top:3px;width:auto;flex:none}
 .client-optin strong{display:block;color:#111;letter-spacing:.03em}
 
+/* Mobile client header: keep the gallery identity clear and collapse secondary
+   actions into one compact overflow menu. Desktop retains the full toolbar. */
+.client-mobile-menu-trigger,
+.client-mobile-menu{display:none}
+
+@media(max-width:600px){
+  .client-gallery .client-topbar{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    grid-template-areas:"head actions" "gate actions" "brand actions";
+    align-items:center;
+    column-gap:10px;
+    padding:6px 0 14px;
+    margin-bottom:18px;
+  }
+
+  .client-gallery .client-topbar-head{
+    min-width:0;
+    flex-wrap:nowrap;
+    gap:8px;
+  }
+
+  .client-gallery .client-topbar-title{
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    font-size:clamp(22px,7vw,32px);
+  }
+
+  .client-gallery .client-topbar-brand{
+    margin-top:5px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    font-size:9px;
+    letter-spacing:.18em;
+  }
+
+  .client-gallery .client-topbar-gate{
+    margin-top:6px;
+  }
+
+  .client-gallery .client-topbar-actions{
+    gap:1px;
+    align-self:center;
+  }
+
+  .client-gallery .client-topbar-actions > .client-topbar-action:not(.client-topbar-favorites),
+  .client-gallery .client-topbar-actions > .client-mobile-menu-trigger{
+    display:none;
+  }
+
+  .client-gallery .client-topbar-favorites{
+    display:grid;
+    width:38px;
+    min-width:38px;
+    height:38px;
+    padding:0;
+    border-radius:50%;
+  }
+
+  .client-gallery .client-topbar-favorites .client-topbar-count{
+    position:absolute;
+    margin:18px 0 0 18px;
+    min-width:15px;
+    height:15px;
+    padding:0 3px;
+    display:grid;
+    place-items:center;
+    border-radius:99px;
+    background:#111;
+    color:#fff;
+    font-size:8px;
+    line-height:1;
+    border:2px solid #FAFAF8;
+  }
+
+  .client-gallery .client-mobile-menu-trigger{
+    display:grid;
+    position:relative;
+    place-items:center;
+    width:38px;
+    height:38px;
+    padding:0;
+    border:0;
+    border-radius:50%;
+    background:transparent;
+    color:#111;
+    cursor:pointer;
+  }
+
+  .client-gallery .client-mobile-menu-trigger:hover{
+    background:#EDEDE9;
+  }
+
+  .client-gallery .client-mobile-menu{
+    position:absolute;
+    z-index:30;
+    top:calc(100% + 8px);
+    right:0;
+    display:grid;
+    min-width:176px;
+    padding:6px;
+    border:1px solid #E1E1DD;
+    background:#FAFAF8;
+    box-shadow:0 14px 36px rgba(17,17,17,.12);
+  }
+
+  .client-gallery .client-mobile-menu-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    width:100%;
+    border:0;
+    background:transparent;
+    color:#111;
+    padding:11px 10px;
+    font:inherit;
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:.02em;
+    text-align:left;
+    cursor:pointer;
+  }
+
+  .client-gallery .client-mobile-menu-item:hover{
+    background:#EDEDE9;
+  }
+
+  .client-gallery .client-mobile-menu-item:disabled{
+    color:#999;
+    cursor:not-allowed;
+    background:transparent;
+  }
+
+  .client-gallery .client-mobile-menu-item svg{
+    flex:none;
+    color:#555;
+  }
+}
+
 /* Mobile: single-column, full-width photos that keep their natural ratio */
 .justified-grid--column .justified-cell{margin:0 0 6px}
 .justified-grid--column .justified-open{display:block;width:100%;height:auto}

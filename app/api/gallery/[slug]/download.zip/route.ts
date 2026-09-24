@@ -6,6 +6,14 @@ import { verifyGalleryPassword } from "@/lib/gallery-password";
 import { photoStore } from "@/lib/storage-provider";
 import { downloadFilename } from "@/lib/client-media";
 import { createStoredZip } from "@/lib/stored-zip";
+import { createHash } from "node:crypto";
+
+function downloadSignature(photos: Array<{ id: string; download_path: string | null; preview_path: string | null; thumbnail_path: string | null; sort_order: number | null }>) {
+  const payload = photos
+    .map(photo => [photo.id, photo.download_path ?? "", photo.preview_path ?? "", photo.thumbnail_path ?? "", photo.sort_order ?? 0].join("|"))
+    .join("\n");
+  return createHash("sha256").update(payload).digest("hex");
+}
 
 function safeSegment(value: string, fallback: string) {
   const cleaned = value.trim().replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").replace(/\.+$/g, "");
@@ -24,7 +32,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     const db = galleryDb();
     const [{ data: photos }, { data: folders }] = await Promise.all([
       db.from("photos").select("id,folder_id,filename,sort_order,thumbnail_path,preview_path,download_path,original_path").eq("gallery_id", gallery.id),
-      db.from("folders").select("id,name,slug,sort_order,download_password_hash").eq("gallery_id", gallery.id),
+      db.from("folders").select("id,name,slug,sort_order,download_password_hash,download_zip_path,download_zip_signature").eq("gallery_id", gallery.id),
     ]);
 
     const photosByFolder = new Map<string, NonNullable<typeof photos>>();
@@ -46,6 +54,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     if (!pinValid) {
       return NextResponse.json({ error: "The download PIN is incorrect." }, { status: 401 });
     }
+    const signature = downloadSignature(photosByFolder.get(targetFolder.id) ?? []);
+    if (
+      targetFolder.download_zip_path &&
+      targetFolder.download_zip_signature === signature &&
+      await photoStore().objectExists(targetFolder.download_zip_path)
+    ) {
+      const archiveName = safeSegment(gallery.title, "gallery") + "-" + safeSegment(targetFolder.name, "photos") + ".zip";
+      const url = await photoStore().signedDownloadUrl(targetFolder.download_zip_path, archiveName, DOWNLOAD_SIGNED_URL_SECONDS);
+      if (url) return NextResponse.redirect(url);
+    }
+
     const scopedFolders = [targetFolder];
     const folderById = new Map(scopedFolders.map(folder => [folder.id, folder]));
     const ordered = [...scopedFolders]

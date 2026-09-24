@@ -3,6 +3,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { adminDb } from "@/lib/admin-data";
 import { requireAdmin } from "@/lib/auth";
 import { HIGHLIGHT_MAX_ZOOM, normalizeHighlightCrop } from "@/lib/site/website-gallery";
+import { encryptDownloadPin, hashGalleryPassword } from "@/lib/gallery-password";
 
 function v(form: FormData, key: string) { return String(form.get(key) ?? ""); }
 
@@ -140,13 +141,14 @@ export async function setFolderDownloadPassword(form: FormData) {
   const { data: folder } = await db.from("folders").select("id").eq("id", id).eq("gallery_id", galleryId).maybeSingle();
   if (!folder) return;
   if (clear) {
-    await db.from("folders").update({ download_password_hash: null }).eq("id", id).eq("gallery_id", galleryId);
+    await db.from("folders").update({ download_password_hash: null, download_password_encrypted: null }).eq("id", id).eq("gallery_id", galleryId);
   } else if (password) {
     if (password.length < 6) {
       redirect(`/admin/galleries/${galleryId}?error=invalid-download-password`);
     }
     const hash = await hashGalleryPassword(password);
-    await db.from("folders").update({ download_password_hash: hash }).eq("id", id).eq("gallery_id", galleryId);
+    const encrypted = encryptDownloadPin(password);
+    await db.from("folders").update({ download_password_hash: hash, download_password_encrypted: encrypted }).eq("id", id).eq("gallery_id", galleryId);
   }
   revalidatePath(`/admin/galleries/${galleryId}`);
 }

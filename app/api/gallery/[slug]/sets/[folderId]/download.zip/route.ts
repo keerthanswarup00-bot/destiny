@@ -112,7 +112,7 @@ export async function POST(
 
           try {
             const lowerPath = path.toLowerCase();
-            const jpeg = /\\.(jpe?g)$/.test(lowerPath)
+            const jpeg = /\.(jpe?g)$/.test(lowerPath)
               ? data
               : await sharp(data).jpeg({ quality: 92 }).toBuffer();
             const filename = downloadFilename({
@@ -120,7 +120,7 @@ export async function POST(
               folderName: folder.name,
               index: index + 1,
               photo,
-            }).replace(/\\.[a-z0-9]+$/i, ".jpg");
+            }).replace(/\.[a-z0-9]+$/i, ".jpg");
 
             entries[index] = { name: filename, data: jpeg };
           } catch {

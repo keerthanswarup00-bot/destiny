@@ -98,6 +98,7 @@ export function CollectionEditor({
   const router = useRouter();
   const [activeId, setActiveId] = useState<string>(folders[0]?.id ?? "");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectionAnchor, setSelectionAnchor] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [uploading, setUploading] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -141,28 +142,62 @@ export function CollectionEditor({
   const single = selected.size === 1;
   const singleId = single ? [...selected][0] : null;
   const allVisibleSelected = visible.length > 0 && visible.every(photo => selected.has(photo.id));
-  const selectAllVisible = () => setSelected(new Set(visible.map(photo => photo.id)));
+  const selectAllVisible = () => {
+    setSelected(new Set(visible.map(photo => photo.id)));
+    setSelectionAnchor(null);
+  };
   const deselectAllVisible = () => {
     const ids = new Set(visible.map(photo => photo.id));
     setSelected(prev => new Set([...prev].filter(id => !ids.has(id))));
+    setSelectionAnchor(null);
   };
 
   const switchSet = (id: string) => {
     setActiveId(id);
     setSelected(new Set());
+    setSelectionAnchor(null);
     setSearch("");
     setMoreMenuFor(null);
   };
 
-  const toggle = (id: string) =>
+  const toggle = (id: string, shiftKey = false, additive = false) => {
+    const clickedIndex = visible.findIndex(photo => photo.id === id);
+
     setSelected(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+
+      if (shiftKey && selectionAnchor && clickedIndex >= 0) {
+        const anchorIndex = visible.findIndex(photo => photo.id === selectionAnchor);
+        if (anchorIndex >= 0) {
+          const start = Math.min(anchorIndex, clickedIndex);
+          const end = Math.max(anchorIndex, clickedIndex);
+          const rangeIds = visible.slice(start, end + 1).map(photo => photo.id);
+
+          if (!additive) next.clear();
+          for (const rangeId of rangeIds) next.add(rangeId);
+          return next;
+        }
+      }
+
+      if (additive) {
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+      } else if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+
       return next;
     });
 
-  const clear = () => setSelected(new Set());
+    setSelectionAnchor(id);
+  };
+
+  const clear = () => {
+    setSelected(new Set());
+    setSelectionAnchor(null);
+  };
 
   function stageFiles(files: FileList | null | File[]) {
     if (!files || files.length === 0 || !activeFolder) return;
@@ -494,7 +529,7 @@ export function CollectionEditor({
                             aria-label={selected.has(photo.id) ? `Deselect ${photo.filename}` : `Select ${photo.filename}`}
                             aria-pressed={selected.has(photo.id)}
                             className="ws-photo-select"
-                            onClick={() => toggle(photo.id)}
+                            onClick={event => toggle(photo.id, event.shiftKey, event.metaKey || event.ctrlKey)}
                             type="button"
                           >
                             <span className="ws-photo-check" aria-hidden="true">

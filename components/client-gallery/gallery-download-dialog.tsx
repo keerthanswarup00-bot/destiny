@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useAnimatedDialog } from "@/components/client-gallery/use-animated-dialog";
 
 export function GalleryDownloadDialog({
-  slug, title, setSlug, setName, onClose,
-}: { slug: string; title: string; setSlug: string; setName: string; onClose: () => void }) {
+  slug, title, setId, setSlug, setName, onClose,
+}: { slug: string; title: string; setId: string; setSlug: string; setName: string; onClose: () => void }) {
   const [pin, setPin] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,11 +19,12 @@ export function GalleryDownloadDialog({
     try {
       const form = new FormData();
       form.set("pin", pin);
+      form.set("set_id", setId);
       form.set("set_slug", setSlug);
       const response = await fetch("/api/gallery/" + encodeURIComponent(slug) + "/download.zip", { method: "POST", body: form });
       if (!response.ok) {
         const payload = await response.json().catch(() => null) as { error?: string } | null;
-        setError(payload?.error || "The download could not be started. Check your PIN and try again.");
+        setError(payload?.error || "The set download could not be started. Check the PIN and try again.");
         return;
       }
       const blob = await response.blob();
@@ -56,7 +57,7 @@ export function GalleryDownloadDialog({
       <form onSubmit={event => { event.preventDefault(); void downloadAll(); }}>
         <div>
           <h2 id="client-gallery-download-title">Download {setName}</h2>
-          <p id="client-gallery-download-sub">Enter the PIN for this set to download all photos as one ZIP file.</p>
+          <p id="client-gallery-download-sub">Enter the PIN for this set to download every photo in this set as one ZIP file.</p>
         </div>
         <input
           aria-label="Set download PIN"
@@ -65,7 +66,7 @@ export function GalleryDownloadDialog({
           disabled={pending}
           inputMode="numeric"
           onChange={event => { setPin(event.target.value); if (error) setError(null); }}
-          placeholder="Set download PIN"
+          placeholder="Download PIN"
           type="password"
           value={pin}
         />
@@ -73,7 +74,7 @@ export function GalleryDownloadDialog({
         <div className="client-favorites-actions">
           <button className="client-clear-button" disabled={pending} onClick={onClose} type="button">Cancel</button>
           <button className="client-submit-button" disabled={pending || !pin.trim()} type="submit">
-            {pending ? "Preparing…" : "Download all"}
+            {pending ? "Preparing…" : "Download set"}
           </button>
         </div>
       </form>

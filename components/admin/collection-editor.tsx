@@ -486,13 +486,22 @@ export function CollectionEditor({
                   {visible.length ? (
                     <div className="ws-photo-grid ce-photo-grid">
                       {visible.map(photo => (
-                        <label className={`ws-photo${selected.has(photo.id) ? " is-selected" : ""}`} key={photo.id}>
+                        <div className={`ws-photo${selected.has(photo.id) ? " is-selected" : ""}`} key={photo.id}>
                           {/* Signed admin-only URL; next/image is a poor fit for short-lived tokens. */}
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img alt="" loading="lazy" src={photo.src} />
-                          <input checked={selected.has(photo.id)} onChange={() => toggle(photo.id)} type="checkbox" />
-                          <span className="ws-photo-check"><Check size={13} strokeWidth={3} /></span>
-                        </label>
+                          <img alt={photo.filename} loading="lazy" src={photo.src} />
+                          <button
+                            aria-label={selected.has(photo.id) ? `Deselect ${photo.filename}` : `Select ${photo.filename}`}
+                            aria-pressed={selected.has(photo.id)}
+                            className="ws-photo-select"
+                            onClick={() => toggle(photo.id)}
+                            type="button"
+                          >
+                            <span className="ws-photo-check" aria-hidden="true">
+                              {selected.has(photo.id) ? <Check size={13} strokeWidth={3} /> : null}
+                            </span>
+                          </button>
+                        </div>
                       ))}
                     </div>
                   ) : (

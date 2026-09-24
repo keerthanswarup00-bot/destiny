@@ -13,6 +13,7 @@ export type WorkspacePhoto = {
   height: number | null;
   selected: boolean;
   clientSelected: boolean;
+  setName?: string;
 };
 
 export function GalleryWorkspace({

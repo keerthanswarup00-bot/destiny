@@ -305,3 +305,9 @@ html{scroll-behavior:smooth}
 @media(max-width:560px){
   .client-review-groups{padding:0 18px 14px}
 }
+
+.client-share-link{display:flex;align-items:stretch;width:100%}
+.client-share-link input{min-width:0;flex:1;padding-right:44px}
+.client-share-copy{width:44px;min-width:44px;margin-left:-45px;border:0;background:transparent;color:#111;display:grid;place-items:center;cursor:pointer;z-index:1}
+.client-share-copy:hover{background:#EDEDE9}
+.client-share-copy:focus-visible{outline:2px solid #111;outline-offset:-2px}

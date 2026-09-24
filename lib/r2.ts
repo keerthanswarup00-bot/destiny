@@ -1,5 +1,5 @@
 import "server-only";
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command, type PutObjectCommandInput } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand, type PutObjectCommandInput, type CompletedPart } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 function required(name: string): string {
@@ -131,4 +131,89 @@ export async function createSignedGetUrl(key: string, seconds = 60 * 60, filenam
 
 export async function createSignedPutUrl(key: string, contentType: string, seconds = 10 * 60) {
   return getSignedUrl(r2(), new PutObjectCommand({ Bucket: R2_BUCKET(), Key: key, ContentType: contentType }), { expiresIn: seconds });
+}
+
+
+export async function uploadMultipartObject(
+  key: string,
+  parts: AsyncIterable<Buffer>,
+  contentType: string,
+) {
+  const partSize = 8 * 1024 * 1024;
+  const iterator = parts[Symbol.asyncIterator]();
+  let pending = Buffer.alloc(0);
+  const first = await iterator.next();
+
+  if (first.done) {
+    await uploadObject({ key, body: Buffer.alloc(0), contentType });
+    return;
+  }
+
+  pending = Buffer.from(first.value);
+
+  async function nextPart(): Promise<Buffer | null> {
+    while (pending.length < partSize) {
+      const next = await iterator.next();
+      if (next.done) break;
+      pending = Buffer.concat([pending, Buffer.from(next.value)]);
+    }
+    if (!pending.length) return null;
+    const out = pending.length > partSize ? pending.subarray(0, partSize) : pending;
+    pending = pending.subarray(out.length);
+    return out;
+  }
+
+  const firstPart = await nextPart();
+  if (!firstPart) return;
+
+  const next = await iterator.next();
+  if (next.done && firstPart.length < partSize) {
+    await uploadObject({ key, body: firstPart, contentType });
+    return;
+  }
+
+  if (!next.done) pending = Buffer.concat([pending, Buffer.from(next.value)]);
+
+  const multipart = await r2().send(new CreateMultipartUploadCommand({
+    Bucket: R2_BUCKET(),
+    Key: key,
+    ContentType: contentType,
+  }));
+  if (!multipart.UploadId) throw new Error("R2 multipart upload did not return an upload ID.");
+
+  const uploaded: CompletedPart[] = [];
+  let partNumber = 1;
+
+  try {
+    let part = firstPart;
+    while (part) {
+      const response = await r2().send(new UploadPartCommand({
+        Bucket: R2_BUCKET(),
+        Key: key,
+        UploadId: multipart.UploadId,
+        PartNumber: partNumber,
+        Body: part,
+        ContentLength: part.length,
+      }));
+      uploaded.push({ PartNumber: partNumber, ETag: response.ETag });
+      partNumber += 1;
+      part = await nextPart();
+    }
+
+    await r2().send(new CompleteMultipartUploadCommand({
+      Bucket: R2_BUCKET(),
+      Key: key,
+      UploadId: multipart.UploadId,
+      MultipartUpload: { Parts: uploaded },
+    }));
+  } catch (error) {
+    try {
+      await r2().send(new AbortMultipartUploadCommand({
+        Bucket: R2_BUCKET(),
+        Key: key,
+        UploadId: multipart.UploadId,
+      }));
+    } catch {}
+    throw error;
+  }
 }

@@ -44,7 +44,7 @@ export async function GET(
     ]);
 
     const folderById = new Map((folders ?? []).map(folder => [folder.id, folder]));
-    const photosByFolder = new Map<string, typeof photos>();
+    const photosByFolder = new Map<string, NonNullable<typeof photos>>();
     for (const photo of photos ?? []) {
       const list = photosByFolder.get(photo.folder_id) ?? [];
       list.push(photo);

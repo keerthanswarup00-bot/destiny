@@ -40,7 +40,7 @@ export function GalleryOverview({
   submitted: boolean;
   clientMode?: boolean;
   onCountChange?: (count: number) => void;
-  onActiveSetChange?: (set: { id: string; slug: string; name: string }) => void;
+  onActiveSetChange?: (set: { slug: string; name: string }) => void;
   ref?: Ref<GalleryOverviewHandle>;
 }) {
   const [favoriteIds, setFavoriteIds] = useState(() => new Set(selectedIds));
@@ -98,7 +98,7 @@ export function GalleryOverview({
 
   useEffect(() => {
     if (!activeSet) return;
-    onActiveSetChange?.({ id: activeSet.id, slug: activeSet.slug, name: activeSet.name });
+    onActiveSetChange?.({ slug: activeSet.slug, name: activeSet.name });
   }, [activeSet, onActiveSetChange]);
 
   // Keep the active set visible (and not clipped) inside the horizontally
@@ -247,10 +247,7 @@ export function GalleryOverview({
                 aria-current={isActive ? "true" : undefined}
                 className={`client-set-nav-item${isActive ? " is-active" : ""}`}
                 key={set.id}
-                onClick={() => {
-                  setActiveSetId(set.id);
-                  onActiveSetChange?.({ id: set.id, slug: set.slug, name: set.name });
-                }}
+                onClick={() => setActiveSetId(set.id)}
                 type="button"
               >
                 {set.name}

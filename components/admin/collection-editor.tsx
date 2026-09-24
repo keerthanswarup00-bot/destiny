@@ -39,9 +39,9 @@ import {
 } from "@/app/admin/crud-actions";
 import {
   moveFolder,
-  setFolderCover,
   setFolderPublished,
   setGalleryStatus,
+  setFolderDownloadPassword,
 } from "@/app/admin/set-actions";
 import { uploadClientGalleryFiles } from "@/components/admin/client-gallery-upload";
 import { StagedUploadQueue, type StagedUploadQueueHandle } from "@/components/admin/upload-queue";
@@ -53,6 +53,8 @@ type EditorFolder = {
   description: string | null;
   published: boolean;
   coverPhotoId: string | null;
+  hasDownloadPassword: boolean;
+  downloadPassword: string | null;
 };
 
 type EditorPhoto = {
@@ -103,27 +105,27 @@ export function CollectionEditor({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [moreMenuFor, setMoreMenuFor] = useState<string | null>(null);
   const [renameFor, setRenameFor] = useState<EditorFolder | null>(null);
-  const [coverFor, setCoverFor] = useState<EditorFolder | null>(null);
   const [deleteFor, setDeleteFor] = useState<EditorFolder | null>(null);
+  const [downloadPasswordFor, setDownloadPasswordFor] = useState<EditorFolder | null>(null);
   const [toolbarMenuOpen, setToolbarMenuOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const queueRef = useRef<StagedUploadQueueHandle>(null);
   const renameRef = useRef<HTMLDialogElement>(null);
-  const coverRef = useRef<HTMLDialogElement>(null);
   const deleteRef = useRef<HTMLDialogElement>(null);
+  const downloadPasswordRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     if (renameFor && renameRef.current && !renameRef.current.open) renameRef.current.showModal();
     else if (!renameFor && renameRef.current?.open) renameRef.current.close();
   }, [renameFor]);
   useEffect(() => {
-    if (coverFor && coverRef.current && !coverRef.current.open) coverRef.current.showModal();
-    else if (!coverFor && coverRef.current?.open) coverRef.current.close();
-  }, [coverFor]);
-  useEffect(() => {
     if (deleteFor && deleteRef.current && !deleteRef.current.open) deleteRef.current.showModal();
     else if (!deleteFor && deleteRef.current?.open) deleteRef.current.close();
   }, [deleteFor]);
+  useEffect(() => {
+    if (downloadPasswordFor && downloadPasswordRef.current && !downloadPasswordRef.current.open) downloadPasswordRef.current.showModal();
+    else if (!downloadPasswordFor && downloadPasswordRef.current?.open) downloadPasswordRef.current.close();
+  }, [downloadPasswordFor]);
 
   const activeFolder = folders.find(folder => folder.id === activeId) ?? folders[0] ?? null;
   const isPublished = gallery.status === "published";
@@ -338,18 +340,9 @@ export function CollectionEditor({
                           <button onClick={() => { setRenameFor(folder); setMoreMenuFor(null); }} role="menuitem" type="button">
                             <Pencil size={14} strokeWidth={1.8} /> Rename
                           </button>
-                          <button onClick={() => { setCoverFor(folder); setMoreMenuFor(null); }} role="menuitem" type="button">
-                            <ImagePlus size={14} strokeWidth={1.8} /> Highlight image
+                          <button onClick={() => { setDownloadPasswordFor(folder); setMoreMenuFor(null); }} role="menuitem" type="button">
+                            <Download size={14} strokeWidth={1.8} /> Download PIN
                           </button>
-                          {coversByFolder?.[folder.id] ? (
-                            <form action={setFolderCover} onSubmit={() => setMoreMenuFor(null)}>
-                              <input name="id" type="hidden" value={folder.id} />
-                              <input name="cover_photo_id" type="hidden" value="" />
-                              <button role="menuitem" type="submit">
-                                <X size={14} strokeWidth={2} /> Remove highlight
-                              </button>
-                            </form>
-                          ) : null}
                           <form action={setFolderPublished}>
                             <input name="id" type="hidden" value={folder.id} />
                             <input name="published" type="hidden" value={folder.published ? "false" : "true"} />
@@ -477,15 +470,6 @@ export function CollectionEditor({
                           galleryId={gallery.id}
                           photoIds={[...selected]}
                         />
-                        {singleId ? (
-                          <form action={setFolderCover} onSubmit={() => router.refresh()}>
-                            <input name="id" type="hidden" value={activeFolder.id} />
-                            <input name="cover_photo_id" type="hidden" value={singleId} />
-                            <button className="admin-button is-secondary" type="submit">
-                              <ImageIcon size={15} strokeWidth={1.8} /> Highlight image
-                            </button>
-                          </form>
-                        ) : null}
                         <button className="admin-button is-secondary is-danger" onClick={() => setConfirmDelete(true)} type="button">
                           <Trash2 size={15} strokeWidth={1.8} /> Delete
                         </button>
@@ -559,30 +543,57 @@ export function CollectionEditor({
           </form>
         </dialog>
       ) : null}
-      {coverFor ? (
-        <dialog className="admin-dialog" onCancel={() => setCoverFor(null)} ref={coverRef}>
-          <form action={setFolderCover} onSubmit={() => { setCoverFor(null); router.refresh(); }}>
-            <h2>Highlight image</h2>
-            <p className="muted">Pick the photo shown on this Set&rsquo;s highlight.</p>
-            {(photosByFolder[coverFor.id] ?? []).length ? (
-              <div className="cover-picker-grid">
-                {(photosByFolder[coverFor.id] ?? []).map(photo => (
-                  <label className="cover-picker-option" key={photo.id}>
-                    {/* Signed admin-only URL; next/image is a poor fit for short-lived tokens. */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img alt="" height={photo.height ?? undefined} loading="lazy" src={photo.src} width={photo.width ?? undefined} />
-                    <input defaultChecked={coverFor.coverPhotoId === photo.id} name="cover_photo_id" type="radio" value={photo.id} />
-                    <span>Highlight</span>
-                  </label>
-                ))}
+      {downloadPasswordFor ? (
+        <dialog className="admin-dialog ce-download-pin-dialog" onCancel={() => setDownloadPasswordFor(null)} ref={downloadPasswordRef}>
+          <form action={setFolderDownloadPassword} onSubmit={() => { setDownloadPasswordFor(null); router.refresh(); }}>
+            <div className="ce-dialog-heading">
+              <div>
+                <h2>{downloadPasswordFor.hasDownloadPassword ? "Download PIN" : "Set download PIN"}</h2>
+                <p className="muted">Protect this set&apos;s ZIP download with a separate PIN. The gallery access password is not used here.</p>
+              </div>
+            </div>
+
+            {downloadPasswordFor.downloadPassword ? (
+              <div className="ce-pin-reveal">
+                <div className="ce-pin-reveal-head">
+                  <span>Current PIN</span>
+                  <span className="ce-pin-status">PIN set</span>
+                </div>
+                <div className="ce-pin-value">
+                  <code>{downloadPasswordFor.downloadPassword}</code>
+                  <CopyButton label="Copy PIN" text={downloadPasswordFor.downloadPassword} />
+                </div>
+                <small>Share this PIN with the client when they need to download the complete set.</small>
               </div>
             ) : (
-              <p className="empty">No photos in this set yet.</p>
+              <div className="ce-pin-empty">
+                <span>Download protection</span>
+                <strong>No PIN set</strong>
+                <small>Clients cannot download the complete set until a PIN is configured.</small>
+              </div>
             )}
-            <input name="id" type="hidden" value={coverFor.id} />
+
+            <input name="id" type="hidden" value={downloadPasswordFor.id} />
+            <input name="gallery_id" type="hidden" value={gallery.id} />
+
+            <label className="ce-pin-input">
+              <span>{downloadPasswordFor.hasDownloadPassword ? "Change PIN" : "Create PIN"}</span>
+              <input autoFocus minLength={6} name="download_password" placeholder="Enter a 6+ character PIN" type="password" />
+            </label>
+
+            {downloadPasswordFor.hasDownloadPassword ? (
+              <label className="admin-checkbox ce-pin-remove">
+                <input name="clear_download_password" type="checkbox" />
+                <span>
+                  <strong>Remove download PIN</strong>
+                  <small>Clients will no longer need a PIN to download this set.</small>
+                </span>
+              </label>
+            ) : null}
+
             <menu>
-              <button onClick={() => setCoverFor(null)} type="button">Cancel</button>
-              <button className="admin-button" disabled={!((photosByFolder[coverFor.id] ?? []).length)} type="submit">Save highlight</button>
+              <button onClick={() => setDownloadPasswordFor(null)} type="button">Cancel</button>
+              <button className="admin-button" type="submit">{downloadPasswordFor.hasDownloadPassword ? "Save changes" : "Set PIN"}</button>
             </menu>
           </form>
         </dialog>

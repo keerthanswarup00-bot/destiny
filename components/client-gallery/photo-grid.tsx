@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import Lightbox, { isImageSlide } from "yet-another-react-lightbox";
 import Slideshow from "yet-another-react-lightbox/plugins/slideshow";
 import { Check, Download, Heart, Share2 } from "lucide-react";
@@ -9,6 +9,8 @@ import { JustifiedPhotoGrid, type JustifiedPhoto } from "@/components/gallery/ju
 import { ClientZoomableSlide } from "@/components/client-gallery/zoomable-slide";
 import { consumePendingAction, useGalleryIdentity } from "@/components/client-gallery/profile-identity";
 import type { WorkspacePhoto } from "@/components/client-gallery/gallery-workspace";
+
+export type ClientPhotoGridHandle = { openSlideshow: () => void };
 
 export function ClientPhotoGrid({
   slug,
@@ -20,6 +22,8 @@ export function ClientPhotoGrid({
   disabled,
   clientMode,
   clientSubmitted,
+  slideshowRequest,
+  ref,
 }: {
   slug: string;
   folder?: string;
@@ -30,15 +34,31 @@ export function ClientPhotoGrid({
   disabled: boolean;
   clientMode?: boolean;
   clientSubmitted?: boolean;
+  slideshowRequest?: number;
+  ref?: Ref<ClientPhotoGridHandle>;
 }) {
   const [index, setIndex] = useState(-1);
+  const [slideshowActive, setSlideshowActive] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { requestIdentity, identified } = useGalleryIdentity();
+  useImperativeHandle(ref, () => ({ openSlideshow: () => setIndex(0) }), []);
 
   const current = index >= 0 ? photos[index] : null;
   const slides = photos.map(photo => ({ src: photo.fullSrc || photo.src, width: photo.width ?? undefined, height: photo.height ?? undefined, alt: "" }));
+
+  const lastSlideshowRequest = useRef(slideshowRequest ?? 0);
+  useEffect(() => {
+    const request = slideshowRequest ?? 0;
+    if (request > lastSlideshowRequest.current && photos.length > 0) {
+      lastSlideshowRequest.current = request;
+      setSlideshowActive(true);
+      setIndex(0);
+      return;
+    }
+    lastSlideshowRequest.current = request;
+  }, [slideshowRequest, photos.length]);
 
   useEffect(() => () => {
     if (noticeTimer.current) clearTimeout(noticeTimer.current);
@@ -174,7 +194,10 @@ export function ClientPhotoGrid({
       <JustifiedPhotoGrid onPhotoClick={setIndex} overlay={renderOverlay} photos={photos} />
       <Lightbox
         className="gallery-lightbox"
-        close={() => setIndex(-1)}
+        close={() => {
+          setIndex(-1);
+          setSlideshowActive(false);
+        }}
         index={index}
         labels={{
           Close: "Close",
@@ -183,7 +206,11 @@ export function ClientPhotoGrid({
           "Photo gallery": "Photo gallery",
           "{index} of {total}": "{index} of {total}",
         }}
-        on={{ view: ({ index: nextIndex }) => setIndex(nextIndex) }}
+        on={{
+          view: ({ index: nextIndex }) => setIndex(nextIndex),
+          slideshowStart: () => setSlideshowActive(true),
+          slideshowStop: () => setSlideshowActive(false),
+        }}
         open={index >= 0}
         plugins={[Slideshow]}
         render={{
@@ -192,7 +219,7 @@ export function ClientPhotoGrid({
             <ClientZoomableSlide rect={rect} slide={slide} slideOffset={offset} />
           ) : undefined,
         }}
-        slideshow={{ autoplay: false, delay: 3500 }}
+        slideshow={{ autoplay: index >= 0 && slideshowActive, delay: 3500 }}
         slides={slides}
         toolbar={{
           buttons: [

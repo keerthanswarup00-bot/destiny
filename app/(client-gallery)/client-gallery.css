@@ -173,12 +173,12 @@ html{scroll-behavior:smooth}
 .client-topbar-note{position:absolute;top:100%;right:0;margin:6px 0 0;padding:6px 12px;background:#111;color:#FAFAF8;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;border-radius:3px;white-space:nowrap;pointer-events:none;animation:client-reveal .18s ease both}
 
 /* Favourites email modal — first-time identifiers enter their email once. */
-.client-favorites-dialog{border:1px solid #111;padding:26px 24px;background:#FAFAF8;color:#111;width:min(calc(100% - 32px),380px)}
+.client-favorites-dialog{border:1px solid #111;padding:26px 24px;background:#FAFAF8;color:#111;width:min(calc(100% - 32px),380px);box-sizing:border-box;max-width:380px}
 .client-favorites-dialog::backdrop{background:rgba(17,17,17,.45)}
 .client-favorites-dialog form{display:grid;gap:14px}
 .client-favorites-dialog h2{margin:0;font-size:18px;letter-spacing:.06em;font-weight:700;color:#111}
 .client-favorites-dialog p{margin:0;color:#777;font-size:14px;line-height:1.55}
-.client-favorites-dialog input{width:100%;box-sizing:border-box;border:1px solid #111;padding:13px 14px;background:#fff;color:#111;font-size:15px}
+.client-favorites-dialog input{width:100%;box-sizing:border-box;border:1px solid #111;padding:13px 14px;background:#fff;color:#111;font-size:15px;min-width:0}
 .client-favorites-dialog input::placeholder{color:#9a9a9a}
 .client-favorites-dialog input:focus{outline:2px solid #111;outline-offset:2px}
 .client-favorites-error{margin:0;color:#B00020;font-size:13px}
@@ -187,17 +187,153 @@ html{scroll-behavior:smooth}
 .client-optin input{margin-top:3px;width:auto;flex:none}
 .client-optin strong{display:block;color:#111;letter-spacing:.03em}
 
+/* Mobile client header: keep the gallery identity clear and collapse secondary
+   actions into one compact overflow menu. Desktop retains the full toolbar. */
+.client-mobile-menu-trigger,
+.client-mobile-menu{display:none}
+
+@media(max-width:600px){
+  .client-gallery .client-topbar{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    grid-template-areas:"head actions" "gate actions" "brand actions";
+    align-items:center;
+    column-gap:10px;
+    padding:6px 0 14px;
+    margin-bottom:18px;
+  }
+
+  .client-gallery .client-topbar-head{
+    min-width:0;
+    flex-wrap:nowrap;
+    gap:8px;
+  }
+
+  .client-gallery .client-topbar-title{
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    font-size:clamp(22px,7vw,32px);
+  }
+
+  .client-gallery .client-topbar-brand{
+    margin-top:5px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    font-size:9px;
+    letter-spacing:.18em;
+  }
+
+  .client-gallery .client-topbar-gate{
+    margin-top:6px;
+  }
+
+  .client-gallery .client-topbar-actions{
+    gap:1px;
+    align-self:center;
+  }
+
+  .client-gallery .client-topbar-actions > .client-topbar-action:not(.client-topbar-favorites),
+  .client-gallery .client-topbar-actions > .client-mobile-menu-trigger{
+    display:none;
+  }
+
+  .client-gallery .client-topbar-favorites{
+    display:grid;
+    width:38px;
+    min-width:38px;
+    height:38px;
+    padding:0;
+    border-radius:50%;
+  }
+
+  .client-gallery .client-topbar-favorites .client-topbar-count{
+    position:absolute;
+    margin:18px 0 0 18px;
+    min-width:15px;
+    height:15px;
+    padding:0 3px;
+    display:grid;
+    place-items:center;
+    border-radius:99px;
+    background:#111;
+    color:#fff;
+    font-size:8px;
+    line-height:1;
+    border:2px solid #FAFAF8;
+  }
+
+  .client-gallery .client-mobile-menu-trigger{
+    display:grid;
+    position:relative;
+    place-items:center;
+    width:38px;
+    height:38px;
+    padding:0;
+    border:0;
+    border-radius:50%;
+    background:transparent;
+    color:#111;
+    cursor:pointer;
+  }
+
+  .client-gallery .client-mobile-menu-trigger:hover{
+    background:#EDEDE9;
+  }
+
+  .client-gallery .client-mobile-menu{
+    position:absolute;
+    z-index:30;
+    top:calc(100% + 8px);
+    right:0;
+    display:grid;
+    min-width:176px;
+    padding:6px;
+    border:1px solid #E1E1DD;
+    background:#FAFAF8;
+    box-shadow:0 14px 36px rgba(17,17,17,.12);
+  }
+
+  .client-gallery .client-mobile-menu-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    width:100%;
+    border:0;
+    background:transparent;
+    color:#111;
+    padding:11px 10px;
+    font:inherit;
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:.02em;
+    text-align:left;
+    cursor:pointer;
+  }
+
+  .client-gallery .client-mobile-menu-item:hover{
+    background:#EDEDE9;
+  }
+
+  .client-gallery .client-mobile-menu-item:disabled{
+    color:#999;
+    cursor:not-allowed;
+    background:transparent;
+  }
+
+  .client-gallery .client-mobile-menu-item svg{
+    flex:none;
+    color:#555;
+  }
+}
+
 /* Mobile: single-column, full-width photos that keep their natural ratio */
 .justified-grid--column .justified-cell{margin:0 0 6px}
 .justified-grid--column .justified-open{display:block;width:100%;height:auto}
 .justified-grid--column .justified-open img{width:100%;height:auto}
 @media(max-width:600px){
-  .client-gallery .client-topbar-title{font-size:clamp(24px,7vw,34px)}
-  .client-gallery .client-topbar{padding-top:6px}
-  .client-gallery .client-topbar-head{flex-wrap:wrap;row-gap:6px}
-  .client-gallery .client-topbar-gate{margin-top:8px}
-  .client-gallery .client-topbar-action{width:38px;height:38px;min-width:38px;font-size:15px}
-  .client-gallery .client-topbar-favorites{padding:0 10px}
   .client-hero-brand{letter-spacing:.22em}
   .client-hero-gallery{font-size:11px;letter-spacing:.18em}
   .client-hero-title{font-size:clamp(32px,9vw,56px)}
@@ -223,12 +359,20 @@ html{scroll-behavior:smooth}
 /* Sets — lightweight category selector. Only the ACTIVE set's photos render;
    switching sets swaps the grid in place instead of stacking sets vertically.
    Selection is shared across sets via the gallery-wide selection bar. */
-.client-set-nav{display:flex;align-items:center;gap:clamp(18px,3.5vw,38px);margin:0 0 26px;padding:0 2px 0 0;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.client-set-nav{display:flex;align-items:center;gap:clamp(18px,3.5vw,38px);margin:0 0 26px;padding:0 2px 2px 0;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none;scroll-snap-type:x proximity}
 .client-set-nav::-webkit-scrollbar{display:none}
-.client-set-nav-item{flex:none;border:0;border-bottom:2px solid transparent;background:transparent;padding:8px 2px;font:inherit;font-size:13px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#777;cursor:pointer;transition:color .15s ease,border-color .15s ease}
+.client-set-nav-item{position:relative;flex:none;border:0;background:transparent;padding:8px 2px;font:inherit;font-size:13px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#777;cursor:pointer;scroll-snap-align:start;transition:color .2s ease,transform .18s ease}
+.client-set-nav-item::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:#111;transform:scaleX(0);transform-origin:center;transition:transform .22s cubic-bezier(.22,.8,.24,1)}
 .client-set-nav-item:hover{color:#111}
-.client-set-nav-item.is-active{color:#111;font-weight:700;border-bottom-color:#111}
-.client-set{margin:0;animation:client-reveal .45s ease both}
+.client-set-nav-item:active{transform:scale(.98)}
+.client-set-nav-item.is-active{color:#111;font-weight:700}
+.client-set-nav-item.is-active::after{transform:scaleX(1)}
+.client-set{margin:0;animation:client-set-swap .32s cubic-bezier(.22,.8,.24,1) both}
+@keyframes client-set-swap{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media(max-width:600px){
+  .client-set-nav{gap:22px;margin-right:-2px;padding-right:18px}
+  .client-set-nav-item{font-size:11px;letter-spacing:.12em}
+}
 
 /* Client accounts + viewer/client roles.
    The viewer tier browses, favourites and downloads. The client tier adds the
@@ -292,4 +436,193 @@ html{scroll-behavior:smooth}
   .client-topbar-note,.client-topbar-action[aria-busy="true"] svg{animation:none !important}
   .client-topbar-action,.client-photo-action,.client-submit-button,.client-review-button{transition:none}
   .client-topbar-action:active,.client-photo-action:active,.client-submit-button:active,.client-review-button:active{transform:none}
+}
+
+/* Favourites review: grouped by gallery set while keeping one global favourites count. */
+.client-review-groups{overflow-y:auto;padding:0 24px 18px}
+.client-review-groups .client-review-group{margin:0 0 24px}
+.client-review-groups .client-review-group:last-child{margin-bottom:0}
+.client-review-group-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 0 10px}
+.client-review-group-head h3{margin:0;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#111}
+.client-review-group-head span{font-size:11px;color:#999}
+.client-review-groups .client-review-grid{overflow:visible;padding:0}
+@media(max-width:560px){
+  .client-review-groups{padding:0 18px 14px}
+}
+
+.client-share-link{display:flex;align-items:stretch;width:100%;position:relative}
+.client-share-link input{min-width:0;flex:1;padding:12px 48px 12px 13px;border:1px solid #DCDCD7!important;background:#fff;color:#555;font-size:12px;line-height:1.3;box-sizing:border-box;transition:border-color .16s ease,background .16s ease}
+.client-share-link input:hover{border-color:#BDBDB7!important}
+.client-share-link input:focus{outline:2px solid #111;outline-offset:1px}
+.client-share-copy{position:absolute;right:1px;top:1px;width:42px;height:calc(100% - 2px);border:0;background:#fff;color:#111;display:grid;place-items:center;cursor:pointer;z-index:1;transition:background .16s ease,color .16s ease}
+.client-share-copy:hover{background:#F1F1ED}
+.client-share-copy:focus-visible{outline:2px solid #111;outline-offset:-2px}
+.client-share-status{margin:-4px 0 0;color:#666;font-size:11px;line-height:1.45}
+
+.client-share-options{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:2px}
+.client-share-option{border:1px solid #D8D8D2;background:#fff;color:#111;min-width:0;min-height:88px;padding:13px 6px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:border-color .18s ease,background .18s ease,transform .12s ease,box-shadow .18s ease}
+.client-share-option:hover{border-color:#111;background:#FAFAF8;box-shadow:0 6px 16px rgba(17,17,17,.06);transform:translateY(-1px)}
+.client-share-option:active{transform:scale(.98)}
+.client-share-option:focus-visible{outline:2px solid #111;outline-offset:2px}
+.client-share-option-icon{width:34px;height:34px;display:grid;place-items:center;border:1px solid #DCDCD7;border-radius:50%;background:#FAFAF8;color:#111;font-size:11px;font-weight:700;letter-spacing:-.03em;text-transform:none}
+.client-share-option-whatsapp{font-size:13px;font-weight:700;letter-spacing:-.04em}
+.client-share-option-instagram{font-size:10px;font-weight:700;letter-spacing:-.05em}
+.client-share-option-facebook{font-family:Arial,sans-serif;font-size:15px;font-weight:700;letter-spacing:-.08em}
+.client-share-option:hover .client-share-option-icon{border-color:#BDBDB7;background:#fff}
+.client-share-dialog{width:min(calc(100% - 32px),430px);padding:30px 28px 24px;box-shadow:0 24px 70px rgba(17,17,17,.16)}
+.client-share-dialog h2{font-size:20px;letter-spacing:-.035em}
+.client-share-dialog form{gap:18px}
+.client-share-dialog p{font-size:12px;line-height:1.55;max-width:44ch}
+.client-share-dialog .client-favorites-actions{margin-top:-2px}
+.client-share-dialog .client-clear-button{padding:8px 2px;font-size:10px;letter-spacing:.14em;color:#999}
+.client-share-dialog .client-clear-button:hover{color:#111}
+
+@media(max-width:600px){
+  .client-favorites-dialog{padding:22px 20px;width:min(calc(100% - 24px),380px)}
+  .client-favorites-dialog h2{font-size:17px}
+  .client-favorites-dialog p{font-size:13px}
+  .client-favorites-actions{gap:4px}
+  .client-share-dialog{width:min(calc(100% - 24px),390px);padding:24px 20px 20px}
+  .client-share-dialog h2{font-size:18px}
+  .client-share-dialog p{font-size:12px}
+}
+@media(max-width:420px){
+  .client-share-options{gap:5px}
+  .client-share-option{min-height:72px;padding-left:3px;padding-right:3px;font-size:8px}
+  .client-share-option-icon{width:32px;height:32px}
+}
+
+/* Share dialog: premium, spacious share sheet. */
+.client-share-dialog{
+  width:min(520px,calc(100vw - 40px)) !important;
+  max-width:none !important;
+  margin:auto;
+  padding:34px 34px 26px !important;
+  border:1px solid #D9D9D4;
+  border-radius:4px;
+  background:#FAFAF8;
+  box-shadow:0 30px 90px rgba(17,17,17,.18);
+}
+.client-share-dialog form{gap:22px}
+.client-share-dialog h2{margin:0;font-size:24px;line-height:1.05;letter-spacing:-.045em;font-weight:650}
+.client-share-dialog p{margin:0;color:#777;font-size:12px;line-height:1.6;max-width:46ch}
+.client-share-dialog .client-share-options{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:0;
+  margin:2px 0 0;
+  border-top:1px solid #E3E3DE;
+  border-bottom:1px solid #E3E3DE;
+}
+.client-share-dialog .client-share-option{
+  position:relative;
+  min-height:112px;
+  padding:18px 8px 16px;
+  border:0;
+  border-right:1px solid #E3E3DE;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  gap:11px;
+  font-size:9px;
+  font-weight:650;
+  letter-spacing:.11em;
+  color:#333;
+}
+.client-share-dialog .client-share-option:last-child{border-right:0}
+.client-share-dialog .client-share-option::after{
+  content:"";
+  position:absolute;
+  left:18px;
+  right:18px;
+  bottom:0;
+  height:2px;
+  background:#111;
+  transform:scaleX(0);
+  transform-origin:center;
+  transition:transform .2s ease;
+}
+.client-share-dialog .client-share-option:hover{
+  background:#F3F3EF;
+  border-color:#E3E3DE;
+  transform:none;
+  box-shadow:none;
+}
+.client-share-dialog .client-share-option:hover::after{transform:scaleX(1)}
+.client-share-dialog .client-share-option:active{transform:none;background:#ECECE8}
+.client-share-dialog .client-share-option-icon{
+  width:42px;
+  height:42px;
+  border:1px solid #D4D4CE;
+  background:#fff;
+  border-radius:50%;
+  font-size:12px;
+  color:#111;
+  transition:transform .2s ease,border-color .2s ease,background .2s ease;
+}
+.client-share-dialog .client-share-option:hover .client-share-option-icon{
+  transform:translateY(-2px);
+  border-color:#111;
+  background:#fff;
+}
+.client-share-dialog .client-share-option-whatsapp{font-size:14px;font-weight:700}
+.client-share-dialog .client-share-option-instagram{font-size:10px;font-weight:700;letter-spacing:-.04em}
+.client-share-dialog .client-share-option-facebook{font-family:Arial,sans-serif;font-size:17px;font-weight:700;letter-spacing:-.08em}
+.client-share-dialog .client-share-link{
+  display:grid;
+  gap:8px;
+  margin:0;
+}
+.client-share-dialog .client-share-link::before{
+  content:"GALLERY LINK";
+  display:block;
+  font-size:9px;
+  font-weight:700;
+  letter-spacing:.16em;
+  color:#999;
+}
+.client-share-dialog .client-share-link input{
+  min-height:46px;
+  padding:12px 50px 12px 14px;
+  border:1px solid #D4D4CE !important;
+  background:#fff;
+  color:#444;
+  font-size:12px;
+  letter-spacing:.01em;
+}
+.client-share-dialog .client-share-copy{
+  right:1px;
+  top:25px;
+  width:46px;
+  height:44px;
+  background:#fff;
+  border-left:1px solid #E3E3DE;
+}
+.client-share-dialog .client-share-copy:hover{background:#F3F3EF}
+.client-share-dialog .client-share-status{margin:-8px 0 0;font-size:11px;color:#666}
+.client-share-dialog .client-favorites-actions{
+  justify-content:flex-end;
+  margin-top:-6px;
+  padding-top:2px;
+}
+.client-share-dialog .client-clear-button{
+  padding:8px 0;
+  font-size:10px;
+  letter-spacing:.16em;
+  color:#999;
+}
+.client-share-dialog .client-clear-button:hover{color:#111}
+
+@media(max-width:600px){
+  .client-share-dialog{
+    width:calc(100vw - 24px) !important;
+    padding:26px 20px 20px !important;
+  }
+  .client-share-dialog h2{font-size:20px}
+  .client-share-dialog .client-share-option{min-height:92px;padding-left:4px;padding-right:4px}
+  .client-share-dialog .client-share-option::after{left:10px;right:10px}
+}
+@media(max-width:420px){
+  .client-share-dialog .client-share-option{min-height:84px;font-size:8px;letter-spacing:.08em}
+  .client-share-dialog .client-share-option-icon{width:36px;height:36px}
 }

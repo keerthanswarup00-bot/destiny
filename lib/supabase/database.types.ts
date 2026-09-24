@@ -99,6 +99,11 @@ export type Database = {
         sort_order: number;
         published: boolean;
         cover_photo_id: string | null;
+        download_password_hash: string | null;
+        download_password_encrypted: string | null;
+        download_zip_path: string | null;
+        download_zip_signature: string | null;
+        download_zip_generated_at: string | null;
         created_at: string;
         updated_at: string;
       }, {
@@ -111,6 +116,11 @@ export type Database = {
         sort_order?: number;
         published?: boolean;
         cover_photo_id?: string | null;
+        download_password_hash?: string | null;
+        download_password_encrypted?: string | null;
+        download_zip_path?: string | null;
+        download_zip_signature?: string | null;
+        download_zip_generated_at?: string | null;
         created_at?: string;
         updated_at?: string;
       }>;

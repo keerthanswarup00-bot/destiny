@@ -670,3 +670,42 @@
 .watermark-dialog{width:min(520px,92vw)}.watermark-dialog .wm-dialog-note{margin:0;font-size:13px;color:var(--muted);line-height:1.45}.wm-sample{position:relative;overflow:hidden;border:1px solid #e7e7e4;border-radius:8px;height:210px;background:linear-gradient(135deg,#454545,#1a1a1a 55%,#0d0d0d)}.wm-sample .wm-sample-logo{position:absolute;right:12%;bottom:8%;width:16%;height:auto;display:block}.wm-sample-label{position:absolute;top:10px;left:12px;font-size:11px;letter-spacing:.08em;color:rgba(255,255,255,.5);text-transform:uppercase}.wm-sample-note{position:absolute;left:12px;bottom:10px;font-size:11.5px;color:rgba(255,255,255,.6)}.wm-dialog-logo img{border:1px solid #eee;border-radius:8px;max-height:110px;object-fit:contain;display:block}.watermark-dialog-plain{padding:28px;display:grid;gap:14px}.watermark-dialog-plain h2{margin:0;font-size:20px;letter-spacing:-.03em}.watermark-dialog-plain p{margin:0;font-size:13.5px;color:var(--muted);line-height:1.5}.watermark-dialog menu .admin-button.is-danger{background:#b00020;color:#fff}.watermark-dialog menu .admin-button.is-danger:hover{background:#8a001a}
 
 .wmov-form{display:grid;gap:20px;max-width:780px}.wmov-preview{position:relative;overflow:hidden;border:1px solid #e7e7e4;border-radius:8px;background:#0f0f0f;min-height:220px;display:flex;align-items:center;justify-content:center}.wmov-preview img{width:100%;height:auto;display:block}.wmov-preview .hint{color:rgba(255,255,255,.5)}.wmov-busy{position:absolute;top:10px;right:12px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#ffe9a3}.wmov-toggle{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;cursor:pointer}.wmov-toggle input{accent-color:var(--yellow)}.wmov-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px 24px}.wmov-field{display:grid;gap:6px;font-size:13.5px;color:var(--muted)}.wmov-field input[type="range"]{accent-color:var(--yellow)}.wmov-positions{display:grid;gap:6px}.wmov-label{font-size:13.5px;color:var(--muted)}.wmov-positions-grid{display:flex;flex-wrap:wrap;gap:8px}.wmov-chip{position:relative;cursor:pointer;font-size:13px;padding:8px 13px;border:1px solid #ddd;border-radius:5px;background:#fff;color:#333;user-select:none}.wmov-chip input{position:absolute;opacity:0;pointer-events:none}.wmov-chip.is-selected{border-color:#111;background:#111;color:#fff}.wmov-save{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.wmov-save .wm-hint{max-width:520px}
+
+
+/* Client gallery download PIN status */
+.ce-set-name {
+  position: relative;
+  padding-right: 3.5rem;
+}
+.ce-set-pin-status {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--admin-muted, #7d7d7d);
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.ce-download-pin-dialog form{gap:18px}
+.ce-dialog-heading{display:grid;gap:5px}
+.ce-dialog-heading .muted{margin:0;line-height:1.5}
+.ce-pin-reveal,.ce-pin-empty{padding:14px;border:1px solid #e6e6e4;background:#fafaf8}
+.ce-pin-reveal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+.ce-pin-status{color:#2e7d32}
+.ce-pin-value{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ce-pin-value code{font-size:17px;letter-spacing:.14em;color:#111}
+.ce-pin-reveal small,.ce-pin-empty small{display:block;margin-top:7px;color:#777;line-height:1.45}
+.ce-pin-empty{display:grid;gap:3px}
+.ce-pin-empty span{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#777}
+.ce-pin-empty strong{font-size:14px}
+.ce-pin-input{display:grid!important;gap:7px!important}
+.ce-pin-input>span{font-size:13px;color:#111}
+.ce-pin-remove{display:grid!important;grid-template-columns:auto 1fr;align-items:start;gap:10px!important;margin-top:-3px}
+.ce-pin-remove input{margin-top:3px}
+.ce-pin-remove span{display:grid;gap:2px}
+.ce-pin-remove strong{font-size:13px;font-weight:600}
+.ce-pin-remove small{color:#777;font-size:12px;line-height:1.4}
+@media(max-width:520px){
+  .ce-download-pin-dialog{width:min(480px,calc(100% - 24px))}
+  .ce-download-pin-dialog form{padding:22px}
+}

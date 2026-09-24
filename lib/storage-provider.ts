@@ -76,6 +76,7 @@ export type PhotoStore = {
   objectBytes(key: string): Promise<number | null>;
   objectExists(key: string): Promise<boolean>;
   listKeys(): Promise<string[]>;
+  uploadStream?(opts: { key: string; parts: AsyncIterable<Buffer>; contentType: string }): Promise<void>;
 };
 
 function activeProvider(): "supabase" | "r2" {
@@ -186,6 +187,11 @@ const r2PhotoStore: PhotoStore = {
     r2ExistenceCache.set(key, true);
     return uploadObject({ key, body, contentType, metadata });
   },
+  async uploadStream({ key, parts, contentType }) {
+    const { uploadMultipartObject } = await import("@/lib/r2");
+    await uploadMultipartObject(key, parts, contentType);
+    r2ExistenceCache.set(key, true);
+  },
   async removePhotos(keys) {
     for (const key of keys) r2ExistenceCache.set(key, false);
     // R2 is authoritative, but legacy copies may also live in the Supabase
@@ -244,9 +250,19 @@ const r2PhotoStore: PhotoStore = {
     return out;
   },
   async signedDownloadUrl(key, filename, seconds = DOWNLOAD_SIGNED_URL_SECONDS) {
-    const supabaseUrl = await supabasePhotoStore.signedDownloadUrl(key, filename, seconds);
-    if (!(await objectExists(key))) return supabaseUrl;
-    return createSignedGetUrl(key, seconds, filename).catch(() => null);
+    const existsInR2 = await objectExists(key);
+    if (existsInR2) {
+      try {
+        return await createSignedGetUrl(key, seconds, filename);
+      } catch (error) {
+        console.error("[storage] R2 signed download URL failed", {
+          key,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return null;
+      }
+    }
+    return supabasePhotoStore.signedDownloadUrl(key, filename, seconds);
   },
   async downloadBytes(key) {
     return (await downloadObjectBytes(key)) ?? (await supabasePhotoStore.downloadBytes(key));

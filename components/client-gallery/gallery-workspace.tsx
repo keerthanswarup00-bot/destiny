@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useImperativeHandle, useRef, useState, type Ref } from "react";
 import { togglePhotoFavorite } from "@/app/(client-gallery)/gallery/actions";
-import { ClientPhotoGrid } from "@/components/client-gallery/photo-grid";
+import { ClientPhotoGrid, type ClientPhotoGridHandle } from "@/components/client-gallery/photo-grid";
 import { useGalleryIdentity } from "@/components/client-gallery/profile-identity";
 
 export type WorkspacePhoto = {
@@ -16,6 +16,8 @@ export type WorkspacePhoto = {
   setName?: string;
 };
 
+export type GalleryWorkspaceHandle = { openSlideshow: () => void };
+
 export function GalleryWorkspace({
   slug,
   folder,
@@ -25,6 +27,8 @@ export function GalleryWorkspace({
   clientSubmitted,
   onFavoriteChange,
   onClientToggle,
+  slideshowRequest,
+  ref,
 }: {
   slug: string;
   folder?: string;
@@ -34,10 +38,14 @@ export function GalleryWorkspace({
   clientSubmitted?: boolean;
   onFavoriteChange?: (photoId: string, favorite: boolean) => void;
   onClientToggle?: (photoId: string, selected: boolean) => Promise<void>;
+  slideshowRequest?: number;
+  ref?: Ref<GalleryWorkspaceHandle>;
 }) {
   const [pending, setPending] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const { requestIdentity } = useGalleryIdentity();
+  const photoGridRef = useRef<ClientPhotoGridHandle>(null);
+  useImperativeHandle(ref, () => ({ openSlideshow: () => photoGridRef.current?.openSlideshow() }), []);
 
   const displayed = photos.map(photo =>
     photo.id in pending
@@ -122,6 +130,8 @@ export function GalleryWorkspace({
         onClientToggle={handleClientToggle}
         onToggle={handleFavoriteToggle}
         photos={displayed}
+        ref={photoGridRef}
+        slideshowRequest={slideshowRequest}
         slug={slug}
       />
 

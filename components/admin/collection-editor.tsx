@@ -55,6 +55,7 @@ type EditorFolder = {
   published: boolean;
   coverPhotoId: string | null;
   hasDownloadPassword: boolean;
+  downloadPassword: string | null;
 };
 
 type EditorPhoto = {
@@ -601,11 +602,21 @@ export function CollectionEditor({
       {downloadPasswordFor ? (
         <dialog className="admin-dialog" onCancel={() => setDownloadPasswordFor(null)} ref={downloadPasswordRef}>
           <form action={setFolderDownloadPassword} onSubmit={() => { setDownloadPasswordFor(null); router.refresh(); }}>
-            <h2>Set download PIN</h2>
+            <h2>Download PIN</h2>
             <p className="muted">This PIN is separate from the gallery password and is required to download the complete set as a ZIP of JPEG images.</p>
+            {downloadPasswordFor.downloadPassword ? (
+              <div className="ce-pin-reveal">
+                <span className="muted">Current PIN</span>
+                <div className="ce-pin-value">
+                  <code>{downloadPasswordFor.downloadPassword}</code>
+                  <CopyButton text={downloadPasswordFor.downloadPassword} />
+                </div>
+                <small>Send this PIN to the client for downloads.</small>
+              </div>
+            ) : null}
             <input name="id" type="hidden" value={downloadPasswordFor.id} />
             <input name="gallery_id" type="hidden" value={gallery.id} />
-            <label>New download PIN<input autoFocus minLength={6} name="download_password" placeholder="Enter PIN" required type="password" /></label>
+            <label>{downloadPasswordFor.hasDownloadPassword ? "Change download PIN" : "Set download PIN"}<input autoFocus minLength={6} name="download_password" placeholder="Enter PIN" required type="password" /></label>
             {downloadPasswordFor.hasDownloadPassword ? (
               <label className="admin-checkbox"><input name="clear_download_password" type="checkbox" /> Remove download PIN</label>
             ) : null}

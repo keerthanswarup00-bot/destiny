@@ -5,6 +5,7 @@ import { Download, Heart, Share2 } from "lucide-react";
 import { GalleryOverview, type GalleryOverviewHandle, type GallerySet } from "@/components/client-gallery/gallery-overview";
 import { ClientAccessDialog } from "@/components/client-gallery/client-access-dialog";
 import { GalleryIdentityProvider, useGalleryIdentity } from "@/components/client-gallery/profile-identity";
+import { GalleryDownloadDialog } from "@/components/client-gallery/gallery-download-dialog";
 
 export function GalleryShell({
   slug,
@@ -32,6 +33,7 @@ export function GalleryShell({
   const [count, setCount] = useState(selectedIds.length);
   const [shareNote, setShareNote] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [downloadOpen, setDownloadOpen] = useState(false);
   const overviewRef = useRef<GalleryOverviewHandle>(null);
   const shareTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -88,10 +90,10 @@ export function GalleryShell({
             {count > 0 ? <span className="client-topbar-count">{count}</span> : null}
           </button>
           <button
-            aria-label="Download favourites"
+            aria-label="Download all photos"
             className="client-topbar-action"
-            onClick={() => overviewRef.current?.downloadFavorites()}
-            title="Download favourites"
+            onClick={() => setDownloadOpen(true)}
+            title="Download all photos"
             type="button"
           >
             <Download size={20} strokeWidth={1.6} />

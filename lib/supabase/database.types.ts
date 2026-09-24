@@ -251,6 +251,21 @@ export type Database = {
         user_agent?: string | null;
         failure_reason?: string | null;
       }>;
+      gallery_views: Table<{
+        id: string;
+        gallery_id: string;
+        visitor_key: string;
+        view_count: number;
+        first_viewed_at: string;
+        last_viewed_at: string;
+      }, {
+        id?: string;
+        gallery_id: string;
+        visitor_key: string;
+        view_count?: number;
+        first_viewed_at?: string;
+        last_viewed_at?: string;
+      }>;
       website_home_items: Table<{
         id: string;
         section: "hero" | "selected_work" | "studio" | "cta";
@@ -441,6 +456,13 @@ export type Database = {
           p_account_key: string | null;
           p_network_key: string | null;
           p_window_minutes: number;
+        };
+        Returns: undefined;
+      };
+      record_gallery_view: {
+        Args: {
+          p_gallery_id: string;
+          p_visitor_key: string;
         };
         Returns: undefined;
       };

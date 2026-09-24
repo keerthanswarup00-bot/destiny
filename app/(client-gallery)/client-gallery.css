@@ -42,8 +42,10 @@ html{scroll-behavior:smooth}
 .client-photo-actions{position:absolute;top:8px;right:8px;z-index:2;display:flex;gap:4px;align-items:center}
 .client-photo-veil{display:flex;gap:4px;align-items:center;opacity:0;transform:translateY(-2px);pointer-events:none;transition:opacity .15s ease,transform .15s ease}
 .client-photo-veil.is-selected{opacity:1;transform:none;pointer-events:auto}
-.client-photo-action{width:34px;height:34px;min-width:34px;border:0;background:rgba(250,250,248,.72);color:#111;font-size:16px;line-height:1;display:grid;place-items:center;transition:background .2s ease,transform .15s ease}
-.client-photo-action:hover{transform:scale(1.08)}
+.client-photo-action{width:34px;height:34px;min-width:34px;border:0;background:rgba(250,250,248,.72);color:#111;font-size:16px;line-height:1;display:grid;place-items:center;transition:background .16s ease,color .16s ease,transform .12s ease}
+.client-photo-action:hover{transform:scale(1.06)}
+.client-photo-action:active{transform:scale(.94)}
+.client-photo-action:focus-visible{outline:2px solid #111;outline-offset:2px}
 .client-photo-action.is-selected{background:#111;color:#dc2626}
 .client-photo-action:disabled{opacity:.55;cursor:not-allowed}
 @media (hover:hover) and (pointer:fine){
@@ -51,10 +53,11 @@ html{scroll-behavior:smooth}
   .justified-cell:focus-within .client-photo-veil{opacity:1;transform:none;pointer-events:auto}
 }
 .client-selection-bar{position:sticky;bottom:12px;margin:28px auto 0;width:max-content;max-width:calc(100% - 24px);padding:8px 10px 8px 14px;border:1px solid #E7E7E4;background:#FAFAF8;color:#777;font-size:12px;letter-spacing:.08em;text-transform:uppercase;display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center}
-.client-submit-button{border:0;background:#111;color:#FAFAF8;padding:10px 14px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;display:inline-flex;align-items:center;gap:8px;transition:background .2s ease}
+.client-submit-button{border:0;background:#111;color:#FAFAF8;padding:10px 14px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;display:inline-flex;align-items:center;gap:8px;transition:background .2s ease,color .2s ease,transform .12s ease}
 .client-submit-button:hover{background:#333}
+.client-submit-button:active{transform:scale(.99)}
 .client-submit-button:disabled{opacity:.55;cursor:not-allowed}
-.client-clear-button{border:0;background:transparent;color:#777;padding:10px 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.client-clear-button{border:0;background:transparent;color:#777;padding:10px 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;transition:color .15s ease}
 .client-clear-button:hover{color:#111}
 .client-clear-button:disabled{opacity:.5;cursor:not-allowed}
 .client-selection-bar.is-submitted{flex-direction:column;align-items:flex-start;gap:2px;background:#111;color:#FAFAF8;letter-spacing:.06em;width:max-content}
@@ -96,8 +99,9 @@ html{scroll-behavior:smooth}
 .client-selection-pill{display:inline-flex;align-items:center;gap:6px;margin-left:10px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#b00020;border:1px solid currentColor;border-radius:99px;padding:4px 10px}
 
 .client-heart svg,.client-photo-action svg{pointer-events:none}
-.client-review-button{border:1px solid #111;background:transparent;color:#111;padding:9px 13px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.client-review-button{border:1px solid #111;background:transparent;color:#111;padding:9px 13px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:background .15s ease,color .15s ease,transform .12s ease}
 .client-review-button:hover{background:#111;color:#FAFAF8}
+.client-review-button:active{transform:scale(.99)}
 .client-download-button:disabled{cursor:not-allowed;opacity:.6}
 .client-bar-error.is-ok{color:#2e7d32}
 .client-lightbox-action{display:grid;place-items:center;color:inherit}
@@ -151,16 +155,22 @@ html{scroll-behavior:smooth}
 .client-gallery .site-footer__bottom{max-width:1440px;margin-left:auto;margin-right:auto}
 
 /* Compact gallery header */
-.client-gallery .client-topbar{display:grid;grid-template-columns:1fr auto;grid-template-areas:"title actions" "brand actions";align-items:center;column-gap:16px;padding:2px 0 18px;margin-bottom:22px;border-bottom:1px solid #E7E7E4}
-.client-gallery .client-topbar-title{grid-area:title;margin:0;font-size:clamp(30px,6vw,54px);letter-spacing:-.06em;line-height:.95;font-weight:600}
+.client-gallery .client-topbar{display:grid;grid-template-columns:1fr auto;grid-template-areas:"head actions" "brand actions" "gate actions";align-items:center;column-gap:16px;padding:2px 0 18px;margin-bottom:22px;border-bottom:1px solid #E7E7E4}
+.client-gallery .client-topbar-head{grid-area:head;display:flex;align-items:baseline;gap:12px;min-width:0}
+.client-gallery .client-topbar-title{margin:0;font-size:clamp(30px,6vw,54px);letter-spacing:-.06em;line-height:.95;font-weight:600}
 .client-gallery .client-topbar-brand{grid-area:brand;margin:8px 0 0;font-size:10px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:#999}
+.client-gallery .client-topbar-gate{grid-area:gate;margin-top:10px;justify-self:start}
 .client-gallery .client-topbar-actions{grid-area:actions;display:flex;align-items:center;gap:2px;position:relative}
-.client-gallery .client-topbar-action{width:42px;height:42px;display:grid;place-items:center;border:0;border-radius:50%;background:transparent;color:#111;cursor:pointer;transition:background .18s ease}
+.client-gallery .client-topbar-action{width:42px;height:42px;display:grid;place-items:center;border:0;border-radius:50%;background:transparent;color:#111;cursor:pointer;transition:background .16s ease,color .16s ease,transform .12s ease}
 .client-gallery .client-topbar-action:hover{background:#EDEDE9}
+.client-gallery .client-topbar-action:active{transform:scale(.94)}
+.client-gallery .client-topbar-action:focus-visible{outline:2px solid #111;outline-offset:2px}
+.client-gallery .client-topbar-action:disabled{opacity:.45;cursor:not-allowed}
+.client-gallery .client-topbar-action[aria-busy="true"] svg{animation:client-spin .85s linear infinite}
 .client-gallery .client-topbar-favorites{display:flex;align-items:center;gap:6px;width:auto;min-width:42px;padding:0 14px;border-radius:999px}
 .client-gallery .client-topbar-favorites.is-active{color:#dc2626}
 .client-topbar-count{font-size:12px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:.02em}
-.client-topbar-note{position:absolute;top:100%;right:0;margin:6px 0 0;padding:6px 12px;background:#111;color:#FAFAF8;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;border-radius:3px;white-space:nowrap;pointer-events:none}
+.client-topbar-note{position:absolute;top:100%;right:0;margin:6px 0 0;padding:6px 12px;background:#111;color:#FAFAF8;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;border-radius:3px;white-space:nowrap;pointer-events:none;animation:client-reveal .18s ease both}
 
 /* Favourites email modal — first-time identifiers enter their email once. */
 .client-favorites-dialog{border:1px solid #111;padding:26px 24px;background:#FAFAF8;color:#111;width:min(calc(100% - 32px),380px)}
@@ -181,6 +191,8 @@ html{scroll-behavior:smooth}
 @media(max-width:600px){
   .client-gallery .client-topbar-title{font-size:clamp(24px,7vw,34px)}
   .client-gallery .client-topbar{padding-top:6px}
+  .client-gallery .client-topbar-head{flex-wrap:wrap;row-gap:6px}
+  .client-gallery .client-topbar-gate{margin-top:8px}
   .client-gallery .client-topbar-action{width:38px;height:38px;min-width:38px;font-size:15px}
   .client-gallery .client-topbar-favorites{padding:0 10px}
   .client-hero-brand{letter-spacing:.22em}
@@ -233,3 +245,48 @@ html{scroll-behavior:smooth}
 .client-photo-action.client-photo-select.is-selected{background:#0f7a3d;color:#FAFAF8}
 .client-photo-action.client-photo-select:not(.is-selected){background:#111;color:#FAFAF8}
 .client-lightbox-select.is-selected{color:#0f7a3d}
+
+/* --- Dialogs: smooth open / close, minimal + quiet --- */
+@keyframes client-dialog-in{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes client-dialog-out{from{opacity:1;transform:none}to{opacity:0;transform:translateY(6px) scale(.985)}}
+@keyframes client-backdrop-in{from{opacity:0}to{opacity:1}}
+@keyframes client-backdrop-out{from{opacity:1}to{opacity:0}}
+.client-review[open],
+.client-favorites-dialog[open],
+.client-access-dialog[open],
+.client-submit-dialog[open]{animation:client-dialog-in .2s ease-out both}
+.client-review[open]::backdrop,
+.client-favorites-dialog[open]::backdrop,
+.client-access-dialog[open]::backdrop,
+.client-submit-dialog[open]::backdrop{animation:client-backdrop-in .2s ease-out both}
+.client-review.is-closing,
+.client-favorites-dialog.is-closing,
+.client-access-dialog.is-closing,
+.client-submit-dialog.is-closing{animation:client-dialog-out .16s ease-in both}
+.client-review.is-closing::backdrop,
+.client-favorites-dialog.is-closing::backdrop,
+.client-access-dialog.is-closing::backdrop,
+.client-submit-dialog.is-closing::backdrop{animation:client-backdrop-out .16s ease-in both}
+
+/* Favourites review: clean empty state */
+.client-review-empty{display:grid;place-items:center;gap:6px;text-align:center;padding:34px 24px 40px;color:#999}
+.client-review-empty-icon{display:grid;place-items:center;width:52px;height:52px;border:1px solid #E7E7E4;border-radius:50%;margin-bottom:4px;color:#C2C2BD}
+.client-review-empty-title{margin:0;font-size:16px;letter-spacing:-.02em;color:#111;font-weight:600}
+.client-review-empty-sub{margin:0;font-size:13px;color:#999;max-width:30ch;line-height:1.5}
+
+/* Busy-spinner used by toolbar buttons */
+@keyframes client-spin{to{transform:rotate(360deg)}}
+
+/* Hero: never drops below a usable height on short/landscape screens */
+.client-hero{min-height:440px}
+
+/* Global reduced-motion overrides for the client gallery */
+@media(prefers-reduced-motion:reduce){
+  .client-review[open],.client-favorites-dialog[open],.client-access-dialog[open],.client-submit-dialog[open],
+  .client-review[open]::backdrop,.client-favorites-dialog[open]::backdrop,.client-access-dialog[open]::backdrop,.client-submit-dialog[open]::backdrop,
+  .client-review.is-closing,.client-favorites-dialog.is-closing,.client-access-dialog.is-closing,.client-submit-dialog.is-closing,
+  .client-review.is-closing::backdrop,.client-favorites-dialog.is-closing::backdrop,.client-access-dialog.is-closing::backdrop,.client-submit-dialog.is-closing::backdrop,
+  .client-topbar-note,.client-topbar-action[aria-busy="true"] svg{animation:none !important}
+  .client-topbar-action,.client-photo-action,.client-submit-button,.client-review-button{transition:none}
+  .client-topbar-action:active,.client-photo-action:active,.client-submit-button:active,.client-review-button:active{transform:none}
+}

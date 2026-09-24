@@ -478,13 +478,13 @@ export async function publishWebsiteGallery(): Promise<void> {
     .eq("pending_delete", true);
   if (pendingError) throw new Error(`Publish could not read pending deletions: ${pendingError.message}`);
   try {
-    const paths = (pending ?? []).flatMap(photo => [photo.original_path, photo.preview_path, photo.thumbnail_path])
-      .filter((path): path is string => Boolean(path));
-    if (paths.length) await photoStore().removePhotos(paths);
     if (pending?.length) {
       const { error } = await supabase.from("photos").delete().in("id", pending.map(photo => photo.id)).eq("gallery_id", galleryId);
       if (error) throw error;
     }
+    const paths = (pending ?? []).flatMap(photo => [photo.original_path, photo.preview_path, photo.thumbnail_path])
+      .filter((path): path is string => Boolean(path));
+    if (paths.length) await photoStore().removePhotos(paths);
     const { data: working, error: workingError } = await supabase.from("photos").select("id,category").eq("gallery_id", galleryId);
     if (workingError) throw workingError;
     for (const photo of working ?? []) {

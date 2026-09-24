@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { CollectionEditor } from "@/components/admin/collection-editor";
 import { GallerySettings } from "@/components/admin/gallery-settings";
 import { adminDb } from "@/lib/admin-data";
+import { galleryViewStats, relativeTimeLabel } from "@/lib/admin-analytics";
 import { adminError } from "@/lib/admin-validation";
 import { photoStore } from "@/lib/storage-provider";
 
@@ -24,12 +25,13 @@ export default async function GalleryDetail({
   if (!gallery) notFound();
   const shareUrl = `${proto}://${host}/gallery/${gallery.slug}`;
 
-  const [{ data: client }, { data: clients }, { data: folders }, { data: photos }, { data: branding }] = await Promise.all([
+  const [{ data: client }, { data: clients }, { data: folders }, { data: photos }, { data: branding }, insights] = await Promise.all([
     db.from("clients").select("id,name").eq("id", gallery.client_id).maybeSingle(),
     db.from("clients").select("id,name").order("name"),
     db.from("folders").select("id,name,slug,parent_folder_id,sort_order,published,cover_photo_id,description").eq("gallery_id", galleryId).order("sort_order").order("id"),
     db.from("photos").select("id,filename,folder_id,thumbnail_path,preview_path,original_path,width,height,sort_order").eq("gallery_id", galleryId).order("sort_order").order("id"),
     db.from("site_branding").select("watermark_path,watermark_enabled").eq("id", "branding").maybeSingle(),
+    galleryViewStats(galleryId),
   ]);
   const watermarkEnabled = Boolean(branding?.watermark_path && branding.watermark_enabled !== false);
 
@@ -126,6 +128,13 @@ const highlight = {
         highlight={highlight}
         photosByFolder={photosByFolder}
         shareUrl={shareUrl}
+        insights={{
+          uniqueVisitors: insights.uniqueVisitors,
+          returningVisitors: insights.returningVisitors,
+          totalViews: insights.totalViews,
+          firstViewedLabel: relativeTimeLabel(insights.firstViewedAt),
+          lastViewedLabel: relativeTimeLabel(insights.lastViewedAt),
+        }}
       />
     </>
   );

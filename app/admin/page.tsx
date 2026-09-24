@@ -19,7 +19,13 @@ export default async function AdminOverview() {
   const galleryRows = galleries ?? [];
   const { data: allClients } = await db.from("clients").select("id,name");
   const clientName = new Map((allClients ?? []).map(client => [client.id, client.name]));
-  const stats = [["Clients", counts[0]], ["Active galleries", counts[1]], ["Photos", counts[2]]];
+  const stats = [
+    ["Clients", counts[0]],
+    ["Active galleries", counts[1]],
+    ["Photos", counts[2]],
+    ["Selections", counts[3]],
+    ["Gallery views", counts[4]],
+  ];
 
   return (
     <section className="admin-content">

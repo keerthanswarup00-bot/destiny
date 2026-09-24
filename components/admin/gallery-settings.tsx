@@ -7,6 +7,7 @@ import { ArrowLeft, Check, ExternalLink, Lock, Trash2 } from "lucide-react";
 import { deleteGallery, updateGallery } from "@/app/admin/crud-actions";
 import { CopyButton } from "@/components/admin/copy-button";
 import { GalleryHighlightEditor } from "@/components/admin/gallery-highlight-editor";
+import { GalleryInsights, type GalleryInsightsValue } from "@/components/admin/gallery-insights";
 
 type GallerySettingsValue = {
   id: string;
@@ -47,6 +48,7 @@ export function GallerySettings({
   folders,
   photosByFolder,
   highlight,
+  insights,
 }: {
   gallery: GallerySettingsValue;
   clients: { id: string; name: string }[];
@@ -55,6 +57,7 @@ export function GallerySettings({
   folders: { id: string; name: string }[];
   photosByFolder: Record<string, { id: string; filename: string; src: string; width: number | null; height: number | null }[]>;
   highlight: { id: string | null; src: string | null };
+  insights?: GalleryInsightsValue;
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const deleteRef = useRef<HTMLDialogElement>(null);
@@ -236,6 +239,8 @@ export function GallerySettings({
             </div>
           </div>
         </section>
+
+        {insights ? <GalleryInsights insights={insights} /> : null}
 
         <section className="gs-card gs-danger" id="settings-danger">
           <div className="gs-card-head">

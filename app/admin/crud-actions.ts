@@ -42,6 +42,11 @@ export async function deleteGallery(form: FormData) {
   const id=value(form,"id"); const supabase=await db();
   const { data: galleryPhotos }=await supabase.from("photos").select("original_path,preview_path,thumbnail_path,download_path").eq("gallery_id",id);
   const paths=(galleryPhotos??[]).flatMap(photoStoragePaths);
+  // Delete the DB rows first so a failed delete never purges storage objects
+  // that are still referenced. Any storage leftovers are reclaimed by the
+  // storage audit instead of becoming broken images.
+  const { error }=await supabase.from("galleries").delete().eq("id",id);
+  if(error) return redirect(`/admin/galleries?error=gallery-delete`);
   if(paths.length) {
     try {
       await photoStore().removePhotos(paths);
@@ -49,8 +54,6 @@ export async function deleteGallery(form: FormData) {
       return redirect(`/admin/galleries?error=gallery-storage-delete`);
     }
   }
-  const { error }=await supabase.from("galleries").delete().eq("id",id);
-  if(error) return redirect(`/admin/galleries?error=gallery-delete`);
   revalidatePath("/admin/galleries");
   await invalidateTags("site-stories", "site-portfolio");
   redirect("/admin/galleries");
@@ -72,6 +75,9 @@ export async function deleteFolder(form: FormData) {
   }
   const { data: folderPhotos }=await supabase.from("photos").select("original_path,preview_path,thumbnail_path,download_path").eq("gallery_id",gallery).in("folder_id",[...affected]);
   const paths=(folderPhotos??[]).flatMap(photoStoragePaths);
+  // DB-first so a failed delete leaves storage intact (see deleteGallery).
+  const { error }=await supabase.from("folders").delete().eq("id",id).eq("gallery_id",gallery);
+  if(error) return redirect(`/admin/galleries/${gallery}?error=folder-delete`);
   if(paths.length){
     try {
       await photoStore().removePhotos(paths);
@@ -79,8 +85,6 @@ export async function deleteFolder(form: FormData) {
       return redirect(`/admin/galleries/${gallery}?error=folder-storage-delete`);
     }
   }
-  const { error }=await supabase.from("folders").delete().eq("id",id).eq("gallery_id",gallery);
-  if(error) return redirect(`/admin/galleries/${gallery}?error=folder-delete`);
   revalidatePath(`/admin/galleries/${gallery}`);
 }
 function galleryFail(gallery: string, code: string) { return redirect(`/admin/galleries/${gallery}?error=${code}`); }
@@ -413,6 +417,10 @@ export async function deletePhoto(form: FormData) {
   const { data: photo }=await supabase.from("photos").select("original_path,preview_path,thumbnail_path,download_path").eq("id",id).eq("gallery_id",gallery).maybeSingle();
   if(!photo) return;
   const paths=photoStoragePaths(photo);
+  // DB-first so a failed delete never orphans storage objects behind a photo
+  // that still exists (the pre-fix cover-FK failure purged them first).
+  const { error }=await supabase.from("photos").delete().eq("id",id).eq("gallery_id",gallery);
+  if(error) return redirect(`/admin/galleries/${gallery}?error=photo-delete`);
   if(paths.length){
     try {
       await photoStore().removePhotos(paths);
@@ -420,8 +428,6 @@ export async function deletePhoto(form: FormData) {
       return redirect(`/admin/galleries/${gallery}?error=photo-storage-delete`);
     }
   }
-  const { error }=await supabase.from("photos").delete().eq("id",id).eq("gallery_id",gallery);
-  if(error) return redirect(`/admin/galleries/${gallery}?error=photo-delete`);
   revalidatePath(`/admin/galleries/${gallery}`);
 }
 
@@ -453,6 +459,10 @@ export async function deletePhotos(form: FormData) {
   const supabase=await db();
   const { data: photos }=await supabase.from("photos").select("id,original_path,preview_path,thumbnail_path,download_path").eq("gallery_id",gallery).in("id",ids);
   const paths=(photos??[]).flatMap(photoStoragePaths);
+  // DB-first so a failed delete never orphans storage objects behind photos
+  // that still exist (see deletePhoto).
+  const { error }=await supabase.from("photos").delete().eq("gallery_id",gallery).in("id",ids);
+  if(error) return redirect(`/admin/galleries/${gallery}?error=photos-delete`);
   if(paths.length){
     try {
       await photoStore().removePhotos(paths);
@@ -460,8 +470,6 @@ export async function deletePhotos(form: FormData) {
       return redirect(`/admin/galleries/${gallery}?error=photos-storage-delete`);
     }
   }
-  const { error }=await supabase.from("photos").delete().eq("gallery_id",gallery).in("id",ids);
-  if(error) return redirect(`/admin/galleries/${gallery}?error=photos-delete`);
   revalidatePath(`/admin/galleries/${gallery}`);
   revalidatePath(`/admin/galleries/${gallery}/${folder}`);
 }

@@ -100,6 +100,7 @@ export function CollectionEditor({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectionAnchor, setSelectionAnchor] = useState<string | null>(null);
   const selectionAnchorRef = useRef<string | null>(null);
+  const selectionModifierRef = useRef({ shiftKey: false, additive: false });
   const [search, setSearch] = useState("");
   const [uploading, setUploading] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);

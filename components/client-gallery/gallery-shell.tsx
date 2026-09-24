@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState, type Ref } from "react";
-import { Heart, MoreVertical } from "lucide-react";
+import { useEffect, useRef, useState, type Ref } from "react";
+import { Download, Heart, Share2 } from "lucide-react";
 import { GalleryOverview, type GalleryOverviewHandle, type GallerySet } from "@/components/client-gallery/gallery-overview";
 import { ClientAccessDialog } from "@/components/client-gallery/client-access-dialog";
 import { GalleryIdentityProvider, useGalleryIdentity } from "@/components/client-gallery/profile-identity";
@@ -30,7 +30,35 @@ export function GalleryShell({
   clientGate: boolean;
 }) {
   const [count, setCount] = useState(selectedIds.length);
+  const [shareNote, setShareNote] = useState<string | null>(null);
   const overviewRef = useRef<GalleryOverviewHandle>(null);
+  const shareTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (shareTimer.current) clearTimeout(shareTimer.current); }, []);
+
+  // Reuses the existing gallery share link (the gallery page URL shown in the
+  // admin "Share link" field) — no new URL/token system. Web Share API when
+  // available, otherwise copy the link for pasting anywhere.
+  async function shareGallery() {
+    const url = window.location.href;
+    const data = { title: title || "Destiny gallery", url };
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      try {
+        await navigator.share(data);
+        return;
+      } catch {
+        // User cancelled; fall back to copying the link.
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareNote("Link copied");
+    } catch {
+      setShareNote("Could not copy the link.");
+    }
+    if (shareTimer.current) clearTimeout(shareTimer.current);
+    shareTimer.current = setTimeout(() => setShareNote(null), 2200);
+  }
 
   return (
     <>
@@ -52,10 +80,26 @@ export function GalleryShell({
             <Heart size={20} strokeWidth={1.6} />
             {count > 0 ? <span className="client-topbar-count">{count}</span> : null}
           </button>
-          {role !== "client" && clientGate ? <ClientAccessDialog slug={slug} /> : null}
-          <button aria-label="More options" className="client-topbar-action" title="More options" type="button">
-            <MoreVertical size={20} strokeWidth={1.6} />
+          <button
+            aria-label="Download favourites"
+            className="client-topbar-action"
+            onClick={() => overviewRef.current?.downloadFavorites()}
+            title="Download favourites"
+            type="button"
+          >
+            <Download size={20} strokeWidth={1.6} />
           </button>
+          <button
+            aria-label="Share the gallery"
+            className="client-topbar-action"
+            onClick={() => void shareGallery()}
+            title="Share the gallery"
+            type="button"
+          >
+            <Share2 size={20} strokeWidth={1.6} />
+          </button>
+          {shareNote ? <span aria-live="polite" className="client-topbar-note" role="status">{shareNote}</span> : null}
+          {role !== "client" && clientGate ? <ClientAccessDialog slug={slug} /> : null}
         </div>
         <p className="client-topbar-brand">{brand}</p>
       </header>

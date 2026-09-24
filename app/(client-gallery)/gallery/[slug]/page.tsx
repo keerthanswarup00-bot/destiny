@@ -4,10 +4,9 @@ import { headers } from "next/headers";
 import { GalleryGate } from "@/components/client-gallery/gallery-gate";
 import { GalleryOverview, type GallerySet } from "@/components/client-gallery/gallery-overview";
 import { GalleryShell } from "@/components/client-gallery/gallery-shell";
-import { GalleryHighlight } from "@/components/public/gallery-highlight";
 import { resolveGalleryAccess } from "@/lib/gallery-access";
 import { currentProfile } from "@/lib/gallery-profile";
-import { galleryFolders, galleryFolderPhotos, selectedPhotoIds, viewerSubmission, clientSelectedPhotoIds } from "@/lib/gallery-data";
+import { galleryClient, galleryClientHighlight, galleryFolders, galleryFolderPhotos, selectedPhotoIds, viewerSubmission, clientSelectedPhotoIds } from "@/lib/gallery-data";
 import { GALLERY_SOCIAL_DESCRIPTION, GALLERY_SOCIAL_IMAGE_LONG_EDGE, galleryCoverImagePath, gallerySocialCover, requestHost, siteOrigin, socialCoverImageSize } from "@/lib/gallery-social";
 import { getSiteBranding, getSiteContact } from "@/lib/site/site-content";
 import { SiteFooter } from "@/components/public/site-footer";
@@ -93,9 +92,11 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
   const profile = await currentProfile();
   const profileId = profile?.id ?? null;
 
-  const [folders, selected] = await Promise.all([
+  const [folders, selected, clientCard, highlightResult] = await Promise.all([
     galleryFolders(access.gallery.id),
     selectedPhotoIds(access.gallery.id, profileId),
+    galleryClient(access.gallery.id),
+    galleryClientHighlight(access.gallery.id),
   ]);
 
   // Client-tier data only loads for CLIENT sessions: the official selection and
@@ -108,8 +109,9 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
   const [branding, contact] = await Promise.all([getSiteBranding(), getSiteContact()]);
 
   // Folders stay grouped — no flattening. Each published set (ordered by
-  // sort_order) keeps its own photos (ordered by sort_order) and the gallery
-  // presents every set in one continuous scroll with a set heading.
+  // sort_order) keeps its own photos (ordered by sort_order); the presentation
+  // switches between sets via the set navigation, with the first published set
+  // active on load.
   const sets: GallerySet[] = [];
   for (const folder of folders) {
     const folderPhotos = await galleryFolderPhotos(access.gallery.id, folder.slug);
@@ -121,13 +123,12 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
     });
   }
 
-  // Gallery highlight/cover: the first published set that has a configured
-  // cover. Selection matches the pre-existing logic — explicit cover_photo_id
-  // within the set, else the set's first photo — with the signed client-facing
-  // URLs already provided by galleryFolders. The full-screen viewer uses the
-  // high-resolution derivative (coverFullUrl) so it never upscales a thumbnail.
-  const cover = folders.find(folder => folder.coverUrl) ?? null;
-  const highlight = cover ? { url: (cover.coverFullUrl ?? cover.coverUrl) as string, width: cover.coverWidth, height: cover.coverHeight } : null;
+  // Gallery-level highlight: the ONE photo set via the admin "Gallery
+  // Highlight" editor (galleries.highlight_photo_id). It drives the full-screen
+  // hero for the entire gallery — every set shares it. Folder-level covers are
+  // never used as a client-facing hero; the full-screen hero uses the
+  // high-resolution derivative so it never upscales a thumbnail.
+  const highlight = highlightResult ? { url: (highlightResult.fullUrl ?? highlightResult.url) as string, width: highlightResult.width, height: highlightResult.height } : null;
 
   const brand = branding.short_name || "DESTINY";
 
@@ -135,10 +136,28 @@ export default async function ClientGalleryHome({ params }: { params: Promise<{ 
     <>
       {highlight ? (
         <section className="client-hero">
-          <GalleryHighlight url={highlight.url} width={highlight.width} height={highlight.height} crop={null} />
-          <div aria-hidden="true" className="client-hero-caption">
-            <span className="client-hero-title">{access.gallery.title}</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            alt=""
+            className="client-hero-bg"
+            decoding="async"
+            fetchPriority="high"
+            height={highlight.height ?? undefined}
+            src={highlight.url}
+            width={highlight.width ?? undefined}
+          />
+          <div aria-hidden="true" className="client-hero-scrim" />
+          <div className="client-hero-content">
             <span className="client-hero-brand">{brand}</span>
+            {clientCard?.name ? <p className="client-hero-title">{clientCard.name}</p> : null}
+            <span className="client-hero-gallery">{access.gallery.title}</span>
+            <a
+              aria-label={`View the ${access.gallery.title} gallery`}
+              className="client-hero-cta"
+              href="#client-gallery-grid"
+            >
+              View gallery
+            </a>
           </div>
         </section>
       ) : null}

@@ -6,7 +6,7 @@ import { GalleryWorkspace, type WorkspacePhoto } from "@/components/client-galle
 import { consumePendingAction } from "@/components/client-gallery/profile-identity";
 import { SelectionBar } from "@/components/client-gallery/selection-bar";
 import { SelectionReview } from "@/components/client-gallery/selection-review";
-import { FavoritesReview } from "@/components/client-gallery/favorites-review";
+import { FavoritesReview, type FavoritesReviewHandle } from "@/components/client-gallery/favorites-review";
 
 export type GallerySet = {
   id: string;
@@ -17,6 +17,7 @@ export type GallerySet = {
 
 export type GalleryOverviewHandle = {
   openReview: () => void;
+  downloadFavorites: () => void;
 };
 
 export function GalleryOverview({
@@ -46,6 +47,7 @@ export function GalleryOverview({
   const [favoritesOpen, setFavoritesOpen] = useState(false);
   const [clientReviewOpen, setClientReviewOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const favoritesRef = useRef<FavoritesReviewHandle>(null);
 
   useEffect(() => {
     onCountChange?.(favoriteIds.size);
@@ -68,12 +70,37 @@ export function GalleryOverview({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identified, slug]);
 
-  useImperativeHandle(ref, () => ({ openReview: () => setFavoritesOpen(true) }), []);
+  useImperativeHandle(ref, () => ({ openReview: () => setFavoritesOpen(true), downloadFavorites }), []);
 
-  // Only sets that actually contain photos are rendered; empty published sets
-  // never produce empty grids, and the whole gallery flows in one continuous
-  // scroll with no tab switching.
+  // Toolbar "Download": open the favourites review and start the existing
+  // favourites download there (identity flow + signed-derivative handling are
+  // all reused — favourites are the gallery-level download source).
+  function downloadFavorites() {
+    setFavoritesOpen(true);
+    favoritesRef.current?.download();
+  }
+
+  // Only sets that actually contain photos are surfaced; empty published sets
+  // never produce empty grids. The gallery presents ONE active set at a time:
+  // the set navigation switches which grid is visible instead of appending
+  // every set down the page.
   const visibleSets = useMemo(() => sets.filter(set => set.photos.length > 0), [sets]);
+
+  // Default set on load: the first published set that has photos. The current
+  // selection is resolved against the visible set list at render time, so it
+  // always points at an existing set even if sets are added or removed later.
+  const [activeSetId, setActiveSetId] = useState<string | null>(null);
+  const resolvedActiveId =
+    activeSetId && visibleSets.some(set => set.id === activeSetId) ? activeSetId : (visibleSets[0]?.id ?? null);
+  const activeSet = visibleSets.find(set => set.id === resolvedActiveId) ?? null;
+
+  // Keep the active set visible (and not clipped) inside the horizontally
+  // scrollable nav, especially on small screens.
+  const setNavRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const activeButton = setNavRef.current?.querySelector<HTMLElement>(".client-set-nav-item.is-active");
+    activeButton?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [resolvedActiveId]);
 
   const allPhotos = useMemo(
     () => visibleSets.flatMap(set => set.photos.map(photo => ({ ...photo, selected: favoriteIds.has(photo.id) }))),
@@ -200,17 +227,34 @@ export function GalleryOverview({
 
   return (
     <div className="client-gallery-content" id="client-gallery-grid">
-      {visibleSets.map(set => (
-        <section className="client-set" key={set.id}>
-          <h2 className="client-set-title">{set.name}</h2>
+      {visibleSets.length > 1 ? (
+        <nav aria-label="Photo sets" className="client-set-nav" ref={setNavRef}>
+          {visibleSets.map(set => {
+            const isActive = set.id === activeSet?.id;
+            return (
+              <button
+                aria-current={isActive ? "true" : undefined}
+                className={`client-set-nav-item${isActive ? " is-active" : ""}`}
+                key={set.id}
+                onClick={() => setActiveSetId(set.id)}
+                type="button"
+              >
+                {set.name}
+              </button>
+            );
+          })}
+        </nav>
+      ) : null}
+      {activeSet ? (
+        <section className="client-set" key={activeSet.id}>
           <GalleryWorkspace
             clientMode={clientMode}
             clientSubmitted={submittedState}
-            folder={set.slug}
+            folder={activeSet.slug}
             identified={identified}
             onClientToggle={(photoId, next) => toggleClient(photoId, next)}
             onFavoriteChange={updateFavorite}
-            photos={set.photos.map(photo => ({
+            photos={activeSet.photos.map(photo => ({
               ...photo,
               selected: favoriteIds.has(photo.id),
               clientSelected: clientSelectionIds.has(photo.id),
@@ -218,7 +262,7 @@ export function GalleryOverview({
             slug={slug}
           />
         </section>
-      ))}
+      ) : null}
       {clientMode ? (
         <>
           <SelectionBar
@@ -249,6 +293,7 @@ export function GalleryOverview({
         onToggle={photoId => { void applyFavorite(photoId, false); }}
         open={favoritesOpen}
         photos={allPhotos}
+        ref={favoritesRef}
         slug={slug}
       />
     </div>

@@ -1,30 +1,25 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Download, ExternalLink, Heart } from "lucide-react";
 import { downloadGalleryPhotos } from "@/app/(client-gallery)/gallery/actions";
 import { consumePendingAction, useGalleryIdentity } from "@/components/client-gallery/profile-identity";
 import type { WorkspacePhoto } from "@/components/client-gallery/gallery-workspace";
 
+export type FavoritesReviewHandle = { download: () => void };
+
 /**
  * Personal favourites review. Distinct from the official client selection: this
  * dialog can remove favourites and download them, but never submits anything.
  */
-export function FavoritesReview({
-  photos,
-  slug,
-  open,
-  onClose,
-  onToggle,
-  onClear,
-}: {
+export const FavoritesReview = forwardRef<FavoritesReviewHandle, {
   photos: WorkspacePhoto[];
   slug: string;
   open: boolean;
   onClose: () => void;
   onToggle: (photoId: string) => void;
   onClear?: () => void;
-}) {
+}>(function FavoritesReview({ photos, slug, open, onClose, onToggle, onClear }, ref) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [downloading, setDownloading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -46,7 +41,7 @@ export function FavoritesReview({
     return () => node.removeEventListener("close", handle);
   }, [onClose]);
 
-  async function download() {
+  const download = useCallback(async () => {
     if (!selected.length || downloading) return;
     const photoIds = selected.map(photo => photo.id);
     setDownloading(true);
@@ -86,7 +81,9 @@ export function FavoritesReview({
       }
     }
     setMessage(failures ? `${failures} ${failures === 1 ? "download" : "downloads"} could not be started.` : `${result.items.length} ${result.items.length === 1 ? "photo" : "photos"} downloaded.`);
-  }
+  }, [downloading, requestIdentity, selected, slug]);
+
+  useImperativeHandle(ref, () => ({ download }), [download]);
 
   // Re-run a favourites download that prompted the email entry once the profile is identified.
   useEffect(() => {
@@ -143,4 +140,4 @@ export function FavoritesReview({
       </div>
     </dialog>
   );
-}
+});

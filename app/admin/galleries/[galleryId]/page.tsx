@@ -20,7 +20,7 @@ export default async function GalleryDetail({
   const host = headerList.get("x-forwarded-host") || headerList.get("host") || "localhost:3000";
   const proto = headerList.get("x-forwarded-proto") || "http";
   const db = await adminDb();
-  const { data: gallery } = await db.from("galleries").select("id,title,slug,description,status,client_id,password_hash,client_password_hash,created_at").eq("id", galleryId).maybeSingle();
+  const { data: gallery } = await db.from("galleries").select("id,title,slug,description,status,client_id,password_hash,client_password_hash,highlight_photo_id,created_at").eq("id", galleryId).maybeSingle();
   if (!gallery) notFound();
   const shareUrl = `${proto}://${host}/gallery/${gallery.slug}`;
 
@@ -60,6 +60,14 @@ for (const folder of folders ?? []) {
   coversByFolder[folder.id] = pick?.src ?? null;
   if (!coverUrl && pick?.src) coverUrl = pick.src;
 }
+
+// The gallery-level client highlight (galleries.highlight_photo_id) resolves to
+// any photo in the gallery regardless of set; null until one is configured.
+const highlightPhoto = (photos ?? []).find(photo => photo.id === gallery.highlight_photo_id);
+const highlight = {
+  id: gallery.highlight_photo_id,
+  src: highlightPhoto ? (urlByPath.get(highlightPhoto.thumbnail_path || highlightPhoto.preview_path || highlightPhoto.original_path) ?? null) : null,
+};
 
   const galleryError = error === "invalid-gallery" ? message : null;
   const folderError =
@@ -103,6 +111,7 @@ for (const folder of folders ?? []) {
       <GallerySettings
         clients={clients ?? []}
         error={galleryError}
+        folders={(folders ?? []).map(folder => ({ id: folder.id, name: folder.name }))}
         gallery={{
           id: gallery.id,
           title: gallery.title,
@@ -114,6 +123,8 @@ for (const folder of folders ?? []) {
           passwordProtected: Boolean(gallery.password_hash),
           clientPasswordProtected: Boolean(gallery.client_password_hash),
         }}
+        highlight={highlight}
+        photosByFolder={photosByFolder}
         shareUrl={shareUrl}
       />
     </>

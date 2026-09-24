@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, Check, ExternalLink, Lock, Trash2 } from "lucide-react";
 import { deleteGallery, updateGallery } from "@/app/admin/crud-actions";
 import { CopyButton } from "@/components/admin/copy-button";
+import { GalleryHighlightEditor } from "@/components/admin/gallery-highlight-editor";
 
 type GallerySettingsValue = {
   id: string;
@@ -43,11 +44,17 @@ export function GallerySettings({
   clients,
   shareUrl,
   error,
+  folders,
+  photosByFolder,
+  highlight,
 }: {
   gallery: GallerySettingsValue;
   clients: { id: string; name: string }[];
   shareUrl: string;
   error?: string | null;
+  folders: { id: string; name: string }[];
+  photosByFolder: Record<string, { id: string; filename: string; src: string; width: number | null; height: number | null }[]>;
+  highlight: { id: string | null; src: string | null };
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const deleteRef = useRef<HTMLDialogElement>(null);
@@ -196,6 +203,13 @@ export function GallerySettings({
             </div>
           </section>
         </form>
+
+        <GalleryHighlightEditor
+          folders={folders}
+          galleryId={gallery.id}
+          highlight={highlight}
+          photosByFolder={photosByFolder}
+        />
 
         <section className="gs-card" id="settings-sharing">
           <div className="gs-card-head">

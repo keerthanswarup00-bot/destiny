@@ -38,6 +38,31 @@ export async function setFolderCover(form: FormData) {
   await invalidateTags("site-stories", "site-portfolio");
 }
 
+/**
+ * Gallery-level highlight used as the ONE client-gallery hero.
+ *
+ * The chosen photo may come from ANY set of the gallery (published or not) —
+ * the gallery-level editor deliberately ignores folder-level covers. Setting it
+ * never touches the photo's folder, ordering, cover, download asset, watermark,
+ * favourites, or selections; it only changes which photo is the gallery hero.
+ */
+export async function setGalleryHighlight(form: FormData) {
+  await requireAdmin();
+  const id = v(form, "id");
+  const photoId = v(form, "photo_id");
+  const supabase = await adminDb();
+  const { data: gallery } = await supabase.from("galleries").select("id").eq("id", id).maybeSingle();
+  if (!gallery) return;
+  if (photoId) {
+    const { data: photo } = await supabase.from("photos").select("id").eq("id", photoId).eq("gallery_id", id).maybeSingle();
+    if (!photo) return;
+  }
+  await supabase.from("galleries").update({ highlight_photo_id: photoId || null }).eq("id", id);
+  revalidatePath(`/admin/galleries/${id}`);
+  revalidatePath(`/gallery/${(await signedGallerySlug(id)) ?? ""}`);
+  await invalidateTags("site-stories", "site-portfolio");
+}
+
 export async function moveFolder(form: FormData) {
   await requireAdmin();
   const id = v(form, "id");

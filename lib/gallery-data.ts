@@ -83,6 +83,51 @@ export async function galleryFolders(galleryId: string): Promise<GalleryFolderCa
   });
 }
 
+export type GalleryClientHighlight = {
+  url: string;
+  fullUrl: string | null;
+  width: number | null;
+  height: number | null;
+};
+
+/**
+ * The ONE gallery-level highlight photo (the client-gallery hero).
+ *
+ * Backed by `galleries.highlight_photo_id` — the only gallery-level photo
+ * reference in the schema. The Website Gallery feature reads the same column
+ * but only ever for its own system-managed gallery row, so client galleries
+ * can use it safely as their hero source. Resolves any photo in the gallery
+ * (any set, published or not) and signs the watermarked client derivatives;
+ * returns null when no highlight is configured or it no longer resolves.
+ */
+export async function galleryClientHighlight(galleryId: string): Promise<GalleryClientHighlight | null> {
+  const db = galleryDb();
+  const { data: gallery } = await db.from("galleries").select("highlight_photo_id").eq("id", galleryId).maybeSingle();
+  if (!gallery?.highlight_photo_id) return null;
+
+  const { data: photo } = await db
+    .from("photos")
+    .select("id,width,height,thumbnail_path,preview_path,original_path")
+    .eq("id", gallery.highlight_photo_id)
+    .eq("gallery_id", galleryId)
+    .maybeSingle();
+  if (!photo) return null;
+
+  const grid = clientFacingObjectPath(photo, "grid");
+  if (!grid) return null;
+  const full = clientFacingObjectPath(photo, "full") ?? grid;
+  const dims = await resolvePhotoDimensions(photo);
+  const urls = await signedClientUrls([grid, full]);
+  const url = urls.get(grid);
+  if (!url) return null;
+  return {
+    url,
+    fullUrl: urls.get(full) ?? null,
+    width: dims.width,
+    height: dims.height,
+  };
+}
+
 export type GalleryOverview = {
   coverUrl: string | null;
   coverWidth: number | null;

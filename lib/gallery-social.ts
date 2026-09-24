@@ -78,15 +78,18 @@ export function socialCoverImageSize(cover: Pick<GallerySocialCover, "width" | "
 }
 
 /**
- * Resolve the highlight/cover photo for a published gallery, using the same
- * selection rule as the gallery landing page (`galleryFolders`): the first
- * published set that has a cover — its explicit cover_photo_id, else its first
- * photo — shown at its high-resolution preview derivative when available.
- * Returns null when the gallery is unpublished/unknown or has no visible cover.
+ * Resolve the highlight/cover photo for a published gallery.
+ *
+ * The primary source is the ONE gallery-level highlight
+ * (`galleries.highlight_photo_id`) — the same photo the client-gallery landing
+ * hero shows. Galleries that have not configured a highlight fall back to the
+ * legacy rule (first published set's explicit cover, else its first photo) so
+ * link previews keep working. Returns null when the gallery is
+ * unpublished/unknown or has no visible cover.
  */
 export async function gallerySocialCover(slug: string, derivative: "full" | "grid" = "full"): Promise<GallerySocialCover | null> {
   const db = galleryDb();
-  const { data: gallery } = await db.from("galleries").select("id,slug,title,status,password_hash").eq("slug", slug).eq("status", "published").maybeSingle();
+  const { data: gallery } = await db.from("galleries").select("id,slug,title,status,password_hash,highlight_photo_id").eq("slug", slug).eq("status", "published").maybeSingle();
   if (!gallery) return null;
 
   // Mirrors resolveGalleryAccess: a truthy password_hash means the gallery is
@@ -94,6 +97,30 @@ export async function gallerySocialCover(slug: string, derivative: "full" | "gri
   // returns 404 and link-preview metadata falls back to the site branding image
   // instead of the protected cover.
   if (gallery.password_hash) return null;
+
+  // 1) Gallery-level highlight (any set — matches the client hero).
+  if (gallery.highlight_photo_id) {
+    const { data: photo } = await db
+      .from("photos")
+      .select("id,thumbnail_path,preview_path,original_path,width,height")
+      .eq("id", gallery.highlight_photo_id)
+      .eq("gallery_id", gallery.id)
+      .maybeSingle();
+    if (photo) {
+      const path = clientFacingObjectPath(photo, derivative) ?? clientFacingObjectPath(photo, "grid");
+      if (path) {
+        const { width, height } = await resolvePhotoDimensions(photo);
+        return {
+          galleryId: gallery.id,
+          slug: gallery.slug,
+          title: gallery.title,
+          path,
+          width,
+          height,
+        };
+      }
+    }
+  }
 
   const [{ data: folders }, { data: photos }] = await Promise.all([
     db.from("folders").select("id,sort_order,published,cover_photo_id").eq("gallery_id", gallery.id).eq("published", true).order("sort_order").order("id"),

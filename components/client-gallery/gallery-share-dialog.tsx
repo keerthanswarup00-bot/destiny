@@ -71,7 +71,7 @@ export function GalleryShareDialog({
     <dialog
       aria-describedby="client-gallery-share-sub"
       aria-labelledby="client-gallery-share-title"
-      className={"client-favorites-dialog" + (closing ? " is-closing" : "")}
+      className={"client-favorites-dialog client-share-dialog" + (closing ? " is-closing" : "")}
       ref={dialogRef}
     >
       <form method="dialog" onSubmit={(event) => event.preventDefault()}>
@@ -83,13 +83,13 @@ export function GalleryShareDialog({
         </div>
 
         <div className="client-share-options" aria-label="Share options">
-          <button className="client-share-option" onClick={() => void shareTo("messages")} type="button">
-            <span className="client-share-option-icon"><MessageCircle size={18} strokeWidth={1.8} /></span>
-            <span>Messages</span>
-          </button>
           <button className="client-share-option" onClick={() => void shareTo("whatsapp")} type="button">
             <span className="client-share-option-icon client-share-option-whatsapp" aria-hidden="true">W</span>
             <span>WhatsApp</span>
+          </button>
+          <button className="client-share-option" onClick={() => void shareTo("messages")} type="button">
+            <span className="client-share-option-icon"><MessageCircle size={18} strokeWidth={1.8} /></span>
+            <span>Messages</span>
           </button>
           <button className="client-share-option" onClick={() => void shareTo("instagram")} type="button">
             <span className="client-share-option-icon client-share-option-instagram" aria-hidden="true">IG</span>

@@ -6,6 +6,8 @@ import { galleryDb } from "@/lib/gallery-db";
 import { photoStore } from "@/lib/storage-provider";
 import { downloadFilename } from "@/lib/client-media";
 
+const activePreparations = new Set<string>();
+
 function u16(value: number) {
   const out = Buffer.allocUnsafe(2);
   out.writeUInt16LE(value, 0);
@@ -187,6 +189,21 @@ export type SetDownloadPreparation = {
 };
 
 export async function prepareSetDownload(
+  galleryId: string,
+  folderId: string,
+): Promise<SetDownloadPreparation> {
+  const lockKey = `${galleryId}:${folderId}`;
+  if (activePreparations.has(lockKey)) return { status: "preparing" };
+  activePreparations.add(lockKey);
+
+  try {
+    return await prepareSetDownloadUnlocked(galleryId, folderId);
+  } finally {
+    activePreparations.delete(lockKey);
+  }
+}
+
+async function prepareSetDownloadUnlocked(
   galleryId: string,
   folderId: string,
 ): Promise<SetDownloadPreparation> {

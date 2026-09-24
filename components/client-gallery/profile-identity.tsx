@@ -107,8 +107,7 @@ function ProfileIdentityDialog({ open, onClose, onIdentified }: { open: boolean;
   return (
     <dialog aria-describedby="client-gallery-identity-sub" aria-labelledby="client-gallery-identity-title" className={`client-favorites-dialog${closing ? " is-closing" : ""}`} ref={dialogRef}>
       <form onSubmit={event => { event.preventDefault(); void identify(); }}>
-        <h2 id="client-gallery-identity-title">Save your photos</h2>
-        <p id="client-gallery-identity-sub">Enter your email so your favourites follow you on any device. Your email is used for identification only &mdash; it never grants access to your gallery.</p>
+        <div><h2 id="client-gallery-identity-title">Save your favourites</h2><p id="client-gallery-identity-sub">Enter your email to save your favourites and keep them linked to you across devices. Your email is used for identification only and does not grant gallery access.</p></div>
         <input
           aria-label="Your email"
           autoComplete="email"
@@ -132,7 +131,7 @@ function ProfileIdentityDialog({ open, onClose, onIdentified }: { open: boolean;
         </label>
         <div className="client-favorites-actions">
           <button className="client-clear-button" disabled={identifying} onClick={onClose} type="button">Cancel</button>
-          <button className="client-submit-button" disabled={identifying || !email.trim()} type="submit">{identifying ? "Saving…" : "Continue"}</button>
+          <button className="client-submit-button" disabled={identifying || !email.trim()} type="submit">{identifying ? "Saving…" : "Save favourites"}</button>
         </div>
       </form>
     </dialog>

@@ -1,11 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function GalleryDownloadDialog({ slug, title, setSlug, setName, onClose }: { slug: string; title: string; setSlug: string; setName: string; onClose: () => void }) {
   const [pin, setPin] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (!dialog.open) dialog.showModal();
+    return () => { if (dialog.open) dialog.close(); };
+  }, []);
 
   async function downloadAll() {
     if (pending) return;
@@ -53,7 +61,7 @@ export function GalleryDownloadDialog({ slug, title, setSlug, setName, onClose }
   }
 
   return (
-    <dialog className="client-favorites-dialog" open>
+    <dialog className="client-favorites-dialog" onCancel={onClose} ref={dialogRef}>
       <form
         onSubmit={event => {
           event.preventDefault();

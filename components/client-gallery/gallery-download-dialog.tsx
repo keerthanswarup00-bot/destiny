@@ -3,15 +3,14 @@
 import { useState } from "react";
 
 export function GalleryDownloadDialog({ slug, title, setSlug, setName, onClose }: { slug: string; title: string; setSlug: string; setName: string; onClose: () => void }) {
-  const [email, setEmail] = useState("");
   const [pin, setPin] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function downloadAll() {
     if (pending) return;
-    if (!email.trim() || !pin.trim()) {
-      setError("Enter your email and PIN.");
+    if (!pin.trim()) {
+      setError("Enter the gallery PIN.");
       return;
     }
 
@@ -19,7 +18,6 @@ export function GalleryDownloadDialog({ slug, title, setSlug, setName, onClose }
     setError(null);
     try {
       const form = new FormData();
-      form.set("email", email);
       form.set("pin", pin);
       form.set("set_slug", setSlug);
 
@@ -63,20 +61,11 @@ export function GalleryDownloadDialog({ slug, title, setSlug, setName, onClose }
         }}
       >
         <h2>Download {setName}</h2>
-        <p>Enter your email and gallery PIN to download all photos in this set as one ZIP file.</p>
-        <input
-          aria-label="Your email"
-          autoComplete="email"
-          autoFocus
-          disabled={pending}
-          onChange={event => setEmail(event.target.value)}
-          placeholder="Your email"
-          type="email"
-          value={email}
-        />
+        <p>Enter the gallery PIN to download all photos in this set as one ZIP file.</p>
         <input
           aria-label="Gallery PIN"
           autoComplete="current-password"
+          autoFocus
           disabled={pending}
           inputMode="numeric"
           onChange={event => setPin(event.target.value)}

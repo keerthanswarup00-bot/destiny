@@ -34,7 +34,7 @@ export function GalleryShell({
   const [shareNote, setShareNote] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
-  const [downloadSet, setDownloadSet] = useState<{ slug: string; name: string } | null>(null);
+  const [downloadSet, setDownloadSet] = useState<{ slug: string; name: string } | null>(sets[0] ? { slug: sets[0].slug, name: sets[0].name } : null);
   const overviewRef = useRef<GalleryOverviewHandle>(null);
   const shareTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 

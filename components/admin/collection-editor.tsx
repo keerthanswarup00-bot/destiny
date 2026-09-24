@@ -609,7 +609,7 @@ export function CollectionEditor({
                 <span className="muted">Current PIN</span>
                 <div className="ce-pin-value">
                   <code>{downloadPasswordFor.downloadPassword}</code>
-                  <CopyButton text={downloadPasswordFor.downloadPassword} />
+                  <CopyButton label="Copy PIN" text={downloadPasswordFor.downloadPassword} />
                 </div>
                 <small>Send this PIN to the client for downloads.</small>
               </div>

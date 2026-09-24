@@ -95,25 +95,27 @@ export function GalleryHighlightEditor({
             <h2>Gallery highlight</h2>
             <p className="muted">Pick the ONE photo shown as the client gallery&rsquo;s hero. Photos are grouped by set for convenience.</p>
             {totalPhotos ? (
-              folders.map(folder => {
-                const photos = photosByFolder[folder.id] ?? [];
-                if (!photos.length) return null;
-                return (
-                  <fieldset className="gh-group" key={folder.id}>
-                    <legend>{folder.name}</legend>
-                    <div className="cover-picker-grid">
-                      {photos.map(photo => (
-                        <label className="cover-picker-option" key={photo.id}>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img alt="" height={photo.height ?? undefined} loading="lazy" src={photo.src} width={photo.width ?? undefined} />
-                          <input defaultChecked={highlight.id === photo.id} name="photo_id" type="radio" value={photo.id} />
-                          <span>Highlight</span>
-                        </label>
-                      ))}
-                    </div>
-                  </fieldset>
-                );
-              })
+              <div className="gh-picker">
+                {folders.map(folder => {
+                  const photos = photosByFolder[folder.id] ?? [];
+                  if (!photos.length) return null;
+                  return (
+                    <fieldset className="gh-group" key={folder.id}>
+                      <legend>{folder.name}</legend>
+                      <div className="gh-picker-grid">
+                        {photos.map(photo => (
+                          <label className="gh-picker-option" key={photo.id}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img alt={photo.filename} loading="lazy" src={photo.src} />
+                            <input defaultChecked={highlight.id === photo.id} name="photo_id" type="radio" value={photo.id} />
+                            <span>Highlight</span>
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  );
+                })}
+              </div>
             ) : (
               <p className="empty">No photos in this gallery yet.</p>
             )}
@@ -125,6 +127,97 @@ export function GalleryHighlightEditor({
           </form>
         </dialog>
       ) : null}
+
+      <style jsx>{`
+        .gh-picker {
+          display: grid;
+          gap: 20px;
+          max-height: min(62vh, 620px);
+          overflow-y: auto;
+          padding-right: 4px;
+        }
+
+        .gh-group {
+          margin: 0;
+          padding: 0;
+          border: 0;
+        }
+
+        .gh-group legend {
+          margin: 0 0 10px;
+          padding: 0;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: .08em;
+          text-transform: uppercase;
+          color: #333;
+        }
+
+        .gh-picker-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+          gap: 10px;
+        }
+
+        .gh-picker-option {
+          position: relative;
+          display: block;
+          min-width: 0;
+          cursor: pointer;
+          overflow: hidden;
+          border: 1px solid #ddd;
+          border-radius: 6px;
+          background: #fafafa;
+        }
+
+        .gh-picker-option img {
+          display: block;
+          width: 100%;
+          aspect-ratio: 1 / 1;
+          object-fit: cover;
+          background: #eee;
+        }
+
+        .gh-picker-option input {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          margin: 0;
+          opacity: 0;
+          cursor: pointer;
+        }
+
+        .gh-picker-option span {
+          position: absolute;
+          left: 6px;
+          right: 6px;
+          bottom: 6px;
+          display: none;
+          padding: 4px 6px;
+          border-radius: 4px;
+          background: rgba(255,255,255,.92);
+          color: #111;
+          font-size: 10px;
+          font-weight: 700;
+          text-align: center;
+        }
+
+        .gh-picker-option:has(input:checked) {
+          border-color: #111;
+          box-shadow: 0 0 0 2px #111;
+        }
+
+        .gh-picker-option:has(input:checked) span {
+          display: block;
+        }
+
+        @media (max-width: 640px) {
+          .gh-picker-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
+        }
+      `}</style>
     </section>
   );
 }

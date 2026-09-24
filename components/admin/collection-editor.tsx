@@ -28,6 +28,7 @@ import {
   X,
 } from "lucide-react";
 import { AddSetDialog } from "@/components/admin/add-set-dialog";
+import { AdminPhotoPreview } from "@/components/admin/admin-photo-preview";
 import { ApplyWatermarkButton } from "@/components/admin/apply-watermark-button";
 import { CopyButton } from "@/components/admin/copy-button";
 import { DeleteSelectedButton } from "@/components/admin/delete-selected-button";
@@ -111,6 +112,7 @@ export function CollectionEditor({
   const [deleteFor, setDeleteFor] = useState<EditorFolder | null>(null);
   const [downloadPasswordFor, setDownloadPasswordFor] = useState<EditorFolder | null>(null);
   const [toolbarMenuOpen, setToolbarMenuOpen] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState(-1);
   const fileInput = useRef<HTMLInputElement>(null);
   const queueRef = useRef<StagedUploadQueueHandle>(null);
   const renameRef = useRef<HTMLDialogElement>(null);
@@ -537,9 +539,16 @@ export function CollectionEditor({
                     <div className="ws-photo-grid ce-photo-grid">
                       {visible.map(photo => (
                         <div className={`ws-photo${selected.has(photo.id) ? " is-selected" : ""}`} key={photo.id}>
-                          {/* Signed admin-only URL; next/image is a poor fit for short-lived tokens. */}
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img alt={photo.filename} loading="lazy" src={photo.src} />
+                          <button
+                            aria-label={`Preview ${photo.filename}`}
+                            className="ws-photo-preview"
+                            onClick={() => setPreviewIndex(visible.findIndex(item => item.id === photo.id))}
+                            type="button"
+                          >
+                            {/* Signed admin-only URL; next/image is a poor fit for short-lived tokens. */}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img alt={photo.filename} loading="lazy" src={photo.src} />
+                          </button>
                           <button
                             aria-label={selected.has(photo.id) ? `Deselect ${photo.filename}` : `Select ${photo.filename}`}
                             aria-pressed={selected.has(photo.id)}
@@ -590,6 +599,14 @@ export function CollectionEditor({
         </div>
       </div>
 
+      {previewIndex >= 0 ? (
+        <AdminPhotoPreview
+          index={previewIndex}
+          onChange={setPreviewIndex}
+          onClose={() => setPreviewIndex(-1)}
+          photos={visible}
+        />
+      ) : null}
       {renameFor ? (
         <dialog className="admin-dialog" onCancel={() => setRenameFor(null)} ref={renameRef}>
           <form action={renameFolder} onSubmit={() => setRenameFor(null)}>

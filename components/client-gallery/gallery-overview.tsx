@@ -53,17 +53,6 @@ export function GalleryOverview({
     onCountChange?.(favoriteIds.size);
   }, [favoriteIds, onCountChange]);
 
-  // The email identity action sets the profile cookie in a Server Action. Next.js
-  // re-renders the Server Components while preserving this client component's
-  // local state, so explicitly reconcile the server-provided favourites here.
-  // This is what makes an existing profile's favourites appear immediately on
-  // the same device after the visitor enters their email, without requiring a
-  // full browser reload.
-  useEffect(() => {
-    if (!identified) return;
-    setFavoriteIds(new Set(selectedIds));
-  }, [identified, selectedIds]);
-
   // Re-apply the action that triggered the email entry once the profile is
   // identified. The pending action is consumed (cleared) in the same read, so
   // this only fires once per flip of the identified state.

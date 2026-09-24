@@ -575,7 +575,7 @@ export function CollectionEditor({
         <dialog className="admin-dialog" onCancel={() => setCoverFor(null)} ref={coverRef}>
           <form action={setFolderCover} onSubmit={() => { setCoverFor(null); router.refresh(); }}>
             <h2>Highlight image</h2>
-            <p className="muted">Pick the photo shown on this set's highlight.</p>
+            <p className="muted">Pick the photo shown on this set&apos;s highlight.</p>
             {(photosByFolder[coverFor.id] ?? []).length ? (
               <div className="cover-picker-grid">
                 {(photosByFolder[coverFor.id] ?? []).map(photo => (
@@ -605,7 +605,7 @@ export function CollectionEditor({
             <div className="ce-dialog-heading">
               <div>
                 <h2>{downloadPasswordFor.hasDownloadPassword ? "Download PIN" : "Set download PIN"}</h2>
-                <p className="muted">Protect this set's ZIP download with a separate PIN. The gallery access password is not used here.</p>
+                <p className="muted">Protect this set&apos;s ZIP download with a separate PIN. The gallery access password is not used here.</p>
               </div>
             </div>
 

@@ -2,7 +2,6 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from "react";
 import { Download, ExternalLink, Heart } from "lucide-react";
-import { downloadGalleryPhotos } from "@/app/(client-gallery)/gallery/actions";
 import { consumePendingAction, useGalleryIdentity } from "@/components/client-gallery/profile-identity";
 import { useAnimatedDialog } from "@/components/client-gallery/use-animated-dialog";
 import type { WorkspacePhoto } from "@/components/client-gallery/gallery-workspace";
@@ -40,47 +39,38 @@ export const FavoritesReview = forwardRef<FavoritesReviewHandle, {
       setStatus({ kind: "info", text: "Add a few favourites first, then download them here." });
       return;
     }
-    const photoIds = selected.map(photo => photo.id);
-    setDownloading(true);
-    setStatus(null);
-    const form = new FormData();
-    form.set("slug", slug);
-    for (const id of photoIds) form.append("photo_id", id);
-    const result = await downloadGalleryPhotos(form);
-    setDownloading(false);
-    if (result.needsIdentity) {
+    if (!identified) {
       requestIdentity({ kind: "download-favorites" });
       setStatus({ kind: "info", text: "Enter your email to download your favourites." });
       return;
     }
-    if (result.error || !result.items.length) {
-      setStatus({ kind: "error", text: result.error ?? "The download could not be started." });
-      return;
-    }
-    let failures = 0;
-    for (const item of result.items) {
-      if (!item.url || !item.filename) {
-        failures += 1;
-        continue;
+
+    setDownloading(true);
+    setStatus(null);
+    try {
+      const response = await fetch(`/api/gallery/${encodeURIComponent(slug)}/favorites.zip`, {
+        credentials: "same-origin",
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null) as { error?: string } | null;
+        throw new Error(body?.error || "The download could not be started.");
       }
-      try {
-        const blob = await fetch(item.url).then(res => res.blob());
-        const href = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
-        anchor.href = href;
-        anchor.download = item.filename;
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
-        URL.revokeObjectURL(href);
-      } catch {
-        window.open(item.url, "_blank", "noopener");
-      }
+      const blob = await response.blob();
+      const href = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = href;
+      anchor.download = `favourites-${slug}.zip`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(href);
+      setStatus({ kind: "info", text: "Your favourites ZIP is downloading." });
+    } catch (error) {
+      setStatus({ kind: "error", text: error instanceof Error ? error.message : "The download could not be started." });
+    } finally {
+      setDownloading(false);
     }
-    setStatus(failures
-      ? { kind: "error", text: `${failures} ${failures === 1 ? "download" : "downloads"} could not be started.` }
-      : { kind: "info", text: `${result.items.length} ${result.items.length === 1 ? "photo" : "photos"} downloaded.` });
-  }, [downloading, requestIdentity, selected, slug]);
+  }, [downloading, identified, requestIdentity, selected.length, slug]);
 
   useImperativeHandle(ref, () => ({ download }), [download]);
 

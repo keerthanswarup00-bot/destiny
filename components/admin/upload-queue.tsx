@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { ImagePlus, Upload, X } from "lucide-react";
 
 const ACCEPTED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
@@ -37,14 +37,19 @@ export const StagedUploadQueue = forwardRef<
 >(function StagedUploadQueue({ onCommit, uploading, onBrowse, onError }, ref) {
   const [files, setFiles] = useState<StagedFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
+  const filesRef = useRef<StagedFile[]>([]);
 
-  const count = files.length;
+  useEffect(() => {
+    filesRef.current = files;
+  }, [files]);
 
   useEffect(() => {
     return () => {
-      for (const item of files) URL.revokeObjectURL(item.previewUrl);
+      for (const item of filesRef.current) URL.revokeObjectURL(item.previewUrl);
     };
-  }, [files]);
+  }, []);
+
+  const count = files.length;
 
   const totalSize = useMemo(
     () => files.reduce((total, item) => total + item.file.size, 0),

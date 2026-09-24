@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Check, Copy, Facebook, Instagram, MessageCircle, Share2 } from "lucide-react";
+import { Check, Copy, Facebook, Instagram, MessageCircle } from "lucide-react";
 import { useAnimatedDialog } from "@/components/client-gallery/use-animated-dialog";
 
 export function GalleryShareDialog({
@@ -14,12 +14,10 @@ export function GalleryShareDialog({
   title: string;
 }) {
   const [copied, setCopied] = useState(false);
-  const [sharing, setSharing] = useState(false);
   const linkInputRef = useRef<HTMLInputElement | null>(null);
 
   function handleClose() {
     setCopied(false);
-    setSharing(false);
     onClose();
   }
 
@@ -67,29 +65,6 @@ export function GalleryShareDialog({
           : `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`;
 
     window.open(target, "_blank", "noopener,noreferrer");
-  }
-
-  async function shareLink() {
-    if (sharing || typeof navigator === "undefined") return;
-
-    const url = window.location.href;
-    if (typeof navigator.share !== "function") {
-      await copyLink();
-      return;
-    }
-
-    setSharing(true);
-    try {
-      await navigator.share({
-        title: title || "Destiny gallery",
-        url,
-      });
-      handleClose();
-    } catch {
-      // Keep the modal open when the native share sheet is cancelled.
-    } finally {
-      setSharing(false);
-    }
   }
 
   return (

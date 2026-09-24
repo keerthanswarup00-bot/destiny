@@ -114,7 +114,11 @@ export function GalleryOverview({
   }, [resolvedActiveId]);
 
   const allPhotos = useMemo(
-    () => visibleSets.flatMap(set => set.photos.map(photo => ({ ...photo, selected: favoriteIds.has(photo.id) }))),
+    () => visibleSets.flatMap(set => set.photos.map(photo => ({
+      ...photo,
+      setName: set.name,
+      selected: favoriteIds.has(photo.id),
+    }))),
     [visibleSets, favoriteIds],
   );
   const favouritePhotos = useMemo(() => allPhotos.filter(photo => photo.selected), [allPhotos]);

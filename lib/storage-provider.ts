@@ -76,6 +76,7 @@ export type PhotoStore = {
   objectBytes(key: string): Promise<number | null>;
   objectExists(key: string): Promise<boolean>;
   listKeys(): Promise<string[]>;
+  uploadStream?(opts: { key: string; parts: AsyncIterable<Buffer>; contentType: string }): Promise<void>;
 };
 
 function activeProvider(): "supabase" | "r2" {
@@ -185,6 +186,11 @@ const r2PhotoStore: PhotoStore = {
   uploadPhoto({ key, body, contentType, metadata }) {
     r2ExistenceCache.set(key, true);
     return uploadObject({ key, body, contentType, metadata });
+  },
+  async uploadStream({ key, parts, contentType }) {
+    const { uploadMultipartObject } = await import("@/lib/r2");
+    await uploadMultipartObject(key, parts, contentType);
+    r2ExistenceCache.set(key, true);
   },
   async removePhotos(keys) {
     for (const key of keys) r2ExistenceCache.set(key, false);

@@ -1,5 +1,5 @@
 "use server";
-import { revalidatePath, revalidateTag } from "next/cache";
+import { redirect, revalidatePath, revalidateTag } from "next/cache";
 import { adminDb } from "@/lib/admin-data";
 import { requireAdmin } from "@/lib/auth";
 import { HIGHLIGHT_MAX_ZOOM, normalizeHighlightCrop } from "@/lib/site/website-gallery";

@@ -334,12 +334,6 @@ html{scroll-behavior:smooth}
 .justified-grid--column .justified-open{display:block;width:100%;height:auto}
 .justified-grid--column .justified-open img{width:100%;height:auto}
 @media(max-width:600px){
-  .client-gallery .client-topbar-title{font-size:clamp(24px,7vw,34px)}
-  .client-gallery .client-topbar{padding-top:6px}
-  .client-gallery .client-topbar-head{flex-wrap:wrap;row-gap:6px}
-  .client-gallery .client-topbar-gate{margin-top:8px}
-  .client-gallery .client-topbar-action{width:38px;height:38px;min-width:38px;font-size:15px}
-  .client-gallery .client-topbar-favorites{padding:0}
   .client-hero-brand{letter-spacing:.22em}
   .client-hero-gallery{font-size:11px;letter-spacing:.18em}
   .client-hero-title{font-size:clamp(32px,9vw,56px)}

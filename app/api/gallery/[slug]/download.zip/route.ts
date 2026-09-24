@@ -17,14 +17,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   try {
     const { slug } = await params;
     const gallery = await requireGalleryAccess(slug);
+    const { data: credentials } = await galleryDb()
+      .from("galleries")
+      .select("password_hash,client_password_hash")
+      .eq("id", gallery.id)
+      .maybeSingle();
     const form = await request.formData();
     const email = normalizeProfileEmail(String(form.get("email") ?? ""));
     const pin = String(form.get("pin") ?? "");
     if (!isValidProfileEmail(email) || !pin) return NextResponse.json({ error: "Enter your email and PIN." }, { status: 400 });
 
     const pinValid =
-      (gallery.password_hash ? await verifyGalleryPassword(pin, gallery.password_hash) : false) ||
-      (gallery.client_password_hash ? await verifyGalleryPassword(pin, gallery.client_password_hash) : false);
+      (credentials?.password_hash ? await verifyGalleryPassword(pin, credentials.password_hash) : false) ||
+      (credentials?.client_password_hash ? await verifyGalleryPassword(pin, credentials.client_password_hash) : false);
     if (!pinValid) return NextResponse.json({ error: "The email or PIN is incorrect." }, { status: 401 });
 
     const profile = await upsertProfile(email, false);

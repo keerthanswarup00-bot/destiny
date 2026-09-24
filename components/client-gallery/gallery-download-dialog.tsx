@@ -59,13 +59,13 @@ export function GalleryDownloadDialog({
           <p id="client-gallery-download-sub">Enter the PIN for this set to download all photos as one ZIP file.</p>
         </div>
         <input
-          aria-label="Gallery PIN"
+          aria-label="Set download PIN"
           autoComplete="current-password"
           autoFocus
           disabled={pending}
           inputMode="numeric"
           onChange={event => { setPin(event.target.value); if (error) setError(null); }}
-          placeholder="Gallery PIN"
+          placeholder="Set download PIN"
           type="password"
           value={pin}
         />

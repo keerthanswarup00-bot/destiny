@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Check, Copy, Facebook, Instagram, MessageCircle } from "lucide-react";
+import { Check, Copy, MessageCircle } from "lucide-react";
 import { useAnimatedDialog } from "@/components/client-gallery/use-animated-dialog";
 
 export function GalleryShareDialog({
@@ -92,11 +92,11 @@ export function GalleryShareDialog({
             <span>WhatsApp</span>
           </button>
           <button className="client-share-option" onClick={() => void shareTo("instagram")} type="button">
-            <span className="client-share-option-icon"><Instagram size={18} strokeWidth={1.8} /></span>
+            <span className="client-share-option-icon client-share-option-instagram" aria-hidden="true">IG</span>
             <span>Instagram</span>
           </button>
           <button className="client-share-option" onClick={() => void shareTo("facebook")} type="button">
-            <span className="client-share-option-icon"><Facebook size={18} strokeWidth={1.8} /></span>
+            <span className="client-share-option-icon client-share-option-facebook" aria-hidden="true">f</span>
             <span>Facebook</span>
           </button>
         </div>

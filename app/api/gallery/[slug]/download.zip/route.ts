@@ -25,7 +25,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     const { slug } = await params;
     const gallery = await requireGalleryAccess(slug);
     const form = await request.formData();
-    const setId = String(form.get("set_id") ?? "").trim();
     const setSlug = String(form.get("set_slug") ?? "").trim();
     const pin = String(form.get("pin") ?? "").trim();
     if (!pin) return NextResponse.json({ error: "Enter the set download PIN." }, { status: 400 });
@@ -33,7 +32,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     const db = galleryDb();
     const [{ data: photos }, { data: folders }] = await Promise.all([
       db.from("photos").select("id,folder_id,filename,sort_order,thumbnail_path,preview_path,download_path,original_path").eq("gallery_id", gallery.id),
-      db.from("folders").select("id,name,slug,sort_order,download_password_hash,download_zip_path,download_zip_signature").eq("gallery_id", gallery.id),
+      db.from("folders").select("id,name,slug,sort_order,download_password_hash,download_zip_path,download_zip_signature").eq("gallery_id", gallery.id).order("sort_order").order("id"),
     ]);
 
     const photosByFolder = new Map<string, NonNullable<typeof photos>>();
@@ -44,13 +43,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     }
     for (const list of photosByFolder.values()) list.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id.localeCompare(b.id));
 
-    const targetFolder = setId
-      ? (folders ?? []).find(folder => folder.id === setId)
-      : setSlug
-        ? (folders ?? []).find(folder => folder.slug === setSlug)
-        : null;
+    const targetFolder = setSlug
+      ? (folders ?? []).find(folder => folder.slug === setSlug)
+      : null;
     if (!targetFolder) {
-      return NextResponse.json({ error: "This photo set could not be found." }, { status: 400 });
+      return NextResponse.json({ error: "This photo set could not be found." }, { status: 404 });
     }
     if (!targetFolder.download_password_hash) {
       return NextResponse.json({ error: "This set is not ready for download yet. Ask the gallery owner to set a download PIN." }, { status: 403 });

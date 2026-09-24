@@ -13,7 +13,7 @@ export function GalleryDownloadDialog({
 
   async function downloadAll() {
     if (pending) return;
-    if (!pin.trim()) { setError("Enter the gallery PIN."); return; }
+    if (!pin.trim()) { setError("Enter the download PIN."); return; }
     setPending(true);
     setError(null);
     try {

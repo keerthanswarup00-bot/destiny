@@ -186,8 +186,9 @@ export function CollectionEditor({
           return next;
         });
 
-        // The most recent shift-click becomes the new range anchor.
-        setAnchor(id);
+        // Shift-click extends from the original anchor.
+        // Keep the anchor unchanged so repeated Shift-clicks behave like
+        // desktop photo managers such as Apple Photos and Google Photos.
         return;
       }
     }

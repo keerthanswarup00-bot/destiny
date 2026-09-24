@@ -57,36 +57,46 @@ export async function POST(
 
     const entries: { name: string; data: Buffer }[] = [];
     let skipped = 0;
+    const results: Array<{ name: string; data: Buffer } | null> = new Array(ordered.length).fill(null);
+    let nextIndex = 0;
+    const concurrency = 8;
 
-    for (const photo of ordered) {
-      const path = photo.download_path || photo.preview_path || photo.thumbnail_path;
-      if (!path) {
-        skipped += 1;
-        continue;
+    const workers = Array.from({ length: Math.min(concurrency, ordered.length) }, async () => {
+      while (nextIndex < ordered.length) {
+        const index = nextIndex++;
+        const photo = ordered[index];
+        const path = photo.download_path || photo.preview_path || photo.thumbnail_path;
+        if (!path) {
+          skipped += 1;
+          continue;
+        }
+
+        const data = await photoStore().downloadBytes(path);
+        if (!data) {
+          skipped += 1;
+          continue;
+        }
+
+        try {
+          const jpeg = /\\.(jpe?g)$/i.test(path)
+            ? data
+            : await sharp(data).jpeg({ quality: 92 }).toBuffer();
+          const filename = downloadFilename({
+            galleryTitle: gallery.title,
+            folderName: folder.name,
+            index: index + 1,
+            photo,
+          }).replace(/\\.[a-z0-9]+$/i, ".jpg");
+          results[index] = { name: filename, data: jpeg };
+        } catch {
+          skipped += 1;
+        }
       }
+    });
 
-      const data = await photoStore().downloadBytes(path);
-      if (!data) {
-        skipped += 1;
-        continue;
-      }
-
-      let jpeg: Buffer;
-      try {
-        jpeg = await sharp(data).jpeg({ quality: 92 }).toBuffer();
-      } catch {
-        skipped += 1;
-        continue;
-      }
-
-      const filename = downloadFilename({
-        galleryTitle: gallery.title,
-        folderName: folder.name,
-        index: ordered.findIndex(item => item.id === photo.id) + 1,
-        photo,
-      }).replace(/\\.[a-z0-9]+$/i, ".jpg");
-
-      entries.push({ name: filename, data: jpeg });
+    await Promise.all(workers);
+    for (const entry of results) {
+      if (entry) entries.push(entry);
     }
 
     if (!entries.length) return NextResponse.json({ error: "This set has no downloadable photos." }, { status: 404 });

@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useAnimatedDialog } from "@/components/client-gallery/use-animated-dialog";
 
 export function GalleryDownloadDialog({
-  slug, title, setId, setSlug, setName, onClose,
-}: { slug: string; title: string; setId: string; setSlug: string; setName: string; onClose: () => void }) {
+  slug, title, setSlug, setName, onClose,
+}: { slug: string; title: string; setSlug: string; setName: string; onClose: () => void }) {
   const [pin, setPin] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +19,6 @@ export function GalleryDownloadDialog({
     try {
       const form = new FormData();
       form.set("pin", pin);
-      form.set("set_id", setId);
       form.set("set_slug", setSlug);
       const response = await fetch("/api/gallery/" + encodeURIComponent(slug) + "/download.zip", { method: "POST", body: form });
       if (!response.ok) {

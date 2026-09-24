@@ -29,7 +29,7 @@ export default async function GalleryDetail({
   const [{ data: client }, { data: clients }, { data: folders }, { data: photos }, { data: branding }, insights, emails] = await Promise.all([
     db.from("clients").select("id,name").eq("id", gallery.client_id).maybeSingle(),
     db.from("clients").select("id,name").order("name"),
-    db.from("folders").select("id,name,slug,parent_folder_id,sort_order,published,cover_photo_id,description").eq("gallery_id", galleryId).order("sort_order").order("id"),
+    db.from("folders").select("id,name,slug,parent_folder_id,sort_order,published,undefined").eq("gallery_id", galleryId).order("sort_order").order("id"),
     db.from("photos").select("id,filename,folder_id,thumbnail_path,preview_path,original_path,width,height,sort_order").eq("gallery_id", galleryId).order("sort_order").order("id"),
     db.from("site_branding").select("watermark_path,watermark_enabled").eq("id", "branding").maybeSingle(),
     galleryViewStats(galleryId),
@@ -96,6 +96,7 @@ const highlight = {
             description: folder.description,
             published: folder.published,
             coverPhotoId: folder.cover_photo_id,
+            hasDownloadPassword: Boolean(folder.download_password_hash),
           }))}
           gallery={{
             id: gallery.id,

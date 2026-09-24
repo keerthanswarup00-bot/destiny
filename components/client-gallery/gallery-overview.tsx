@@ -2,7 +2,7 @@
 
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 import { clearClientSelection, clearPhotoSelection, toggleClientSelection, togglePhotoFavorite } from "@/app/(client-gallery)/gallery/actions";
-import { GalleryWorkspace, type WorkspacePhoto } from "@/components/client-gallery/gallery-workspace";
+import { GalleryWorkspace, type GalleryWorkspaceHandle, type WorkspacePhoto } from "@/components/client-gallery/gallery-workspace";
 import { consumePendingAction } from "@/components/client-gallery/profile-identity";
 import { SelectionBar } from "@/components/client-gallery/selection-bar";
 import { SelectionReview } from "@/components/client-gallery/selection-review";
@@ -18,6 +18,7 @@ export type GallerySet = {
 export type GalleryOverviewHandle = {
   openReview: () => void;
   downloadFavorites: () => void;
+  openSlideshow: () => void;
 };
 
 export function GalleryOverview({
@@ -30,6 +31,7 @@ export function GalleryOverview({
   clientMode,
   onCountChange,
   onActiveSetChange,
+  slideshowRequest,
   ref,
 }: {
   slug: string;
@@ -41,6 +43,7 @@ export function GalleryOverview({
   clientMode?: boolean;
   onCountChange?: (count: number) => void;
   onActiveSetChange?: (set: { id: string; slug: string; name: string }) => void;
+  slideshowRequest?: number;
   ref?: Ref<GalleryOverviewHandle>;
 }) {
   const [favoriteIds, setFavoriteIds] = useState(() => new Set(selectedIds));
@@ -50,6 +53,7 @@ export function GalleryOverview({
   const [clientReviewOpen, setClientReviewOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const favoritesRef = useRef<FavoritesReviewHandle>(null);
+  const workspaceRef = useRef<GalleryWorkspaceHandle>(null);
 
   useEffect(() => {
     onCountChange?.(favoriteIds.size);
@@ -72,7 +76,7 @@ export function GalleryOverview({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identified, slug]);
 
-  useImperativeHandle(ref, () => ({ openReview: () => setFavoritesOpen(true), downloadFavorites }), []);
+  useImperativeHandle(ref, () => ({ openReview: () => setFavoritesOpen(true), downloadFavorites, openSlideshow: () => workspaceRef.current?.openSlideshow() }), []);
 
   // Toolbar "Download": open the favourites review and start the existing
   // favourites download there (identity flow + signed-derivative handling are
@@ -271,6 +275,8 @@ export function GalleryOverview({
               clientSelected: clientSelectionIds.has(photo.id),
             }))}
             slug={slug}
+            ref={workspaceRef}
+            slideshowRequest={slideshowRequest}
           />
         </section>
       ) : null}

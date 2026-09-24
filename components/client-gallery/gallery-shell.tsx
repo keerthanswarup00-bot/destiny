@@ -34,7 +34,7 @@ export function GalleryShell({
   const [count, setCount] = useState(selectedIds.length);
   const [shareOpen, setShareOpen] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
-  const [downloadSet, setDownloadSet] = useState<{ slug: string; name: string } | null>(sets[0] ? { slug: sets[0].slug, name: sets[0].name } : null);
+  const [downloadSet, setDownloadSet] = useState<{ id: string; slug: string; name: string } | null>(sets[0] ? { id: sets[0].id, slug: sets[0].slug, name: sets[0].name } : null);
   const overviewRef = useRef<GalleryOverviewHandle>(null);
 
   return (
@@ -58,10 +58,11 @@ export function GalleryShell({
             {count > 0 ? <span className="client-topbar-count">{count}</span> : null}
           </button>
           <button
-            aria-label="Download all photos"
+            aria-label="Download current set"
             className="client-topbar-action"
+            disabled={!downloadSet}
             onClick={() => setDownloadOpen(true)}
-            title="Download all photos"
+            title={downloadSet ? `Download ${downloadSet.name}` : "Download current set"}
             type="button"
           >
             <Download size={20} strokeWidth={1.6} />
@@ -99,6 +100,7 @@ export function GalleryShell({
       {downloadOpen && downloadSet ? (
         <GalleryDownloadDialog
           onClose={() => setDownloadOpen(false)}
+          setId={downloadSet.id}
           setSlug={downloadSet.slug}
           setName={downloadSet.name}
           slug={slug}
@@ -132,7 +134,7 @@ function GalleryInner({
   submitted: boolean;
   clientMode?: boolean;
   onCountChange?: (count: number) => void;
-  onActiveSetChange?: (set: { slug: string; name: string }) => void;
+  onActiveSetChange?: (set: { id: string; slug: string; name: string }) => void;
   ref?: Ref<GalleryOverviewHandle>;
 }) {
   const { identified } = useGalleryIdentity();

@@ -40,7 +40,7 @@ export function GalleryOverview({
   submitted: boolean;
   clientMode?: boolean;
   onCountChange?: (count: number) => void;
-  onActiveSetChange?: (set: { slug: string; name: string }) => void;
+  onActiveSetChange?: (set: { id: string; slug: string; name: string }) => void;
   ref?: Ref<GalleryOverviewHandle>;
 }) {
   const [favoriteIds, setFavoriteIds] = useState(() => new Set(selectedIds));
@@ -98,7 +98,7 @@ export function GalleryOverview({
 
   useEffect(() => {
     if (!activeSet) return;
-    onActiveSetChange?.({ slug: activeSet.slug, name: activeSet.name });
+    onActiveSetChange?.({ id: activeSet.id, slug: activeSet.slug, name: activeSet.name });
   }, [activeSet, onActiveSetChange]);
 
   // Keep the active set visible (and not clipped) inside the horizontally

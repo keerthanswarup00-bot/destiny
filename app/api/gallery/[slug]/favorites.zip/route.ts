@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import sharp from "sharp";
 import { currentProfile } from "@/lib/gallery-profile";
 import { requireGalleryAccess } from "@/lib/gallery-access";
 import { galleryDb } from "@/lib/gallery-db";
@@ -75,6 +76,14 @@ export async function GET(
         continue;
       }
 
+      let jpeg: Buffer;
+      try {
+        jpeg = await sharp(data).jpeg({ quality: 92 }).toBuffer();
+      } catch {
+        skipped += 1;
+        continue;
+      }
+
       const folder = folderById.get(photo.folder_id);
       const folderName = safeSegment(folder?.name ?? "Gallery", "Gallery");
       const filename = downloadFilename({
@@ -83,8 +92,8 @@ export async function GET(
         index: (photosByFolder.get(photo.folder_id) ?? []).findIndex(item => item.id === photo.id) + 1,
         photo,
       });
-      const finalName = safeSegment(derivativeDownloadName(filename, path), "photograph.jpg");
-      entries.push({ name: folderName + "/" + finalName, data });
+      const finalName = safeSegment(derivativeDownloadName(filename, path).replace(/\.[a-z0-9]+$/i, ".jpg"), "photograph.jpg");
+      entries.push({ name: folderName + "/" + finalName, data: jpeg });
     }
 
     if (!entries.length) {

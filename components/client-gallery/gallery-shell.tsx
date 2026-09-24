@@ -208,6 +208,7 @@ function GalleryInner({
   clientMode,
   onCountChange,
   onActiveSetChange,
+  slideshowRequest,
   ref,
 }: {
   slug: string;
@@ -218,6 +219,7 @@ function GalleryInner({
   clientMode?: boolean;
   onCountChange?: (count: number) => void;
   onActiveSetChange?: (set: { id: string; slug: string; name: string }) => void;
+  slideshowRequest?: number;
   ref?: Ref<GalleryOverviewHandle>;
 }) {
   const { identified } = useGalleryIdentity();
@@ -227,6 +229,7 @@ function GalleryInner({
       identified={identified}
       onCountChange={onCountChange}
       onActiveSetChange={onActiveSetChange}
+      slideshowRequest={slideshowRequest}
       ref={ref}
       clientSelectedIds={clientSelectedIds}
       selectedIds={selectedIds}

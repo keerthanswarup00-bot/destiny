@@ -23,6 +23,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       .eq("id", gallery.id)
       .maybeSingle();
     const form = await request.formData();
+    const setSlug = String(form.get("set_slug") ?? "").trim();
     const email = normalizeProfileEmail(String(form.get("email") ?? ""));
     const pin = String(form.get("pin") ?? "");
     if (!isValidProfileEmail(email) || !pin) return NextResponse.json({ error: "Enter your email and PIN." }, { status: 400 });
@@ -39,7 +40,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     const db = galleryDb();
     const [{ data: photos }, { data: folders }] = await Promise.all([
       db.from("photos").select("id,folder_id,filename,sort_order,thumbnail_path,preview_path,download_path,original_path").eq("gallery_id", gallery.id),
-      db.from("folders").select("id,name,sort_order").eq("gallery_id", gallery.id),
+      db.from("folders").select("id,name,slug,sort_order").eq("gallery_id", gallery.id),
     ]);
 
     const photosByFolder = new Map<string, NonNullable<typeof photos>>();
@@ -50,8 +51,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     }
     for (const list of photosByFolder.values()) list.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id.localeCompare(b.id));
 
-    const folderById = new Map((folders ?? []).map(folder => [folder.id, folder]));
-    const ordered = [...(folders ?? [])]
+    const targetFolder = setSlug ? (folders ?? []).find(folder => folder.slug === setSlug) : null;
+    if (setSlug && !targetFolder) {
+      return NextResponse.json({ error: "That photo set could not be found." }, { status: 404 });
+    }
+    const scopedFolders = targetFolder ? [targetFolder] : (folders ?? []);
+    const folderById = new Map(scopedFolders.map(folder => [folder.id, folder]));
+    const ordered = [...scopedFolders]
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id.localeCompare(b.id))
       .flatMap(folder => photosByFolder.get(folder.id) ?? []);
 
@@ -76,9 +82,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       entries.push({ name: folderName + "/" + filename, data: jpeg });
     }
 
-    if (!entries.length) return NextResponse.json({ error: "The gallery has no downloadable photos." }, { status: 404 });
+    if (!entries.length) return NextResponse.json({ error: "This set has no downloadable photos." }, { status: 404 });
     const zip = createStoredZip(entries);
-    const archiveName = safeSegment(gallery.title, "gallery") + "-photos.zip";
+    const archiveName = safeSegment(gallery.title, "gallery") + "-" + safeSegment(targetFolder?.name ?? "photos", "photos") + ".zip";
     return new NextResponse(zip, {
       headers: {
         "Content-Type": "application/zip",

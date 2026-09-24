@@ -23,7 +23,7 @@ export async function verifyGalleryPassword(password: string, stored: string) {
 }
 
 
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash } from "node:crypto";
 import { accessSecret } from "@/lib/gallery-cookie";
 
 function pinKey() {

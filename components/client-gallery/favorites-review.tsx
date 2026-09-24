@@ -25,6 +25,13 @@ export const FavoritesReview = forwardRef<FavoritesReviewHandle, {
   const [status, setStatus] = useState<{ kind: "info" | "error"; text: string } | null>(null);
   const { requestIdentity, identified } = useGalleryIdentity();
   const selected = photos.filter(photo => photo.selected);
+  const grouped = selected.reduce<Map<string, WorkspacePhoto[]>>((groups, photo) => {
+    const name = photo.setName?.trim() || "Favourites";
+    const existing = groups.get(name);
+    if (existing) existing.push(photo);
+    else groups.set(name, [photo]);
+    return groups;
+  }, new Map());
   const { dialogRef, closing } = useAnimatedDialog({ open, onClose });
 
   const download = useCallback(async () => {
@@ -98,21 +105,31 @@ export const FavoritesReview = forwardRef<FavoritesReviewHandle, {
         </header>
         {selected.length ? (
           <>
-            <div className="client-review-grid">
-              {selected.map(photo => (
-                <figure className="client-review-photo" key={photo.id}>
-                  {/* Signed preview URL; next/image is a poor fit for short-lived tokens. */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img alt="" loading="lazy" src={photo.src} />
-                  <figcaption>
-                    <a aria-label="Open full photo" href={photo.fullSrc || photo.src} rel="noreferrer" target="_blank" title="Open photo">
-                      <ExternalLink size={13} strokeWidth={1.8} />
-                    </a>
-                    <button aria-label="Remove from favourites" onClick={() => onToggle(photo.id)} title="Remove from favourites" type="button">
-                      <Heart fill="currentColor" size={13} strokeWidth={1.8} />
-                    </button>
-                  </figcaption>
-                </figure>
+            <div className="client-review-groups">
+              {[...grouped.entries()].map(([setName, group]) => (
+                <section className="client-review-group" key={setName}>
+                  <header className="client-review-group-head">
+                    <h3>{setName}</h3>
+                    <span>{group.length} {group.length === 1 ? "photo" : "photos"}</span>
+                  </header>
+                  <div className="client-review-grid">
+                    {group.map(photo => (
+                      <figure className="client-review-photo" key={photo.id}>
+                        {/* Signed preview URL; next/image is a poor fit for short-lived tokens. */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img alt="" loading="lazy" src={photo.src} />
+                        <figcaption>
+                          <a aria-label="Open full photo" href={photo.fullSrc || photo.src} rel="noreferrer" target="_blank" title="Open photo">
+                            <ExternalLink size={13} strokeWidth={1.8} />
+                          </a>
+                          <button aria-label="Remove from favourites" onClick={() => onToggle(photo.id)} title="Remove from favourites" type="button">
+                            <Heart fill="currentColor" size={13} strokeWidth={1.8} />
+                          </button>
+                        </figcaption>
+                      </figure>
+                    ))}
+                  </div>
+                </section>
               ))}
             </div>
             <footer className="client-review-foot">

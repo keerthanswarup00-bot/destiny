@@ -130,7 +130,8 @@ export async function POST(
       });
       await Promise.all(workers);
 
-      const readyEntries = entries.filter(Boolean);\n      if (!readyEntries.length) {
+      const readyEntries = entries.filter(Boolean);
+      if (!readyEntries.length) {
         return NextResponse.json({ error: "This set has no downloadable photos." }, { status: 404 });
       }
 

@@ -29,6 +29,7 @@ export function GalleryOverview({
   submitted,
   clientMode,
   onCountChange,
+  onActiveSetChange,
   ref,
 }: {
   slug: string;
@@ -39,6 +40,7 @@ export function GalleryOverview({
   submitted: boolean;
   clientMode?: boolean;
   onCountChange?: (count: number) => void;
+  onActiveSetChange?: (set: { slug: string; name: string }) => void;
   ref?: Ref<GalleryOverviewHandle>;
 }) {
   const [favoriteIds, setFavoriteIds] = useState(() => new Set(selectedIds));
@@ -93,6 +95,11 @@ export function GalleryOverview({
   const resolvedActiveId =
     activeSetId && visibleSets.some(set => set.id === activeSetId) ? activeSetId : (visibleSets[0]?.id ?? null);
   const activeSet = visibleSets.find(set => set.id === resolvedActiveId) ?? null;
+
+  useEffect(() => {
+    if (!activeSet) return;
+    onActiveSetChange?.({ slug: activeSet.slug, name: activeSet.name });
+  }, [activeSet, onActiveSetChange]);
 
   // Keep the active set visible (and not clipped) inside the horizontally
   // scrollable nav, especially on small screens.

@@ -133,15 +133,36 @@ function zipParts(
 
     for (let index = 0; index < photos.length; index += 1) {
       const photo = photos[index];
-      const path = photo.download_path || photo.original_path || photo.preview_path || photo.thumbnail_path;
-      if (!path) continue;
+      const candidates = [
+        photo.download_path,
+        photo.original_path,
+        photo.preview_path,
+        photo.thumbnail_path,
+      ].filter((path): path is string => Boolean(path));
 
-      const data = await photoStore().downloadBytes(path);
-      if (!data) throw new Error(`Could not read photo ${photo.filename || photo.original_path}`);
+      if (!candidates.length) continue;
+
+      let data: Buffer | null = null;
+      let sourcePath: string | null = null;
+
+      for (const candidate of candidates) {
+        const candidateData = await photoStore().downloadBytes(candidate);
+        if (candidateData) {
+          data = candidateData;
+          sourcePath = candidate;
+          break;
+        }
+      }
+
+      if (!data || !sourcePath) {
+        throw new Error(
+          `Could not read photo ${photo.filename || photo.original_path}. Tried: ${candidates.join(", ")}`,
+        );
+      }
 
       let jpeg: Buffer;
       try {
-        jpeg = /\.(jpe?g)$/i.test(path)
+        jpeg = /\.(jpe?g)$/i.test(sourcePath)
           ? data
           : await sharp(data).jpeg({ quality: 92 }).toBuffer();
       } catch (error) {

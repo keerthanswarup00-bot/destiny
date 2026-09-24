@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Check, Copy, Share2 } from "lucide-react";
 import { useAnimatedDialog } from "@/components/client-gallery/use-animated-dialog";
 
@@ -15,6 +15,8 @@ export function GalleryShareDialog({
 }) {
   const [copied, setCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const linkInputRef = useRef<HTMLInputElement | null>(null);
+
   function handleClose() {
     setCopied(false);
     setSharing(false);
@@ -23,9 +25,19 @@ export function GalleryShareDialog({
 
   const { dialogRef, closing } = useAnimatedDialog({ open, onClose: handleClose });
 
+  function syncLinkInput(node: HTMLInputElement | null) {
+    linkInputRef.current = node;
+    if (node && typeof window !== "undefined") {
+      node.value = window.location.href;
+    }
+  }
+
   async function copyLink() {
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    if (!url) return;
+
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(url);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
@@ -34,13 +46,19 @@ export function GalleryShareDialog({
   }
 
   async function shareLink() {
-    if (sharing || typeof navigator.share !== "function") return;
+    if (sharing || typeof navigator === "undefined") return;
+
+    const url = window.location.href;
+    if (typeof navigator.share !== "function") {
+      await copyLink();
+      return;
+    }
 
     setSharing(true);
     try {
       await navigator.share({
         title: title || "Destiny gallery",
-        url: window.location.href,
+        url,
       });
       handleClose();
     } catch {
@@ -50,25 +68,27 @@ export function GalleryShareDialog({
     }
   }
 
-  const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
-
   return (
     <dialog
-      aria-describedby="client-gallery-share-sub" aria-labelledby="client-gallery-share-title"
+      aria-describedby="client-gallery-share-sub"
+      aria-labelledby="client-gallery-share-title"
       className={"client-favorites-dialog" + (closing ? " is-closing" : "")}
       ref={dialogRef}
     >
       <form method="dialog" onSubmit={(event) => event.preventDefault()}>
         <div>
           <h2 id="client-gallery-share-title">Share this gallery</h2>
-          <p id="client-gallery-share-sub">Send this gallery link to family, friends, or anyone you want to share the photos with.</p>
+          <p id="client-gallery-share-sub">
+            Send this gallery link to family, friends, or anyone you want to share the photos with.
+          </p>
         </div>
 
         <div className="client-share-link">
           <input
             aria-label="Gallery link"
             readOnly
-            value={typeof window !== "undefined" ? window.location.href : ""}
+            ref={syncLinkInput}
+            defaultValue=""
           />
           <button
             aria-label={copied ? "Link copied" : "Copy gallery link"}
@@ -84,21 +104,15 @@ export function GalleryShareDialog({
           <button className="client-clear-button" onClick={handleClose} type="button">
             Cancel
           </button>
-          {canNativeShare ? (
-            <button
-              className="client-submit-button"
-              disabled={sharing}
-              onClick={() => void shareLink()}
-              type="button"
-            >
-              <Share2 size={15} strokeWidth={1.8} />
-              {sharing ? "Sharing..." : "Share"}
-            </button>
-          ) : (
-            <button className="client-submit-button" onClick={() => void copyLink()} type="button">
-              {copied ? "Copied" : "Copy link"}
-            </button>
-          )}
+          <button
+            className="client-submit-button"
+            disabled={sharing}
+            onClick={() => void shareLink()}
+            type="button"
+          >
+            <Share2 size={15} strokeWidth={1.8} />
+            {sharing ? "Sharing..." : "Share"}
+          </button>
         </div>
       </form>
     </dialog>

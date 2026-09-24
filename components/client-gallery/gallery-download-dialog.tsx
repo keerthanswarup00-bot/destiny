@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-export function GalleryDownloadDialog({ slug, title, onClose }: { slug: string; title: string; onClose: () => void }) {
+export function GalleryDownloadDialog({ slug, title, setSlug, setName, onClose }: { slug: string; title: string; setSlug: string; setName: string; onClose: () => void }) {
   const [email, setEmail] = useState("");
   const [pin, setPin] = useState("");
   const [pending, setPending] = useState(false);
@@ -21,6 +21,7 @@ export function GalleryDownloadDialog({ slug, title, onClose }: { slug: string; 
       const form = new FormData();
       form.set("email", email);
       form.set("pin", pin);
+      form.set("set_slug", setSlug);
 
       const response = await fetch("/api/gallery/" + encodeURIComponent(slug) + "/download.zip", {
         method: "POST",
@@ -37,7 +38,7 @@ export function GalleryDownloadDialog({ slug, title, onClose }: { slug: string; 
       const url = URL.createObjectURL(blob);
       const disposition = response.headers.get("Content-Disposition") || "";
       const match = disposition.match(/filename="([^"]+)"/i);
-      const filename = match?.[1] || ((title || "gallery").replace(/[^a-z0-9_-]+/gi, "-") + "-photos.zip");
+      const filename = match?.[1] || ((title || "gallery").replace(/[^a-z0-9_-]+/gi, "-") + "-" + (setName || "photos").replace(/[^a-z0-9_-]+/gi, "-") + ".zip");
       const anchor = document.createElement("a");
       anchor.href = url;
       anchor.download = filename;
@@ -61,8 +62,8 @@ export function GalleryDownloadDialog({ slug, title, onClose }: { slug: string; 
           void downloadAll();
         }}
       >
-        <h2>Download all photos</h2>
-        <p>Enter your email and gallery PIN to download all photos as one ZIP file.</p>
+        <h2>Download {setName}</h2>
+        <p>Enter your email and gallery PIN to download all photos in this set as one ZIP file.</p>
         <input
           aria-label="Your email"
           autoComplete="email"

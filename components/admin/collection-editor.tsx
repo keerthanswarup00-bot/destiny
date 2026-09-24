@@ -575,7 +575,7 @@ export function CollectionEditor({
         <dialog className="admin-dialog" onCancel={() => setCoverFor(null)} ref={coverRef}>
           <form action={setFolderCover} onSubmit={() => { setCoverFor(null); router.refresh(); }}>
             <h2>Highlight image</h2>
-            <p className="muted">Pick the photo shown on this Set&rsquo;s highlight.</p>
+            <p className="muted">Pick the photo shown on this set's highlight.</p>
             {(photosByFolder[coverFor.id] ?? []).length ? (
               <div className="cover-picker-grid">
                 {(photosByFolder[coverFor.id] ?? []).map(photo => (

@@ -31,7 +31,7 @@ export async function POST(
     const [{ data: gallery }, { data: folder }, { data: photos }] = await Promise.all([
       db.from("galleries").select("id,title").eq("id", galleryId).maybeSingle(),
       db.from("folders").select("id,name,slug,download_zip_path,download_zip_signature").eq("id", folderId).eq("gallery_id", galleryId).maybeSingle(),
-      db.from("photos").select("id,filename,folder_id,sort_order,download_path,preview_path,thumbnail_path").eq("gallery_id", galleryId).eq("folder_id", folderId).order("sort_order").order("id"),
+      db.from("photos").select("id,filename,folder_id,original_path,sort_order,download_path,preview_path,thumbnail_path").eq("gallery_id", galleryId).eq("folder_id", folderId).order("sort_order").order("id"),
     ]);
 
     if (!gallery || !folder) return NextResponse.json({ error: "Set not found." }, { status: 404 });

@@ -184,7 +184,7 @@ function zipParts(
 }
 
 export type SetDownloadPreparation = {
-  status: "ready" | "empty";
+  status: "ready" | "empty" | "preparing";
   path?: string;
 };
 

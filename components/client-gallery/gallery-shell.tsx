@@ -152,6 +152,7 @@ function GalleryInner({
   submitted,
   clientMode,
   onCountChange,
+  onActiveSetChange,
   ref,
 }: {
   slug: string;

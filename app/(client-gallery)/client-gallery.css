@@ -317,3 +317,15 @@ html{scroll-behavior:smooth}
   .client-favorites-dialog p{font-size:13px}
   .client-favorites-actions{gap:4px}
 }
+
+
+/* Share destinations */
+.client-share-options{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.client-share-option{border:1px solid #E7E7E4;background:#fff;color:#111;min-width:0;padding:12px 6px 11px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;font-size:10px;font-weight:600;letter-spacing:.04em;cursor:pointer;transition:border-color .16s ease,background .16s ease,transform .12s ease}
+.client-share-option:hover{border-color:#111;background:#FAFAF8}
+.client-share-option:active{transform:scale(.98)}
+.client-share-option:focus-visible{outline:2px solid #111;outline-offset:2px}
+.client-share-option-icon{width:32px;height:32px;display:grid;place-items:center;border:1px solid #E7E7E4;border-radius:50%;background:#FAFAF8;color:#111}
+.client-share-option-whatsapp{font-size:13px;font-weight:700;letter-spacing:-.04em}
+.client-share-status{margin:-4px 0 0;color:#777;font-size:12px;line-height:1.4}
+@media(max-width:420px){.client-share-options{gap:5px}.client-share-option{padding-left:3px;padding-right:3px;font-size:9px}}

@@ -627,20 +627,14 @@ html{scroll-behavior:smooth}
 }
 
 
-/* Mobile client gallery: balanced two-column masonry.
+/* Mobile client gallery: balanced two-column grid.
    Each image keeps its natural aspect ratio, while the shorter column receives
    the next photo to minimize uneven vertical gaps. Desktop/tablet layout is unchanged. */
-.justified-grid--mobile .justified-mobile-columns{
+.justified-grid--mobile .justified-mobile-grid{
   display:grid;
   grid-template-columns:repeat(2,minmax(0,1fr));
   gap:4px;
   align-items:start;
-}
-.justified-grid--mobile .justified-mobile-column{
-  display:flex;
-  flex-direction:column;
-  gap:4px;
-  min-width:0;
 }
 .justified-grid--mobile .justified-cell{
   position:relative;

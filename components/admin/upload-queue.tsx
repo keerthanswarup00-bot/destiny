@@ -131,7 +131,7 @@ export const StagedUploadQueue = forwardRef<
     const incoming = event.dataTransfer.files;
     const accepted: StagedFile[] = [];
     let rejected = 0;
-    const existing = new Set(filesRef.current.map(item => `${item.file.name}\u0000${item.file.size}\u0000${item.file.lastModified}`);
+    const existing = new Set(filesRef.current.map(item => `${item.file.name}\u0000${item.file.size}\u0000${item.file.lastModified}`));
 
     for (const file of Array.from(incoming)) {
       const key = `${file.name}\u0000${file.size}\u0000${file.lastModified}`;

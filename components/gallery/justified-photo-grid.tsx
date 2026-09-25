@@ -23,7 +23,7 @@ function ratioOf(photo: JustifiedPhoto) {
  *
  * Rows are formed from natural aspect ratios and scaled so the row fills the
  * available width. Every photograph keeps its true proportions — nothing is
- * cropped or distorted. On narrow viewports the photos switch to a balanced two-column masonry-style
+ * cropped or distorted. On narrow viewports the photos switch to a balanced two-column
  * layout that preserves each image's natural aspect ratio.
  */
 export function JustifiedPhotoGrid({
@@ -55,20 +55,10 @@ export function JustifiedPhotoGrid({
   const mobileTwoColumn = width > 0 && width <= NARROW_BREAKPOINT;
   const viewportMobile = typeof window !== "undefined" && window.innerWidth <= NARROW_BREAKPOINT;
 
-  const mobileColumns = useMemo(() => {
-    if (!width || !photos.length || (!mobileTwoColumn && !viewportMobile)) return [[], []] as JustifiedPhoto[][];
-    const columnWidth = Math.max(1, (width - gap) / 2);
-    const heights = [0, 0];
-    const columns: JustifiedPhoto[][] = [[], []];
-    photos.forEach(photo => {
-      const ratio = Math.max(0.35, ratioOf(photo));
-      const estimatedHeight = columnWidth / ratio;
-      const target = heights[0] <= heights[1] ? 0 : 1;
-      columns[target].push(photo);
-      heights[target] += estimatedHeight + gap;
-    });
-    return columns;
-  }, [photos, width, gap, mobileTwoColumn, viewportMobile]);
+  const mobilePhotos = useMemo(() => {
+    if (!width || !photos.length || (!mobileTwoColumn && !viewportMobile)) return [];
+    return photos;
+  }, [photos, width, mobileTwoColumn, viewportMobile]);
 
   const rows = useMemo(() => {
     if (!width || !photos.length) return [];
@@ -121,26 +111,19 @@ export function JustifiedPhotoGrid({
           <div className="justified-loading-cell" />
         </div>
       ) : (mobileTwoColumn || viewportMobile) ? (
-        <div className="justified-mobile-columns">
-          {mobileColumns.map((column, columnIndex) => (
-            <div className="justified-mobile-column" key={columnIndex}>
-              {column.map(item => {
-                const index = photos.findIndex(photo => photo.id === item.id);
-                return (
-                  <figure className="justified-cell" key={item.id}>
-                    <button
-                      aria-label="View photo"
-                      className="justified-open"
-                      onClick={() => onPhotoClick(index)}
-                      type="button"
-                    >
-                      {renderImage(item)}
-                    </button>
-                    {overlay ? overlay(item, index) : null}
-                  </figure>
-                );
-              })}
-            </div>
+        <div className="justified-mobile-grid">
+          {mobilePhotos.map((item, index) => (
+            <figure className="justified-cell" key={item.id}>
+              <button
+                aria-label="View photo"
+                className="justified-open"
+                onClick={() => onPhotoClick(index)}
+                type="button"
+              >
+                {renderImage(item)}
+              </button>
+              {overlay ? overlay(item, index) : null}
+            </figure>
           ))}
         </div>
       ) : (() => {

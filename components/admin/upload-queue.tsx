@@ -160,11 +160,17 @@ export const StagedUploadQueue = forwardRef<
 
   async function commit() {
     if (!files.length || uploading) return;
+    const pending = files
+      .map((item, index) => ({ item, index }))
+      .filter(entry => entry.item.state !== "done");
+
     const result = await onCommit(
-      files.map(item => item.file),
+      pending.map(entry => entry.item.file),
       event => {
+        const target = pending[event.index];
+        if (!target) return;
         setFiles(prev => prev.map((item, index) => {
-          if (index !== event.index) return item;
+          if (index !== target.index) return item;
           return {
             ...item,
             state: event.state,

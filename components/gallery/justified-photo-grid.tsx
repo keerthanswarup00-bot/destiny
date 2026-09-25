@@ -111,7 +111,7 @@ export function JustifiedPhotoGrid({
   }
 
   return (
-    <div className={`justified-grid${className ? ` ${className}` : ""}${singleColumn ? " justified-grid--mobile" : ""}`} ref={ref}>
+    <div className={`justified-grid${className ? ` ${className}` : ""}${mobileTwoColumn ? " justified-grid--mobile" : ""}`} ref={ref}>
       {width === 0 ? (
         <div aria-hidden="true" className="justified-loading">
           <div className="justified-loading-cell" />

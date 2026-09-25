@@ -627,14 +627,19 @@ html{scroll-behavior:smooth}
 }
 
 
-/* Mobile client gallery: balanced two-column grid.
-   Each image keeps its natural aspect ratio, while the shorter column receives
-   the next photo to minimize uneven vertical gaps. Desktop/tablet layout is unchanged. */
-.justified-grid--mobile .justified-mobile-grid{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
+/* Mobile client gallery: justified two-photo rows.
+   Each pair shares one computed row height, so top and bottom edges align while
+   every image keeps its natural aspect ratio. Desktop/tablet layout is unchanged. */
+.justified-grid--mobile .justified-mobile-rows{
+  display:flex;
+  flex-direction:column;
   gap:4px;
-  align-items:start;
+  width:100%;
+}
+.justified-grid--mobile .justified-mobile-row{
+  display:flex;
+  align-items:stretch;
+  width:100%;
 }
 .justified-grid--mobile .justified-cell{
   position:relative;

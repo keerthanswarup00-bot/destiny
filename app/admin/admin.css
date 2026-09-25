@@ -1003,3 +1003,24 @@
   .upload-queue-actions .admin-button{width:100%;justify-content:center}
   .upload-queue-hint{width:100%}
 }
+
+
+/* Upload queue progress */
+.upload-progress-overall{height:3px;background:#e7e7e3;border-radius:999px;overflow:hidden;margin:0 0 14px}
+.upload-progress-overall span{display:block;height:100%;background:#111;border-radius:inherit;transition:width .2s ease}
+.upload-queue-card{position:relative}
+.upload-queue-card.is-uploading img,.upload-queue-card.is-processing img{opacity:.68}
+.upload-queue-card-meta{min-width:0}
+.upload-queue-card-meta span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.upload-queue-card-meta small{display:block;color:#777;margin-top:3px}
+.upload-queue-card-progress{position:absolute;left:8px;right:8px;bottom:8px;height:3px;background:rgba(255,255,255,.65);border-radius:999px;overflow:hidden}
+.upload-queue-card-progress span{display:block;height:100%;background:#111;border-radius:inherit;transition:width .15s ease}
+.upload-queue-card-status{position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#111;color:#fff;font-size:13px;font-weight:600}
+.upload-queue-card-status.is-failed{background:#fff;color:#111;border:1px solid #111}
+.upload-queue-card.is-failed{outline:1px solid #b7b7b2;outline-offset:-1px}
+.upload-queue-card.is-processing .upload-queue-card-progress span{width:100%!important;animation:upload-processing 1.2s ease-in-out infinite alternate}
+@keyframes upload-processing{from{opacity:.35}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){
+  .upload-progress-overall span,.upload-queue-card-progress span{transition:none}
+  .upload-queue-card.is-processing .upload-queue-card-progress span{animation:none}
+}

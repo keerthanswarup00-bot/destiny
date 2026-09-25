@@ -3,12 +3,13 @@ import { photoStore } from "@/lib/storage-provider";
 
 /**
  * Photo storage keys are strictly server-controlled and deterministic:
- * `<gallery>/<folder>/<photo>/<name>.ext` where every segment is a uuid. Watermark
- * logos, branding assets and Website Gallery images live elsewhere and must
- * NEVER match this shape so an over-broad cleanup can not delete them.
+ * `<gallery>/<folder>/<photo>/original` or a derivative name where every
+ * segment before the filename is a uuid. Watermark logos, branding assets and
+ * Website Gallery images live elsewhere and must NEVER match this shape so an
+ * over-broad cleanup can not delete them.
  */
 const PHOTO_KEY_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[^/]+$/i;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/(?:original|(?:thumbnail|preview|download)\.[a-z0-9]+|[^/]+\.[a-z0-9]{1,8})$/i;
 
 export function isClientPhotoStorageKey(key: string): boolean {
   return key.length > 36 && PHOTO_KEY_RE.test(key);

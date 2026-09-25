@@ -53,10 +53,9 @@ async function serverFallback(
   context: UploadContext,
   index: number,
   onProgress: (event: GalleryUploadProgress) => void,
-): Promise<boolean> {
+): Promise<{ ok: boolean; message?: string }> {
   onProgress({ index, state: "processing" });
-  const fallback = await uploadPhotosAsync(uploadForm(context, file));
-  return fallback.ok;
+  return uploadPhotosAsync(uploadForm(context, file));
 }
 
 function uploadFailureMessage(error: unknown) {
@@ -84,9 +83,9 @@ export async function uploadClientGalleryFiles(
       const prepared = await prepareClientGalleryUpload(preparationForm(context, file));
       if (!prepared.ok) {
         if (prepared.fallback) {
-          const fallbackOk = await serverFallback(file, context, index, event => onProgress?.(event));
-          if (!fallbackOk) {
-            const message = "Upload failed. Please try again.";
+          const fallback = await serverFallback(file, context, index, event => onProgress?.(event));
+          if (!fallback.ok) {
+            const message = fallback.message ?? "Upload failed. Please try again.";
             onProgress?.({ index, state: "failed", message });
             return { ok: false, message, failedIndex: index };
           }
@@ -102,21 +101,6 @@ export async function uploadClientGalleryFiles(
       const directSucceeded = await directPut(prepared.uploadUrl, file, progress => {
         onProgress?.({ index, state: "uploading", progress });
       });
-
-      if (!directSucceeded) {
-        const fallbackOk = await serverFallback(file, context, index, event => onProgress?.(event));
-        if (!fallbackOk) {
-          const message = "Upload failed. Direct storage upload and the server fallback both failed.";
-          onProgress?.({ index, state: "failed", message });
-          return { ok: false, message, failedIndex: index };
-        }
-        uploaded += 1;
-        onProgress?.({ index, state: "done", progress: 100 });
-        continue;
-      }
-
-      onProgress?.({ index, state: "processing" });
-
       const completion = new FormData();
       completion.set("gallery_id", context.galleryId);
       completion.set("folder_id", context.folderId);
@@ -126,6 +110,28 @@ export async function uploadClientGalleryFiles(
       completion.set("mime_type", file.type);
       completion.set("bytes", String(file.size));
 
+      if (!directSucceeded) {
+        onProgress?.({ index, state: "processing" });
+        try {
+          const recovered = await completeClientGalleryUpload(completion);
+          if (recovered.ok) {
+            uploaded += 1;
+            onProgress?.({ index, state: "done", progress: 100 });
+            continue;
+          }
+        } catch {}
+        const fallback = await serverFallback(file, context, index, event => onProgress?.(event));
+        if (!fallback.ok) {
+          const message = fallback.message ?? "Upload failed. Direct storage upload and the server fallback both failed.";
+          onProgress?.({ index, state: "failed", message });
+          return { ok: false, message, failedIndex: index };
+        }
+        uploaded += 1;
+        onProgress?.({ index, state: "done", progress: 100 });
+        continue;
+      }
+
+      onProgress?.({ index, state: "processing" });
       const completed = await completeClientGalleryUpload(completion);
       if (!completed.ok) {
         const message = completed.message ?? "Upload failed while processing the image.";

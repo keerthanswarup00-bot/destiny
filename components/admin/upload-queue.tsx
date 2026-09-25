@@ -2,8 +2,7 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { ImagePlus, Upload, X } from "lucide-react";
-
-const ACCEPTED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+import { MAX_PHOTO_BYTES, validatePhotoMetadata } from "@/lib/photo-validation";
 
 export type UploadProgressState = "uploading" | "processing" | "done" | "failed";
 export type UploadProgressEvent = {
@@ -39,7 +38,7 @@ function progressForEvent(state: UploadProgressState, progress?: number) {
 }
 
 function isAcceptedImage(file: File) {
-  return ACCEPTED_TYPES.has(file.type);
+  return validatePhotoMetadata({ filename: file.name, mimeType: file.type, bytes: file.size }).ok;
 }
 
 export const StagedUploadQueue = forwardRef<
@@ -98,7 +97,7 @@ export const StagedUploadQueue = forwardRef<
       }
 
       if (rejected) {
-        onError?.(`${rejected} ${rejected === 1 ? "file was" : "files were"} skipped. Use JPEG, PNG, WebP or GIF images.`);
+        onError?.(`${rejected} ${rejected === 1 ? "file was" : "files were"} skipped. Use JPEG, PNG, WebP or GIF images with matching file extensions, up to ${MAX_PHOTO_BYTES / (1024 * 1024)} MB each.`);
       } else {
         onError?.(null);
       }
@@ -236,7 +235,7 @@ export const StagedUploadQueue = forwardRef<
         <button aria-label="Choose photos to upload" className="admin-button" disabled={uploading} onClick={onBrowse} type="button">
           <Upload size={15} strokeWidth={1.8} /> Choose Photos
         </button>
-        <em>JPEG, PNG, WebP or GIF · up to 15 MB each</em>
+        <em>JPEG, PNG, WebP or GIF · up to {MAX_PHOTO_BYTES / (1024 * 1024)} MB each</em>
       </div>
 
       {count ? (

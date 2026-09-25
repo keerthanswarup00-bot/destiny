@@ -1,10 +1,9 @@
 import { z } from "zod";
+export { ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES } from "@/lib/photo-validation";
 export const clientSchema = z.object({ name: z.string().trim().min(1, "Name is required").max(200), event_date: z.string().trim().max(50), phone: z.string().trim().max(50), notes: z.string().trim().max(5000) });
 export const gallerySchema = z.object({ title: z.string().trim().min(1).max(200), client_id: z.string().uuid(), description: z.string().trim().max(5000), slug: z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use lowercase letters, numbers, and hyphens"), status: z.enum(["draft", "published", "archived"]) });
 export const folderSchema = z.object({ name: z.string().trim().min(1).max(200) });
 export const photoUploadSchema = z.object({ gallery_id: z.string().uuid(), folder_id: z.string().uuid() });
-export const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
-export const MAX_PHOTO_BYTES = 15 * 1024 * 1024;
 export const GALLERY_ASSET_BUCKET = "client-gallery-assets";
 export const slugify = (value: string) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const errorMessages: Record<string, string> = {

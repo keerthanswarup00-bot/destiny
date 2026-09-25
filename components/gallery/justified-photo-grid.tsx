@@ -53,9 +53,10 @@ export function JustifiedPhotoGrid({
 
   const gap = width > 760 ? 5 : 4;
   const mobileTwoColumn = width > 0 && width <= NARROW_BREAKPOINT;
+  const viewportMobile = typeof window !== "undefined" && window.innerWidth <= NARROW_BREAKPOINT;
 
   const mobileColumns = useMemo(() => {
-    if (!width || !photos.length || !mobileTwoColumn) return [[], []] as JustifiedPhoto[][];
+    if (!width || !photos.length || (!mobileTwoColumn && !viewportMobile)) return [[], []] as JustifiedPhoto[][];
     const columnWidth = Math.max(1, (width - gap) / 2);
     const heights = [0, 0];
     const columns: JustifiedPhoto[][] = [[], []];
@@ -67,7 +68,7 @@ export function JustifiedPhotoGrid({
       heights[target] += estimatedHeight + gap;
     });
     return columns;
-  }, [photos, width, gap, mobileTwoColumn]);
+  }, [photos, width, gap, mobileTwoColumn, viewportMobile]);
 
   const rows = useMemo(() => {
     if (!width || !photos.length) return [];
@@ -111,7 +112,7 @@ export function JustifiedPhotoGrid({
   }
 
   return (
-    <div className={`justified-grid${className ? ` ${className}` : ""}${mobileTwoColumn ? " justified-grid--mobile" : ""}`} ref={ref}>
+    <div className={`justified-grid${className ? ` ${className}` : ""}${mobileTwoColumn || viewportMobile ? " justified-grid--mobile" : ""}`} ref={ref}>
       {width === 0 ? (
         <div aria-hidden="true" className="justified-loading">
           <div className="justified-loading-cell" />
@@ -119,7 +120,7 @@ export function JustifiedPhotoGrid({
           <div className="justified-loading-cell" />
           <div className="justified-loading-cell" />
         </div>
-      ) : mobileTwoColumn ? (
+      ) : (mobileTwoColumn || viewportMobile) ? (
         <div className="justified-mobile-columns">
           {mobileColumns.map((column, columnIndex) => (
             <div className="justified-mobile-column" key={columnIndex}>

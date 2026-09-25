@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { GalleryFeed } from "@/components/public/gallery-feed";
 import { GalleryHighlight } from "@/components/public/gallery-highlight";
 import { PhotoGrid } from "@/components/public/photo-grid";
 import { Reveal } from "@/components/public/reveal";
-import { WeddingGallery } from "@/components/public/wedding-gallery";
+import { mixGalleryImages, staticGalleryImages, STATIC_GALLERY_CATEGORIES, type GalleryImage } from "@/lib/site/gallery-feed";
 import { getPortfolioGalleries, getSiteWebsiteGalleryByCategory, getSiteWebsiteGalleryHighlight, hasSiteWebsiteGallery } from "@/lib/site/site-content";
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<{ category?: string }> }) {
@@ -12,7 +13,36 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
     : { title: "Gallery", description: "Selected work from Destiny Events and Photography." };
 }
 
-const sizes = ["portrait", "wide", "landscape"] as const;
+type WebsiteFeedImage = {
+  id: string;
+  url: string;
+  width: number | null;
+  height: number | null;
+  category: string | null;
+};
+
+type GalleryHighlightData = {
+  url: string;
+  width: number | null;
+  height: number | null;
+  crop: { x: number; y: number; zoom: number } | null;
+};
+
+function toFeedImage(image: WebsiteFeedImage): GalleryImage {
+  return { id: image.id, src: image.url, width: image.width, height: image.height, alt: "" };
+}
+
+/** One group per stored category so the mixed view alternates between them. */
+function groupWebsiteImages(images: WebsiteFeedImage[]): GalleryImage[][] {
+  const groups = new Map<string, GalleryImage[]>();
+  for (const image of images) {
+    const key = image.category ?? "";
+    const group = groups.get(key);
+    if (group) group.push(toFeedImage(image));
+    else groups.set(key, [toFeedImage(image)]);
+  }
+  return [...groups.values()];
+}
 
 const CATEGORY_OPTIONS = [
   { label: "All", value: "" },
@@ -42,54 +72,35 @@ function normalizeCategory(value: string | undefined): string {
 export default async function Gallery({ searchParams }: { searchParams: Promise<{ category?: string }> }) {
   const { category: rawCategory } = await searchParams;
   const category = normalizeCategory(rawCategory);
-  if (category === "wedding") {
-    return (
-      <section aria-labelledby="wedding-gallery-title" className="section gallery-page wedding-page">
-        <Reveal><p className="eyebrow">WEDDING</p></Reveal>
-        <Reveal delay={90}><h1 id="wedding-gallery-title">The wedding, <br /><em>in its truest light.</em></h1></Reveal>
-        <Reveal delay={170}><p className="intro">A quiet record of the people, places, and in-between moments that make a celebration feel like your own.</p></Reveal>
-        <GalleryFilters active={category} />
-        <WeddingGallery />
-      </section>
-    );
-  }
+  const isWedding = category === "wedding";
   const websiteGalleryExists = await hasSiteWebsiteGallery();
-  const [websiteImages, highlight] = websiteGalleryExists
-    ? await Promise.all([getSiteWebsiteGalleryByCategory(category), getSiteWebsiteGalleryHighlight()])
+  const [websiteImages, highlight]: [WebsiteFeedImage[], GalleryHighlightData | null] = websiteGalleryExists
+    ? await Promise.all([
+        getSiteWebsiteGalleryByCategory(category || undefined),
+        isWedding ? Promise.resolve(null) : getSiteWebsiteGalleryHighlight(),
+      ])
     : [[], null];
-  if (websiteGalleryExists) {
+  const staticGroups = STATIC_GALLERY_CATEGORIES
+    .filter(key => !category || key === category)
+    .map(key => staticGalleryImages(key));
+  const images = mixGalleryImages([...staticGroups, ...groupWebsiteImages(websiteImages)]);
+  if (images.length || category) {
     return (
-      <section className="section gallery-page">
-        <Reveal><p className="eyebrow">GALLERY</p></Reveal>
-        <Reveal delay={90}><h1>Moments, held<br /><em>in their truest light.</em></h1></Reveal>
-        <Reveal delay={170}><p className="intro">A collection of celebrations, connections, and quiet in-between moments.</p></Reveal>
+      <section aria-labelledby={isWedding ? "wedding-gallery-title" : undefined} className={`section gallery-page${isWedding ? " wedding-page" : ""}`}>
+        <Reveal><p className="eyebrow">{isWedding ? "WEDDING" : "GALLERY"}</p></Reveal>
+        <Reveal delay={90}>
+          {isWedding
+            ? <h1 id="wedding-gallery-title">The wedding, <br /><em>in its truest light.</em></h1>
+            : <h1>Moments, held<br /><em>in their truest light.</em></h1>}
+        </Reveal>
+        <Reveal delay={170}>
+          <p className="intro">{isWedding
+            ? "A quiet record of the people, places, and in-between moments that make a celebration feel like your own."
+            : "A collection of celebrations, connections, and quiet in-between moments."}</p>
+        </Reveal>
         {highlight ? <GalleryHighlight crop={highlight.crop} height={highlight.height} url={highlight.url} width={highlight.width} /> : null}
         <GalleryFilters active={category} />
-        <div className="photo-grid expanded">
-          {websiteImages.map((image, index) => (
-            <Reveal
-              as="figure"
-              className={sizes[index % sizes.length]}
-              delay={(index % 4) * 90}
-              key={image.id}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                alt=""
-                decoding="async"
-                fetchPriority={index < 2 ? "high" : "low"}
-                height={image.height ?? undefined}
-                loading={index < 2 ? "eager" : "lazy"}
-                src={image.url}
-                width={image.width ?? undefined}
-              />
-              <figcaption>
-                <span className="photo-grid__index">{String(index + 1).padStart(2, "0")}</span>
-                <span>Website gallery</span>
-              </figcaption>
-            </Reveal>
-          ))}
-        </div>
+        {images.length ? <GalleryFeed images={images} label={isWedding ? "Wedding photography" : "Photography"} /> : <p className="empty">No photographs are available in this category yet.</p>}
       </section>
     );
   }

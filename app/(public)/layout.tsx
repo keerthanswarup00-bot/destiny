@@ -1,4 +1,6 @@
 import type { CSSProperties } from "react";
+import "yet-another-react-lightbox/styles.css";
+import "yet-another-react-lightbox/plugins/counter.css";
 import { SiteFooter } from "@/components/public/site-footer";
 import { SiteHeader } from "@/components/public/site-header";
 import { getSiteBranding, getSiteContact, getSiteThemeCssVars } from "@/lib/site/site-content";

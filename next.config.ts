@@ -7,6 +7,9 @@ const nextConfig: NextConfig = {
     },
     middlewareClientMaxBodySize: "100mb",
   },
+  images: {
+    qualities: [86],
+  },
 };
 
 export default nextConfig;

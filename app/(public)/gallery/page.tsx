@@ -2,9 +2,15 @@ import Link from "next/link";
 import { GalleryHighlight } from "@/components/public/gallery-highlight";
 import { PhotoGrid } from "@/components/public/photo-grid";
 import { Reveal } from "@/components/public/reveal";
+import { WeddingGallery } from "@/components/public/wedding-gallery";
 import { getPortfolioGalleries, getSiteWebsiteGalleryByCategory, getSiteWebsiteGalleryHighlight, hasSiteWebsiteGallery } from "@/lib/site/site-content";
 
-export const metadata = { title: "Gallery", description: "Selected work from Destiny Events and Photography." };
+export async function generateMetadata({ searchParams }: { searchParams: Promise<{ category?: string }> }) {
+  const { category: rawCategory } = await searchParams;
+  return normalizeCategory(rawCategory) === "wedding"
+    ? { title: "Wedding Gallery", description: "A quiet record of the people, places, and in-between moments that make a celebration feel like your own." }
+    : { title: "Gallery", description: "Selected work from Destiny Events and Photography." };
+}
 
 const sizes = ["portrait", "wide", "landscape"] as const;
 
@@ -36,6 +42,17 @@ function normalizeCategory(value: string | undefined): string {
 export default async function Gallery({ searchParams }: { searchParams: Promise<{ category?: string }> }) {
   const { category: rawCategory } = await searchParams;
   const category = normalizeCategory(rawCategory);
+  if (category === "wedding") {
+    return (
+      <section aria-labelledby="wedding-gallery-title" className="section gallery-page wedding-page">
+        <Reveal><p className="eyebrow">WEDDING</p></Reveal>
+        <Reveal delay={90}><h1 id="wedding-gallery-title">The wedding, <br /><em>in its truest light.</em></h1></Reveal>
+        <Reveal delay={170}><p className="intro">A quiet record of the people, places, and in-between moments that make a celebration feel like your own.</p></Reveal>
+        <GalleryFilters active={category} />
+        <WeddingGallery />
+      </section>
+    );
+  }
   const websiteGalleryExists = await hasSiteWebsiteGallery();
   const [websiteImages, highlight] = websiteGalleryExists
     ? await Promise.all([getSiteWebsiteGalleryByCategory(category), getSiteWebsiteGalleryHighlight()])

@@ -7,7 +7,7 @@ import { adminDb } from "@/lib/admin-data";
 import { clientSchema, folderSchema, gallerySchema, photoUploadSchema, slugify } from "@/lib/admin-validation";
 import { photoStore } from "@/lib/storage-provider";
 import { auditStorageOrphans as auditOrphans, cleanupOrphanedPhotoKeys as cleanupOrphans, photoStoragePaths } from "@/lib/storage-ops";
-import { validatePhotoContent } from "@/lib/photo-content-validation";
+import { validatePhotoContent, type PhotoContentResult } from "@/lib/photo-content-validation";
 import { validatePhotoMetadata, type PhotoMetadataResult } from "@/lib/photo-validation";
 import { hashGalleryPassword } from "@/lib/gallery-password";
 import { validateWatermarkSettings, watermarkSourceFromBytes, watermarkedDerivative, type ActiveWatermarkConfig, type WatermarkSource } from "@/lib/watermark-core";
@@ -359,20 +359,30 @@ async function runFolderUpload(
   const supabase = await db();
   const { data: folder } = await supabase.from("folders").select("id").eq("id", folderId).eq("gallery_id", gallery).maybeSingle();
   if (!folder) return { error: "Upload failed: the selected folder is unavailable." };
-  const { count } = await supabase.from("photos").select("id", { count: "exact", head: true }).eq("gallery_id", gallery).eq("folder_id", folder.id);
-  let sort = count ?? 0;
-  let watermark: ActiveWatermarkConfig | null;
-  try {
-    watermark = await activeWatermark(supabase);
-  } catch {
-    return { error: "Upload failed: the image processor is unavailable." };
-  }
+  const validated: Array<{
+    file: File;
+    validation: Extract<PhotoMetadataResult, { ok: true }>;
+    content: Extract<PhotoContentResult, { ok: true }>;
+  }> = [];
   for (const file of files) {
     const validation = validatePhotoMetadata({ filename: file.name, mimeType: file.type, bytes: file.size });
     if (!validation.ok) return { error: validation.message };
     const body = Buffer.from(await file.arrayBuffer());
     const content = await validatePhotoContent(body, validation);
     if (!content.ok) return { error: content.message };
+    validated.push({ file, validation, content });
+  }
+  let watermark: ActiveWatermarkConfig | null;
+  try {
+    watermark = await activeWatermark(supabase);
+  } catch {
+    return { error: "Upload failed: the image processor is unavailable." };
+  }
+  const { count } = await supabase.from("photos").select("id", { count: "exact", head: true }).eq("gallery_id", gallery).eq("folder_id", folder.id);
+  let sort = count ?? 0;
+  for (const { file, validation, content } of validated) {
+    const body = Buffer.from(await file.arrayBuffer());
+    if (body.byteLength !== content.bytes) return { error: "Upload failed: the uploaded file size did not match." };
     const id = crypto.randomUUID();
     const paths = clientPhotoPaths(gallery, folder.id, id);
     const uploadedPaths: string[] = [];

@@ -254,7 +254,6 @@ export function ClientPhotoGrid({
             <button aria-label="Download photo" className="client-lightbox-action yarl__button" disabled={!current || actionBusy === current?.id} key="download" onClick={() => void downloadCurrent()} title="Download photo" type="button"><Download size={17} strokeWidth={1.6} /></button>,
             <button aria-label="Share photo" className="client-lightbox-action yarl__button" disabled={!current || actionBusy === current?.id} key="share" onClick={() => void shareCurrent()} title="Share photo" type="button"><Share2 size={17} strokeWidth={1.6} /></button>,
             "slideshow",
-            "fullscreen",
             "close",
           ],
         }}

@@ -370,6 +370,7 @@ export async function uploadWebsiteGalleryImages(form: FormData): Promise<{ ok: 
     file: File;
     validation: Extract<PhotoMetadataResult, { ok: true }>;
     content: Extract<PhotoContentResult, { ok: true }>;
+    extension: string;
   }> = [];
   for (const file of files) {
     const validation = validatePhotoMetadataWithPolicy({ filename: file.name, mimeType: file.type, bytes: file.size });

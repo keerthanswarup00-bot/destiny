@@ -3,13 +3,21 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { adminDb } from "@/lib/admin-data";
-import { ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES } from "@/lib/admin-validation";
 import { ensureWebsiteGallery, HIGHLIGHT_MAX_ZOOM, normalizeHighlightCrop, normalizeWebsiteGalleryCategory, websiteGalleryId, websiteImageKey } from "@/lib/site/website-gallery";
 import { photoStore } from "@/lib/storage-provider";
-import { createSignedPutUrl } from "@/lib/r2";
+import { validatePhotoContent, type PhotoContentResult } from "@/lib/photo-content-validation";
+import { ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES, photoExtensionForMime, validatePhotoMetadata, type PhotoMetadataResult } from "@/lib/photo-validation";
 
 const value = (form: FormData, key: string) => String(form.get(key) ?? "");
 const checked = (form: FormData, key: string) => value(form, key) === "on";
+function validatePhotoMetadataWithPolicy(input: { filename: string; mimeType: string; bytes: number }): PhotoMetadataResult {
+  const validation = validatePhotoMetadata(input);
+  if (!validation.ok) return validation;
+  if (!ALLOWED_PHOTO_TYPES.includes(validation.mimeType) || validation.bytes > MAX_PHOTO_BYTES) {
+    return { ok: false, message: "Upload failed: invalid file metadata." };
+  }
+  return validation;
+}
 const revalidate = () => {
   revalidatePath("/", "layout");
   revalidatePath("/");
@@ -53,13 +61,6 @@ async function patchHome(section: string, patch: Record<string, unknown>, redire
   redirect(`${redirectTo}?saved=1`);
 }
 
-const extByMime: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-  "image/gif": "gif",
-};
-
 type WebsiteUploadPreparation = {
   ok: true;
   id: string;
@@ -71,57 +72,90 @@ type WebsiteUploadPreparation = {
   fallback?: boolean;
 };
 
-function isR2Provider() {
-  return process.env.PHOTO_STORAGE_PROVIDER?.trim().toLowerCase() === "r2";
-}
-
 export async function prepareWebsiteGalleryUpload(form: FormData): Promise<WebsiteUploadPreparation> {
-  const filename = value(form, "filename").trim();
+  const filename = value(form, "filename");
   const mimeType = value(form, "mime_type");
   const bytes = Number(value(form, "bytes"));
   const categoryValue = value(form, "category");
   const category = normalizeWebsiteGalleryCategory(categoryValue);
-  if (!filename || !mimeType || !Number.isFinite(bytes) || bytes <= 0) return { ok: false, message: "Upload failed: invalid file metadata." };
-  if (!(ALLOWED_PHOTO_TYPES as readonly string[]).includes(mimeType) || bytes > MAX_PHOTO_BYTES) {
-    return { ok: false, message: "Upload failed: use JPEG, PNG, WebP, or GIF images up to 15MB." };
-  }
+  const validation = validatePhotoMetadataWithPolicy({ filename, mimeType, bytes });
+  if (!validation.ok) return { ok: false, message: validation.message };
   if (categoryValue && !category) return { ok: false, message: "Upload failed: choose a valid category." };
-  if (!isR2Provider()) return { ok: false, message: "Direct upload is unavailable for the configured storage provider.", fallback: true };
   const supabase = await db();
   const target = await ensureWebsiteGallery(supabase);
   if (!target) return { ok: false, message: "Upload failed: could not prepare the Website Gallery." };
   const id = crypto.randomUUID();
-  const ext = extByMime[mimeType] ?? "png";
-  const key = websiteImageKey(id, ext);
+  const extension = photoExtensionForMime(validation.mimeType);
+  if (!extension) return { ok: false, message: "Upload failed: the image type is not supported." };
+  const key = websiteImageKey(id, extension);
   try {
-    return { ok: true, id, key, uploadUrl: await createSignedPutUrl(key, mimeType) };
+    const uploadUrl = await photoStore().signedPutUrl(key, validation.mimeType);
+    if (!uploadUrl) {
+      return { ok: false, message: "Direct upload is unavailable for the configured storage provider.", fallback: true };
+    }
+    return { ok: true, id, key, uploadUrl };
   } catch {
-    return { ok: false, message: "Upload failed: R2 storage is unavailable." };
+    return { ok: false, message: "Upload failed: direct storage upload is unavailable." };
   }
 }
 
 export async function completeWebsiteGalleryUpload(form: FormData): Promise<{ ok: boolean; message?: string }> {
   const id = value(form, "id");
   const key = value(form, "key");
-  const filename = value(form, "filename").trim();
+  const filename = value(form, "filename");
   const mimeType = value(form, "mime_type");
   const bytes = Number(value(form, "bytes"));
   const categoryValue = value(form, "category");
   const category = normalizeWebsiteGalleryCategory(categoryValue);
-  if (!id || !key || !filename || !mimeType || !Number.isFinite(bytes)) return { ok: false, message: "Upload failed: invalid file metadata." };
+  const validation = validatePhotoMetadataWithPolicy({ filename, mimeType, bytes });
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) || !validation.ok) {
+    return { ok: false, message: validation.ok ? "Upload failed: invalid file metadata." : validation.message };
+  }
   if (categoryValue && !category) return { ok: false, message: "Upload failed: choose a valid category." };
+  const extension = photoExtensionForMime(validation.mimeType);
+  if (!extension) return { ok: false, message: "Upload failed: the image type is not supported." };
+  const expectedKey = websiteImageKey(id, extension);
+  if (key !== expectedKey) return { ok: false, message: "Upload failed: invalid storage path." };
   const supabase = await db();
   const target = await ensureWebsiteGallery(supabase);
   if (!target) return { ok: false, message: "Upload failed: could not prepare the Website Gallery." };
+  const { data: existing, error: existingError } = await supabase
+    .from("photos")
+    .select("id, original_path")
+    .eq("id", id)
+    .eq("gallery_id", target.galleryId)
+    .maybeSingle();
+  if (existingError) return { ok: false, message: "Upload failed: the upload could not be checked." };
+  if (existing) {
+    if (existing.original_path !== expectedKey) return { ok: false, message: "Upload failed: invalid storage path." };
+    return { ok: true };
+  }
+  let body: Buffer | null;
+  try {
+    body = await photoStore().downloadBytes(expectedKey);
+  } catch {
+    body = null;
+  }
+  if (!body) {
+    try { await photoStore().removePhotos([expectedKey]); } catch {}
+    return { ok: false, message: "Upload failed: the original file was not stored." };
+  }
+  const content = await validatePhotoContent(body, validation);
+  if (!content.ok) {
+    try { await photoStore().removePhotos([expectedKey]); } catch {}
+    return { ok: false, message: content.message };
+  }
   const { count } = await supabase.from("photos").select("id", { count: "exact", head: true }).eq("gallery_id", target.galleryId);
   const { error } = await supabase.from("photos").insert({
     id,
     gallery_id: target.galleryId,
     folder_id: target.folderId,
-    filename: filename.slice(0, 500),
-    original_path: key,
-    mime_type: mimeType,
-    bytes,
+    filename: validation.filename,
+    original_path: expectedKey,
+    mime_type: content.mimeType,
+    bytes: content.bytes,
+    width: content.width,
+    height: content.height,
     category: category ?? null,
     published_category: null,
     published: false,
@@ -129,7 +163,7 @@ export async function completeWebsiteGalleryUpload(form: FormData): Promise<{ ok
     sort_order: (count ?? 0) + 1,
   });
   if (error) {
-    try { await photoStore().removePhotos([key]); } catch { /* preserve database error */ }
+    try { await photoStore().removePhotos([expectedKey]); } catch {}
     return { ok: false, message: "Upload failed: the photo record could not be created." };
   }
   revalidate();
@@ -147,16 +181,21 @@ async function receiveAsset(form: FormData, field: string, previous: Record<stri
       obsolete.push(old);
     }
     patch = { image_path: null, image_mime: null, image_bytes: null, [`${field}_path`]: null, [`${field}_mime`]: null, [`${field}_bytes`]: null };
-  } else if (file instanceof File && file.size > 0) {
-    if (!(ALLOWED_PHOTO_TYPES as readonly string[]).includes(file.type) || file.size > MAX_PHOTO_BYTES) {
-      throw new Error("invalid-asset");
-    }
-    const ext = extByMime[file.type] ?? "png";
+  } else if (file instanceof File) {
+    if (file.size <= 0) throw new Error("invalid-asset");
+    const mimeType = file.type.trim().toLowerCase();
+    const extension = photoExtensionForMime(mimeType);
+    if (!extension) throw new Error("invalid-asset");
+    const validation = validatePhotoMetadataWithPolicy({ filename: `asset.${extension}`, mimeType, bytes: file.size });
+    if (!validation.ok) throw new Error("invalid-asset");
+    const body = Buffer.from(await file.arrayBuffer());
+    const content = await validatePhotoContent(body, validation);
+    if (!content.ok) throw new Error("invalid-asset");
     const old = (previous.image_path ?? previous[`${field}_path`]) as string | null;
-    const key = `website/${crypto.randomUUID()}.${ext}`;
-    await photoStore().uploadPhoto({ key, body: Buffer.from(await file.arrayBuffer()), contentType: file.type });
+    const key = `website/${crypto.randomUUID()}.${extension}`;
+    await photoStore().uploadPhoto({ key, body, contentType: content.mimeType });
     if (old) obsolete.push(old);
-    patch = { image_path: key, image_mime: file.type, image_bytes: file.size, [`${field}_path`]: key, [`${field}_mime`]: file.type, [`${field}_bytes`]: file.size };
+    patch = { image_path: key, image_mime: content.mimeType, image_bytes: content.bytes, [`${field}_path`]: key, [`${field}_mime`]: content.mimeType, [`${field}_bytes`]: content.bytes };
   }
   return { patch, obsolete };
 }
@@ -166,7 +205,15 @@ async function receiveAsset(form: FormData, field: string, previous: Record<stri
 export async function saveHomeHero(form: FormData) {
   const previous = await getHomeRow(await db());
   const hero = { ...(previous.hero as Record<string, unknown>) };
-  const { patch: asset, obsolete } = await receiveAsset(form, "image", hero);
+  let asset: Record<string, unknown>;
+  let obsolete: string[];
+  try {
+    const result = await receiveAsset(form, "image", hero);
+    asset = result.patch;
+    obsolete = result.obsolete;
+  } catch {
+    return redirect("/admin/website/home?error=invalid-asset");
+  }
   await patchHome(
     "hero",
     {
@@ -210,7 +257,15 @@ export async function saveStoriesConfig(form: FormData) {
 export async function saveApproach(form: FormData) {
   const previous = await getHomeRow(await db());
   const approach = { ...(previous.approach as Record<string, unknown>) };
-  const { patch: asset, obsolete } = await receiveAsset(form, "image", approach);
+  let asset: Record<string, unknown>;
+  let obsolete: string[];
+  try {
+    const result = await receiveAsset(form, "image", approach);
+    asset = result.patch;
+    obsolete = result.obsolete;
+  } catch {
+    return redirect("/admin/website/home?error=invalid-asset");
+  }
   const count = Math.min(12, Math.max(0, Number(value(form, "principle_count")) || 0));
   const principles: { label: string; description: string }[] = [];
   for (let index = 0; index < count; index += 1) {
@@ -303,62 +358,72 @@ export async function saveGalleryPortfolio(form: FormData) {
 /* --------------------------- website gallery ------------------------------- */
 
 export async function uploadWebsiteGalleryImages(form: FormData): Promise<{ ok: boolean; message?: string; count?: number }> {
-  const files = form.getAll("files").filter((entry): entry is File => entry instanceof File && entry.size > 0);
+  const entries = form.getAll("files");
+  if (entries.some(entry => !(entry instanceof File))) return { ok: false, message: "Choose image files only." };
+  const files = entries.filter((entry): entry is File => entry instanceof File);
   if (!files.length) return { ok: false, message: "Choose a photo to upload." };
+  if (files.some(file => file.size === 0)) return { ok: false, message: "Upload failed: empty files are not supported." };
   const category = normalizeWebsiteGalleryCategory(value(form, "category"));
   if (value(form, "category") && !category) return { ok: false, message: "Choose a valid website gallery category." };
   const supabase = await db();
+  const validated: Array<{
+    file: File;
+    validation: Extract<PhotoMetadataResult, { ok: true }>;
+    content: Extract<PhotoContentResult, { ok: true }>;
+    extension: string;
+  }> = [];
+  for (const file of files) {
+    const validation = validatePhotoMetadataWithPolicy({ filename: file.name, mimeType: file.type, bytes: file.size });
+    if (!validation.ok) return { ok: false, message: validation.message };
+    const body = Buffer.from(await file.arrayBuffer());
+    const content = await validatePhotoContent(body, validation);
+    if (!content.ok) return { ok: false, message: content.message };
+    const extension = photoExtensionForMime(validation.mimeType);
+    if (!extension) return { ok: false, message: "Upload failed: the image type is not supported." };
+    validated.push({ file, validation, content, extension });
+  }
   const target = await ensureWebsiteGallery(supabase);
   if (!target) return { ok: false, message: "Could not prepare the website gallery." };
   const { count, error: countError } = await supabase.from("photos").select("id", { count: "exact", head: true }).eq("gallery_id", target.galleryId);
-  if (countError) return { ok: false, message: `Could not prepare the upload: ${countError.message}` };
-  const uploadedKeys: string[] = [];
+  if (countError) return { ok: false, message: "Could not prepare the upload. Try again." };
+  let inserted = 0;
+  let currentKey: string | null = null;
   try {
-    for (const file of files) {
-      if (!(ALLOWED_PHOTO_TYPES as readonly string[]).includes(file.type) || file.size > MAX_PHOTO_BYTES) {
-        if (uploadedKeys.length) await photoStore().removePhotos(uploadedKeys);
-        return { ok: false, message: "Use JPEG, PNG, WebP, or GIF images up to 15MB." };
-      }
+    for (const { file, validation, content, extension } of validated) {
+      const body = Buffer.from(await file.arrayBuffer());
+      if (body.byteLength !== content.bytes) return { ok: false, message: "Upload failed: the uploaded file size did not match." };
       const id = crypto.randomUUID();
-      const ext = extByMime[file.type] ?? "png";
-      const key = websiteImageKey(id, ext);
-      await photoStore().uploadPhoto({ key, body: Buffer.from(await file.arrayBuffer()), contentType: file.type });
-      uploadedKeys.push(key);
+      currentKey = websiteImageKey(id, extension);
+      await photoStore().uploadPhoto({ key: currentKey, body, contentType: content.mimeType });
       const { error } = await supabase.from("photos").insert({
         id,
         gallery_id: target.galleryId,
         folder_id: target.folderId,
-        filename: file.name.trim().slice(0, 500) || `photo-${id}.${ext}`,
-        original_path: key,
-        mime_type: file.type,
-        bytes: file.size,
+        filename: validation.filename,
+        original_path: currentKey,
+        mime_type: content.mimeType,
+        bytes: content.bytes,
+        width: content.width,
+        height: content.height,
         category: category ?? null,
         published_category: null,
         published: false,
         pending_delete: false,
-        sort_order: (count ?? 0) + uploadedKeys.length,
+        sort_order: (count ?? 0) + inserted + 1,
       });
-      if (error) throw new Error(`Photo record could not be created: ${error.message}`);
+      if (error) throw new Error("photo-insert-failed");
+      currentKey = null;
+      inserted += 1;
     }
-
-  } catch (error) {
-    if (uploadedKeys.length) {
-      try {
-        await photoStore().removePhotos(uploadedKeys);
-      } catch {
-        // Preserve the original upload/database failure for the admin UI.
-      }
+  } catch {
+    if (currentKey) {
+      try { await photoStore().removePhotos([currentKey]); } catch {}
     }
-    return {
-      ok: false,
-      message: error instanceof Error && error.message
-        ? error.message
-        : "Could not store that image. Try again.",
-    };
+    return { ok: false, message: "Could not store that image. Try again." };
   }
   revalidate();
   await invalidateTags("site-website-gallery");
-  return { ok: true, count: uploadedKeys.length };
+  return { ok: true, count: inserted };
 }
 
 export async function updateWebsiteGalleryImageCategory(form: FormData) {
@@ -554,16 +619,25 @@ export async function saveBranding(form: FormData) {
       if (previous) obsolete.push(previous);
       patch[`${field}_path`] = null;
       patch[`${field}_mime`] = null;
-    } else if (file instanceof File && file.size > 0) {
-      if (!(ALLOWED_PHOTO_TYPES as readonly string[]).includes(file.type) || file.size > MAX_PHOTO_BYTES) {
+    } else if (file instanceof File) {
+      if (file.size <= 0) return redirect("/admin/website/branding?error=invalid-asset");
+      const mimeType = file.type.trim().toLowerCase();
+      const extension = photoExtensionForMime(mimeType);
+      if (!extension) return redirect("/admin/website/branding?error=invalid-asset");
+    const validation = validatePhotoMetadataWithPolicy({ filename: `asset.${extension}`, mimeType, bytes: file.size });
+      if (!validation.ok) return redirect("/admin/website/branding?error=invalid-asset");
+      const body = Buffer.from(await file.arrayBuffer());
+      const content = await validatePhotoContent(body, validation);
+      if (!content.ok) return redirect("/admin/website/branding?error=invalid-asset");
+      const key = `website/${field}/${crypto.randomUUID()}.${extension}`;
+      try {
+        await photoStore().uploadPhoto({ key, body, contentType: content.mimeType });
+      } catch {
         return redirect("/admin/website/branding?error=invalid-asset");
       }
-      const ext = extByMime[file.type] ?? "png";
-      const key = `website/${field}/${crypto.randomUUID()}.${ext}`;
-      await photoStore().uploadPhoto({ key, body: Buffer.from(await file.arrayBuffer()), contentType: file.type });
       if (previous) obsolete.push(previous);
       patch[`${field}_path`] = key;
-      patch[`${field}_mime`] = file.type;
+      patch[`${field}_mime`] = content.mimeType;
     }
   }
   await supabase.from("site_branding").upsert(

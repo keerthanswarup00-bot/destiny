@@ -4,10 +4,11 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { adminDb } from "@/lib/admin-data";
-import { ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES, clientSchema, folderSchema, gallerySchema, photoUploadSchema, slugify } from "@/lib/admin-validation";
+import { clientSchema, folderSchema, gallerySchema, photoUploadSchema, slugify } from "@/lib/admin-validation";
 import { photoStore } from "@/lib/storage-provider";
-import { auditStorageOrphans as auditOrphans, cleanupOrphanedPhotoKeys as cleanupOrphans, isClientPhotoStorageKey, photoStoragePaths } from "@/lib/storage-ops";
-import { createSignedPutUrl, downloadObjectBytes } from "@/lib/r2";
+import { auditStorageOrphans as auditOrphans, cleanupOrphanedPhotoKeys as cleanupOrphans, photoStoragePaths } from "@/lib/storage-ops";
+import { validatePhotoContent, type PhotoContentResult } from "@/lib/photo-content-validation";
+import { validatePhotoMetadata, type PhotoMetadataResult } from "@/lib/photo-validation";
 import { hashGalleryPassword } from "@/lib/gallery-password";
 import { validateWatermarkSettings, watermarkSourceFromBytes, watermarkedDerivative, type ActiveWatermarkConfig, type WatermarkSource } from "@/lib/watermark-core";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -88,11 +89,9 @@ export async function deleteFolder(form: FormData) {
   revalidatePath(`/admin/galleries/${gallery}`);
 }
 function galleryFail(gallery: string, code: string) { return redirect(`/admin/galleries/${gallery}?error=${code}`); }
-function storageFilename(filename: string) { const trimmed=filename.trim().slice(0,500); const dot=trimmed.lastIndexOf("."); const ext=dot>0?trimmed.slice(dot).toLowerCase().replace(/[^a-z0-9.]/g,""):""; return `${slugify(dot>0?trimmed.slice(0,dot):trimmed)||"photo"}${ext}`; }
 const THUMBNAIL_LONG_EDGE = 640;
 const PREVIEW_LONG_EDGE = 2400;
 const DOWNLOAD_QUALITY = 92;
-const isR2Provider = () => process.env.PHOTO_STORAGE_PROVIDER?.trim().toLowerCase() === "r2";
 
 /* ------------------------------------------------------------------ */
 /* Client Gallery watermarking                                         */
@@ -146,11 +145,11 @@ async function storeWatermarkedDerivatives(
   body: Buffer,
   paths: { thumbnail: string; preview: string; download: string },
   watermark: ActiveWatermarkConfig | null,
-  options?: { overwrite?: boolean; keepOnFailure?: string[] },
+  options?: { overwrite?: boolean; keepOnFailure?: string[]; dimensions?: { width: number; height: number } },
 ): Promise<{ width: number | null; height: number | null; uploaded: string[] }> {
-  const metadata = await sharp(body).metadata();
-  const width = metadata.width;
-  const height = metadata.height;
+  const metadata = options?.dimensions ? null : await sharp(body).metadata();
+  const width = options?.dimensions?.width ?? metadata?.width;
+  const height = options?.dimensions?.height ?? metadata?.height;
   if (!width || !height) throw new Error("derivative-missing-dimensions");
   // Display derivatives stay WebP for fast loading; the client-download
   // derivative is a full-resolution JPEG. Each job's contentType is the exact
@@ -195,25 +194,19 @@ function photoMetadata(form: FormData) {
   return {
     gallery: value(form, "gallery_id"),
     folder: value(form, "folder_id"),
-    filename: value(form, "filename").trim(),
+    filename: value(form, "filename"),
     mimeType: value(form, "mime_type"),
     bytes: Number(value(form, "bytes")),
   };
 }
 
-function validPhotoMetadata({ filename, mimeType, bytes }: ReturnType<typeof photoMetadata>) {
-  return Boolean(
-    filename &&
-    Number.isFinite(bytes) &&
-    bytes > 0 &&
-    (ALLOWED_PHOTO_TYPES as readonly string[]).includes(mimeType) &&
-    bytes <= MAX_PHOTO_BYTES,
-  );
+function validPhotoMetadata(metadata: ReturnType<typeof photoMetadata>): PhotoMetadataResult {
+  return validatePhotoMetadata(metadata);
 }
 
-function clientPhotoPaths(gallery: string, folder: string, id: string, filename: string) {
+function clientPhotoPaths(gallery: string, folder: string, id: string) {
   return {
-    original: `${gallery}/${folder}/${id}/${storageFilename(filename)}`,
+    original: `${gallery}/${folder}/${id}/original`,
     thumbnail: `${gallery}/${folder}/${id}/thumbnail.webp`,
     preview: `${gallery}/${folder}/${id}/preview.webp`,
     download: `${gallery}/${folder}/${id}/download.jpg`,
@@ -223,8 +216,9 @@ function clientPhotoPaths(gallery: string, folder: string, id: string, filename:
 export async function prepareClientGalleryUpload(form: FormData): Promise<ClientGalleryUploadPreparation> {
   const metadata = photoMetadata(form);
   const parsed = photoUploadSchema.safeParse({ gallery_id: metadata.gallery, folder_id: metadata.folder });
-  if (!parsed.success || !validPhotoMetadata(metadata)) {
-    return { ok: false, message: "Upload failed: use JPEG, PNG, WebP, or GIF images up to 15MB." };
+  const validation = validPhotoMetadata(metadata);
+  if (!parsed.success || !validation.ok) {
+    return { ok: false, message: validation.ok ? "Upload failed: choose a valid gallery folder." : validation.message };
   }
   const supabase = await db();
   const { data: folder } = await supabase
@@ -234,15 +228,16 @@ export async function prepareClientGalleryUpload(form: FormData): Promise<Client
     .eq("gallery_id", parsed.data.gallery_id)
     .maybeSingle();
   if (!folder) return { ok: false, message: "Upload failed: the selected folder is unavailable." };
-  if (!isR2Provider()) {
-    return { ok: false, message: "Direct upload is unavailable for the configured storage provider.", fallback: true };
-  }
   const id = crypto.randomUUID();
-  const key = clientPhotoPaths(parsed.data.gallery_id, folder.id, id, metadata.filename).original;
+  const key = clientPhotoPaths(parsed.data.gallery_id, folder.id, id).original;
   try {
-    return { ok: true, id, key, uploadUrl: await createSignedPutUrl(key, metadata.mimeType) };
+    const uploadUrl = await photoStore().signedPutUrl(key, validation.mimeType);
+    if (!uploadUrl) {
+      return { ok: false, message: "Direct upload is unavailable for the configured storage provider.", fallback: true };
+    }
+    return { ok: true, id, key, uploadUrl };
   } catch {
-    return { ok: false, message: "Upload failed: R2 storage is unavailable." };
+    return { ok: false, message: "Upload failed: direct storage upload is unavailable." };
   }
 }
 
@@ -250,10 +245,10 @@ export async function completeClientGalleryUpload(form: FormData): Promise<{ ok:
   const metadata = photoMetadata(form);
   const id = value(form, "id");
   const parsed = photoUploadSchema.safeParse({ gallery_id: metadata.gallery, folder_id: metadata.folder });
-  if (!parsed.success || !id || !/^[0-9a-f-]{36}$/i.test(id) || !validPhotoMetadata(metadata)) {
-    return { ok: false, message: "Upload failed: invalid photo metadata." };
+  const validation = validPhotoMetadata(metadata);
+  if (!parsed.success || !id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) || !validation.ok) {
+    return { ok: false, message: validation.ok ? "Upload failed: invalid photo metadata." : validation.message };
   }
-  if (!isR2Provider()) return { ok: false, message: "Upload failed: R2 storage is unavailable." };
   const supabase = await db();
   const { data: folder } = await supabase
     .from("folders")
@@ -262,31 +257,29 @@ export async function completeClientGalleryUpload(form: FormData): Promise<{ ok:
     .eq("gallery_id", parsed.data.gallery_id)
     .maybeSingle();
   if (!folder) return { ok: false, message: "Upload failed: the selected folder is unavailable." };
-  const paths = clientPhotoPaths(parsed.data.gallery_id, folder.id, id, metadata.filename);
+  const paths = clientPhotoPaths(parsed.data.gallery_id, folder.id, id);
   if (value(form, "key") !== paths.original) {
-    // The client must never choose its own key. Clean up any object it
-    // managed to upload under the prepared key before rejecting.
-    try {
-      if (isClientPhotoStorageKey(value(form, "key"))) await photoStore().removePhotos([value(form, "key")]);
-    } catch { /* Best-effort cleanup of a rejected upload. */ }
     return { ok: false, message: "Upload failed: invalid storage path." };
   }
-  // Idempotent retry: a previous completion already recorded this photo.
-  const { data: existing } = await supabase.from("photos").select("id,original_path").eq("id", id).maybeSingle();
+  const { data: existing } = await supabase.from("photos").select("id,original_path").eq("id", id).eq("gallery_id", parsed.data.gallery_id).maybeSingle();
   if (existing) {
     if (existing.original_path === paths.original) return { ok: true };
-    // The id collides with a different photo; never touch the existing record.
     return { ok: false, message: "Upload failed: invalid photo reference." };
   }
-  // A single read verifies integrity AND feeds derivative generation, so the
-  // upload cannot race between a HEAD size-check and the GET (and one fewer
-  // round trip to storage).
-  const body = await downloadObjectBytes(paths.original);
-  if (!body || body.byteLength !== metadata.bytes) {
-    // Nothing was stored, or it is partial/corrupt. Removing a missing key is
-    // an idempotent no-op, so cleanup is safe on either outcome.
-    try { await photoStore().removePhotos([paths.original]); } catch { /* Best-effort cleanup. */ }
+  let body: Buffer | null;
+  try {
+    body = await photoStore().downloadBytes(paths.original);
+  } catch {
+    body = null;
+  }
+  if (!body) {
+    try { await photoStore().removePhotos([paths.original]); } catch {}
     return { ok: false, message: "Upload failed: the original file was not stored." };
+  }
+  const content = await validatePhotoContent(body, validation);
+  if (!content.ok) {
+    try { await photoStore().removePhotos([paths.original]); } catch {}
+    return { ok: false, message: content.message };
   }
   const { count } = await supabase
     .from("photos")
@@ -294,39 +287,38 @@ export async function completeClientGalleryUpload(form: FormData): Promise<{ ok:
     .eq("gallery_id", parsed.data.gallery_id)
     .eq("folder_id", folder.id);
   const uploadedPaths = [paths.original];
-  let width: number | null = null;
-  let height: number | null = null;
   try {
     const watermark = await activeWatermark(supabase);
-    const derivatives = await storeWatermarkedDerivatives(body, { thumbnail: paths.thumbnail, preview: paths.preview, download: paths.download }, watermark);
+    const derivatives = await storeWatermarkedDerivatives(
+      body,
+      { thumbnail: paths.thumbnail, preview: paths.preview, download: paths.download },
+      watermark,
+      { dimensions: { width: content.width, height: content.height } },
+    );
     uploadedPaths.push(...derivatives.uploaded);
-    width = derivatives.width;
-    height = derivatives.height;
+    const { error } = await supabase.from("photos").insert({
+      id,
+      gallery_id: parsed.data.gallery_id,
+      folder_id: folder.id,
+      filename: validation.filename,
+      original_path: paths.original,
+      preview_path: paths.preview,
+      thumbnail_path: paths.thumbnail,
+      download_path: paths.download,
+      width: content.width,
+      height: content.height,
+      mime_type: content.mimeType,
+      bytes: content.bytes,
+      sort_order: count ?? 0,
+    });
+    if (error) {
+      try { await photoStore().removePhotos(uploadedPaths); } catch {}
+      return { ok: false, message: "Upload failed: the photo record could not be created." };
+    }
   } catch (error) {
     console.error(`client-gallery: failed to build client derivatives for ${paths.original}`, error);
-    // No client-facing record is created unless the client derivatives
-    // exist; the private original is only removed once nothing references it.
-    try { await photoStore().removePhotos(uploadedPaths); } catch { /* Preserve the original failure. */ }
+    try { await photoStore().removePhotos(uploadedPaths); } catch {}
     return { ok: false, message: "Upload failed: the image could not be processed for delivery." };
-  }
-  const { error } = await supabase.from("photos").insert({
-    id,
-    gallery_id: parsed.data.gallery_id,
-    folder_id: folder.id,
-    filename: metadata.filename.slice(0, 500) || storageFilename(metadata.filename),
-    original_path: paths.original,
-    preview_path: paths.preview,
-    thumbnail_path: paths.thumbnail,
-    download_path: paths.download,
-    width,
-    height,
-    mime_type: metadata.mimeType,
-    bytes: metadata.bytes,
-    sort_order: count ?? 0,
-  });
-  if (error) {
-    try { await photoStore().removePhotos(uploadedPaths); } catch { /* Preserve the database failure. */ }
-    return { ok: false, message: "Upload failed: the photo record could not be created." };
   }
   revalidatePath(`/admin/galleries/${parsed.data.gallery_id}`);
   revalidatePath(`/admin/galleries/${parsed.data.gallery_id}/${folder.id}`);
@@ -337,80 +329,98 @@ export async function uploadPhotos(form: FormData) {
   const gallery=value(form,"gallery_id");
   const parsed=photoUploadSchema.safeParse({ gallery_id:gallery, folder_id:value(form,"folder_id") });
   if(!parsed.success) return galleryFail(gallery,"invalid-photo");
-  return (await runFolderUpload(parsed.data.gallery_id, parsed.data.folder_id, form)) ?? galleryFail(gallery, "photo-upload");
+  const result = await runFolderUpload(parsed.data.gallery_id, parsed.data.folder_id, form);
+  if (!result) return galleryFail(gallery, "photo-upload");
+  if ("error" in result) return galleryFail(gallery, "photo-upload");
+  return result;
 }
 
 export async function uploadPhotosAsync(form: FormData) {
   const gallery=value(form,"gallery_id");
   const parsed=photoUploadSchema.safeParse({ gallery_id:gallery, folder_id:value(form,"folder_id") });
-  if(!parsed.success) return { ok:false as const };
+  if(!parsed.success) return { ok:false as const, message: "Upload failed: choose a valid gallery folder." };
   const config=await runFolderUpload(parsed.data.gallery_id, parsed.data.folder_id, form);
-  if(!config) return { ok:false as const };
+  if(!config) return { ok:false as const, message: "Upload failed: no file selected." };
+  if ("error" in config) return { ok:false as const, message: config.error };
   revalidatePath(`/admin/galleries/${gallery}/${parsed.data.folder_id}`);
   return { ok:true as const, count: config.count };
 }
 
-async function runFolderUpload(gallery: string, folderId: string, form: FormData): Promise<{ count: number } | null> {
-  const files=form.getAll("files").filter((entry): entry is File => entry instanceof File && entry.size>0);
-  if(!files.length) return null;
-  const supabase=await db();
-  const { data: folder }=await supabase.from("folders").select("id").eq("id",folderId).eq("gallery_id",gallery).maybeSingle();
-  if(!folder) return null;
-  const { count }=await supabase.from("photos").select("id",{ count:"exact", head:true }).eq("gallery_id",gallery).eq("folder_id",folder.id);
-  let sort=count??0;
-  const watermark = await activeWatermark(supabase);
+async function runFolderUpload(
+  gallery: string,
+  folderId: string,
+  form: FormData,
+): Promise<{ count: number } | { error: string } | null> {
+  const entries = form.getAll("files");
+  if (entries.some(entry => !(entry instanceof File))) return { error: "Upload failed: choose image files only." };
+  const files = entries.filter((entry): entry is File => entry instanceof File);
+  if (!files.length) return null;
+  if (files.some(file => file.size === 0)) return { error: "Upload failed: empty files are not supported." };
+  const supabase = await db();
+  const { data: folder } = await supabase.from("folders").select("id").eq("id", folderId).eq("gallery_id", gallery).maybeSingle();
+  if (!folder) return { error: "Upload failed: the selected folder is unavailable." };
+  const validated: Array<{
+    file: File;
+    validation: Extract<PhotoMetadataResult, { ok: true }>;
+    content: Extract<PhotoContentResult, { ok: true }>;
+  }> = [];
   for (const file of files) {
-    if(!(ALLOWED_PHOTO_TYPES as readonly string[]).includes(file.type) || file.size>MAX_PHOTO_BYTES) return null;
-    const id=crypto.randomUUID();
-    const original_path=`${gallery}/${folder.id}/${id}/${storageFilename(file.name)}`;
-    const thumbnail_path=`${gallery}/${folder.id}/${id}/thumbnail.webp`;
-    const preview_path=`${gallery}/${folder.id}/${id}/preview.webp`;
-    const download_path=`${gallery}/${folder.id}/${id}/download.jpg`;
+    const validation = validatePhotoMetadata({ filename: file.name, mimeType: file.type, bytes: file.size });
+    if (!validation.ok) return { error: validation.message };
+    const body = Buffer.from(await file.arrayBuffer());
+    const content = await validatePhotoContent(body, validation);
+    if (!content.ok) return { error: content.message };
+    validated.push({ file, validation, content });
+  }
+  let watermark: ActiveWatermarkConfig | null;
+  try {
+    watermark = await activeWatermark(supabase);
+  } catch {
+    return { error: "Upload failed: the image processor is unavailable." };
+  }
+  const { count } = await supabase.from("photos").select("id", { count: "exact", head: true }).eq("gallery_id", gallery).eq("folder_id", folder.id);
+  let sort = count ?? 0;
+  for (const { file, validation, content } of validated) {
+    const body = Buffer.from(await file.arrayBuffer());
+    if (body.byteLength !== content.bytes) return { error: "Upload failed: the uploaded file size did not match." };
+    const id = crypto.randomUUID();
+    const paths = clientPhotoPaths(gallery, folder.id, id);
     const uploadedPaths: string[] = [];
-    const body=Buffer.from(await file.arrayBuffer());
-    let width: number | null = null;
-    let height: number | null = null;
     try {
-      await photoStore().uploadPhoto({ key: original_path, body, contentType: file.type });
-      uploadedPaths.push(original_path);
-    } catch {
-      return null;
-    }
-    try {
-      const derivatives = await storeWatermarkedDerivatives(body, { thumbnail: thumbnail_path, preview: preview_path, download: download_path }, watermark);
+      await photoStore().uploadPhoto({ key: paths.original, body, contentType: content.mimeType });
+      uploadedPaths.push(paths.original);
+      const derivatives = await storeWatermarkedDerivatives(
+        body,
+        { thumbnail: paths.thumbnail, preview: paths.preview, download: paths.download },
+        watermark,
+        { dimensions: { width: content.width, height: content.height } },
+      );
       uploadedPaths.push(...derivatives.uploaded);
-      width = derivatives.width;
-      height = derivatives.height;
+      const { error: insertError } = await supabase.from("photos").insert({
+        id,
+        gallery_id: gallery,
+        folder_id: folder.id,
+        filename: validation.filename,
+        original_path: paths.original,
+        preview_path: paths.preview,
+        thumbnail_path: paths.thumbnail,
+        download_path: paths.download,
+        width: content.width,
+        height: content.height,
+        mime_type: content.mimeType,
+        bytes: content.bytes,
+        sort_order: sort,
+      });
+      if (insertError) throw new Error("photo-insert-failed");
     } catch (error) {
-      console.error(`client-gallery: failed to build client derivatives for ${original_path}`, error);
-      // No client-facing record is created unless the client derivatives
-      // exist; the private original is only removed once nothing references it.
-      try { await photoStore().removePhotos(uploadedPaths); } catch { /* Preserve the original failure. */ }
-      return null;
+      console.error(`client-gallery: failed to process ${paths.original}`, error);
+      try { await photoStore().removePhotos(uploadedPaths); } catch {}
+      return { error: "Upload failed: the image could not be stored." };
     }
-    const { error: insertError }=await supabase.from("photos").insert({
-      id,
-      gallery_id:gallery,
-      folder_id:folder.id,
-      filename:file.name.trim().slice(0,500)||storageFilename(file.name),
-      original_path,
-      preview_path,
-      thumbnail_path,
-      download_path,
-      width,
-      height,
-      mime_type:file.type,
-      bytes:file.size,
-      sort_order:sort,
-    });
-    if(insertError) {
-      try { await photoStore().removePhotos(uploadedPaths); } catch { /* Preserve the database failure. */ }
-      return null;
-    }
-    sort+=1;
+    sort += 1;
   }
   revalidatePath(`/admin/galleries/${gallery}`);
-  return { count: sort -(count??0) };
+  return { count: sort - (count ?? 0) };
 }
 export async function deletePhoto(form: FormData) {
   const gallery=value(form,"gallery_id"); const id=value(form,"id"); const supabase=await db();
@@ -503,7 +513,7 @@ type ReapplyPhoto = {
 async function reapplyPhotoWatermark(supabase: SupabaseClient<Database>, gallery: string, photo: ReapplyPhoto, watermark: ActiveWatermarkConfig): Promise<void> {
   const body = await photoStore().downloadBytes(photo.original_path);
   if (!body) throw new Error("original-unreadable");
-  const paths = clientPhotoPaths(gallery, photo.folder_id, photo.id, photo.original_path.split("/").pop() ?? "photo.webp");
+  const paths = clientPhotoPaths(gallery, photo.folder_id, photo.id);
   const previous = [photo.thumbnail_path, photo.preview_path, photo.download_path].filter((path): path is string => Boolean(path));
   const derivatives = await storeWatermarkedDerivatives(
     body,

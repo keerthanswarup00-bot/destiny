@@ -19,7 +19,7 @@ import { deletePhotos, movePhotos } from "@/app/admin/crud-actions";
 import { setFolderCover, setFolderPublished } from "@/app/admin/set-actions";
 import { ApplyWatermarkButton } from "@/components/admin/apply-watermark-button";
 import { DeleteSelectedButton } from "@/components/admin/delete-selected-button";
-import { uploadClientGalleryFiles } from "@/components/admin/client-gallery-upload";
+import { uploadClientGalleryFiles, type GalleryUploadProgress } from "@/components/admin/client-gallery-upload";
 import { StagedUploadQueue, type StagedUploadQueueHandle } from "@/components/admin/upload-queue";
 
 type WorkspacePhoto = { id: string; filename: string; width: number | null; height: number | null; src: string; downloadUrl: string };
@@ -43,9 +43,7 @@ export function SetWorkspace({
   const [uploading, setUploading] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [showUpload, setShowUpload] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [queueCount, setQueueCount] = useState(0);
   const fileInput = useRef<HTMLInputElement>(null);
   const queueRef = useRef<StagedUploadQueueHandle>(null);
 
@@ -64,26 +62,39 @@ export function SetWorkspace({
   const selectAll = () => setSelected(new Set(photos.map(photo => photo.id)));
 
   function stageFiles(files: FileList | null | File[]) {
-    if (!files || files.length === 0) return;
+    if (!files || files.length === 0 || uploading > 0) return;
     setUploadError(null);
     queueRef.current?.addFiles(files);
   }
 
-  async function commitPending(files: File[]) {
-    if (!files.length) return;
+  function openUploadPicker() {
+    if (uploading > 0) return;
+    setShowUpload(true);
+    fileInput.current?.click();
+  }
+
+  async function commitPending(files: File[], onProgress: (event: GalleryUploadProgress) => void) {
+    if (!files.length) return { ok: false };
     setUploading(files.length);
     setUploadError(null);
-    setDragOver(false);
     try {
-      const result = await uploadClientGalleryFiles(files, { galleryId: gallery.id, folderId: folder.id });
+      const result = await uploadClientGalleryFiles(
+        files,
+        { galleryId: gallery.id, folderId: folder.id },
+        onProgress,
+      );
       if (!result.ok) setUploadError(result.message);
+      if (result.ok) {
+        setShowUpload(false);
+        router.refresh();
+      }
+      return { ok: result.ok };
     } catch (uploadError) {
-      setUploadError(uploadError instanceof Error && uploadError.message ? uploadError.message : "Upload failed. Please try again.");
+      const message = uploadError instanceof Error && uploadError.message ? uploadError.message : "Upload failed. Please try again.";
+      setUploadError(message);
+      return { ok: false };
     } finally {
       setUploading(0);
-      setShowUpload(false);
-      queueRef.current?.clear();
-      router.refresh();
     }
   }
 
@@ -127,41 +138,25 @@ export function SetWorkspace({
           <Link className="admin-button is-secondary" href={clientUrl} rel="noreferrer" target="_blank">
             <ExternalLink size={15} strokeWidth={1.8} /> Open gallery
           </Link>
-          <button className="admin-button" onClick={() => fileInput.current?.click()} type="button">
+          <button className="admin-button" disabled={uploading > 0} onClick={openUploadPicker} type="button">
             <Upload size={15} strokeWidth={1.8} /> Upload
           </button>
         </div>
       </header>
 
-      {showUpload && !uploading ? (
-        <>
-          <StagedUploadQueue
-            onCommit={commitPending}
-            onCountChange={setQueueCount}
-            ref={queueRef}
-            uploading={uploading > 0}
-          />
-          {!queueCount ? (
-            <div
-              className={`upload-zone${dragOver ? " is-dragging" : ""}`}
-              onDragLeave={() => setDragOver(false)}
-              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-              onDrop={e => { e.preventDefault(); stageFiles(e.dataTransfer.files); }}
-            >
-              <button aria-label="Close" className="upload-close" onClick={() => setShowUpload(false)} type="button"><X size={16} /></button>
-              <div className="upload-zone-icon"><ImageIcon size={26} strokeWidth={1.5} /></div>
-              <strong>Drop photos here</strong>
-              <span>or</span>
-              <button className="admin-button" onClick={() => fileInput.current?.click()} type="button">Browse files</button>
-              <em>JPEG, PNG, WebP or GIF.</em>
-            </div>
-          ) : null}
-        </>
+      {showUpload ? (
+        <StagedUploadQueue
+          onBrowse={() => fileInput.current?.click()}
+          onCommit={commitPending}
+          onError={setUploadError}
+          ref={queueRef}
+          uploading={uploading > 0}
+        />
       ) : null}
       {uploading ? (
         <div className="upload-progress" role="status">
           <span className="upload-spinner" />
-          Uploading {uploading} {uploading === 1 ? "photo" : "photos"}…
+          Uploading and processing {uploading} {uploading === 1 ? "photo" : "photos"}…
         </div>
       ) : null}
       {uploadError ? <p className="form-error" role="alert">{uploadError}</p> : null}
@@ -183,7 +178,7 @@ export function SetWorkspace({
             {photos.length ? (
               <button className="admin-button is-secondary" onClick={selectAll} type="button">Select All</button>
             ) : null}
-            <button className="admin-button is-secondary" onClick={() => fileInput.current?.click()} type="button">
+            <button className="admin-button is-secondary" disabled={uploading > 0} onClick={openUploadPicker} type="button">
               <Upload size={15} strokeWidth={1.8} /> Upload pictures
             </button>
             <Link className="admin-button is-secondary" href={clientUrl} rel="noreferrer" target="_blank">
@@ -255,7 +250,7 @@ export function SetWorkspace({
           <ImageIcon size={34} strokeWidth={1.2} />
           <h2>No photos yet</h2>
           <p className="muted">Drop a few photos here or click Upload to start this set.</p>
-          <button className="admin-button" onClick={() => fileInput.current?.click()} type="button">
+          <button className="admin-button" disabled={uploading > 0} onClick={openUploadPicker} type="button">
             <Upload size={15} strokeWidth={1.8} /> Upload photos
           </button>
         </div>

@@ -31,12 +31,17 @@ export function sanitizeFilenameSegment(value: string): string {
 }
 
 function originalExtension(photo: { original_path: string; filename: string }): string {
-  const tail = (photo.original_path || photo.filename || "")
+  const pathTail = (photo.original_path || "")
     .replaceAll("\\", "/")
     .split("/")
     .pop()
     ?.split("?")[0] ?? "";
-  const match = tail.match(/\.([A-Za-z0-9]{2,8})$/);
+  const filenameTail = (photo.filename || "")
+    .replaceAll("\\", "/")
+    .split("/")
+    .pop()
+    ?.split("?")[0] ?? "";
+  const match = (pathTail.match(/\.([A-Za-z0-9]{2,8})$/) ?? filenameTail.match(/\.([A-Za-z0-9]{2,8})$/));
   return match ? `.${match[1].toLowerCase()}` : ".jpg";
 }
 

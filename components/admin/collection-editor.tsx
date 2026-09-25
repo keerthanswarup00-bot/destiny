@@ -28,6 +28,7 @@ import {
   X,
 } from "lucide-react";
 import { AddSetDialog } from "@/components/admin/add-set-dialog";
+import { AdminPhotoPreview } from "@/components/admin/admin-photo-preview";
 import { ApplyWatermarkButton } from "@/components/admin/apply-watermark-button";
 import { CopyButton } from "@/components/admin/copy-button";
 import { DeleteSelectedButton } from "@/components/admin/delete-selected-button";
@@ -43,7 +44,7 @@ import {
   setGalleryStatus,
   setFolderDownloadPassword,
 } from "@/app/admin/set-actions";
-import { uploadClientGalleryFiles } from "@/components/admin/client-gallery-upload";
+import { uploadClientGalleryFiles, type GalleryUploadProgress } from "@/components/admin/client-gallery-upload";
 import { StagedUploadQueue, type StagedUploadQueueHandle } from "@/components/admin/upload-queue";
 
 type EditorFolder = {
@@ -98,16 +99,19 @@ export function CollectionEditor({
   const router = useRouter();
   const [activeId, setActiveId] = useState<string>(folders[0]?.id ?? "");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectionAnchor, setSelectionAnchor] = useState<string | null>(null);
+  const selectionAnchorRef = useRef<string | null>(null);
+  const selectionModifierRef = useRef({ shiftKey: false, additive: false });
   const [search, setSearch] = useState("");
   const [uploading, setUploading] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [dragOver, setDragOver] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [moreMenuFor, setMoreMenuFor] = useState<string | null>(null);
   const [renameFor, setRenameFor] = useState<EditorFolder | null>(null);
   const [deleteFor, setDeleteFor] = useState<EditorFolder | null>(null);
   const [downloadPasswordFor, setDownloadPasswordFor] = useState<EditorFolder | null>(null);
   const [toolbarMenuOpen, setToolbarMenuOpen] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState(-1);
   const fileInput = useRef<HTMLInputElement>(null);
   const queueRef = useRef<StagedUploadQueueHandle>(null);
   const renameRef = useRef<HTMLDialogElement>(null);
@@ -141,49 +145,101 @@ export function CollectionEditor({
   const single = selected.size === 1;
   const singleId = single ? [...selected][0] : null;
   const allVisibleSelected = visible.length > 0 && visible.every(photo => selected.has(photo.id));
-  const selectAllVisible = () => setSelected(new Set(visible.map(photo => photo.id)));
+  const setAnchor = (id: string | null) => {
+    selectionAnchorRef.current = id;
+    setSelectionAnchor(id);
+  };
+
+  const selectAllVisible = () => {
+    setSelected(new Set(visible.map(photo => photo.id)));
+    setAnchor(null);
+  };
   const deselectAllVisible = () => {
     const ids = new Set(visible.map(photo => photo.id));
     setSelected(prev => new Set([...prev].filter(id => !ids.has(id))));
+    setAnchor(null);
   };
 
   const switchSet = (id: string) => {
     setActiveId(id);
     setSelected(new Set());
+    setAnchor(null);
     setSearch("");
     setMoreMenuFor(null);
   };
 
-  const toggle = (id: string) =>
+  const toggle = (id: string, shiftKey = false, additive = false) => {
+    const clickedIndex = visible.findIndex(photo => photo.id === id);
+    const anchorId = selectionAnchorRef.current;
+
+    if (shiftKey && anchorId && clickedIndex >= 0) {
+      const anchorIndex = visible.findIndex(photo => photo.id === anchorId);
+
+      if (anchorIndex >= 0) {
+        const start = Math.min(anchorIndex, clickedIndex);
+        const end = Math.max(anchorIndex, clickedIndex);
+        const rangeIds = visible.slice(start, end + 1).map(photo => photo.id);
+
+        setSelected(prev => {
+          if (!additive) return new Set(rangeIds);
+          const next = new Set(prev);
+          for (const rangeId of rangeIds) next.add(rangeId);
+          return next;
+        });
+
+        // Shift-click extends from the original anchor.
+        // Keep the anchor unchanged so repeated Shift-clicks behave like
+        // desktop photo managers such as Apple Photos and Google Photos.
+        return;
+      }
+    }
+
     setSelected(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (additive) {
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+      } else if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
 
-  const clear = () => setSelected(new Set());
+    setAnchor(id);
+  };
+
+  const clear = () => {
+    setSelected(new Set());
+    setAnchor(null);
+  };
 
   function stageFiles(files: FileList | null | File[]) {
-    if (!files || files.length === 0 || !activeFolder) return;
+    if (!files || files.length === 0 || !activeFolder || uploading > 0) return;
     setUploadError(null);
     queueRef.current?.addFiles(files);
   }
 
-  async function commitPending(files: File[]) {
-    if (!files.length || !activeFolder) return;
+  async function commitPending(files: File[], onProgress: (event: GalleryUploadProgress) => void) {
+    if (!files.length || !activeFolder) return { ok: false };
     setUploading(files.length);
     setUploadError(null);
-    setDragOver(false);
     try {
-      const result = await uploadClientGalleryFiles(files, { galleryId: gallery.id, folderId: activeFolder.id });
+      const result = await uploadClientGalleryFiles(
+        files,
+        { galleryId: gallery.id, folderId: activeFolder.id },
+        onProgress,
+      );
       if (!result.ok) setUploadError(result.message);
+      if (result.ok) router.refresh();
+      return { ok: result.ok };
     } catch (uploadError) {
-      setUploadError(uploadError instanceof Error && uploadError.message ? uploadError.message : "Upload failed. Please try again.");
+      const message = uploadError instanceof Error && uploadError.message ? uploadError.message : "Upload failed. Please try again.";
+      setUploadError(message);
+      return { ok: false };
     } finally {
       setUploading(0);
-      queueRef.current?.clear();
-      router.refresh();
     }
   }
 
@@ -248,7 +304,7 @@ export function CollectionEditor({
               </div>
             ) : null}
           </div>
-          <button className="admin-button ce-primary-upload" onClick={() => fileInput.current?.click()} type="button">
+          <button className="admin-button ce-primary-upload" disabled={uploading > 0} onClick={() => fileInput.current?.click()} type="button">
             <Upload size={15} strokeWidth={1.8} /> Upload Photos
           </button>
           <CopyButton label="Share" text={shareUrl} />
@@ -405,44 +461,36 @@ export function CollectionEditor({
               {uploading ? (
                 <div className="upload-progress" role="status">
                   <span className="upload-spinner" />
-                  Uploading {uploading} {uploading === 1 ? "photo" : "photos"}…
+                  Uploading and processing {uploading} {uploading === 1 ? "photo" : "photos"}…
                 </div>
               ) : null}
               {uploadError ? <p className="form-error" role="alert">{uploadError}</p> : null}
-              {!uploading && dragOver ? (
-                <div
-                  className="upload-zone is-dragging"
-                  onDragLeave={() => setDragOver(false)}
-                  onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-                  onDrop={e => { e.preventDefault(); setDragOver(false); stageFiles(e.dataTransfer.files); }}
-                >
-                  <strong>Drop photos here to upload</strong>
-                </div>
-              ) : null}
-
-              {!uploading ? (
-                <StagedUploadQueue
-                  onCommit={commitPending}
-                  ref={queueRef}
-                  uploading={uploading > 0}
-                />
-              ) : null}
+              <StagedUploadQueue
+                onBrowse={() => fileInput.current?.click()}
+                onCommit={commitPending}
+                onError={setUploadError}
+                ref={queueRef}
+                uploading={uploading > 0}
+              />
 
               {photos.length ? (
                 <>
-                  <div className="ws-toolbar" aria-live="polite">
-                    {none ? (
-                      <>
-                        {visible.length ? (
-                          <button className="admin-button is-secondary" onClick={selectAllVisible} type="button">Select All</button>
-                        ) : null}
-                        {visible.length !== photos.length ? (
-                          <span className="ce-filtered-hint">{visible.length} of {photos.length} shown</span>
-                        ) : null}
-                      </>
-                    ) : (
-                      <>
-                        <strong className="ws-selected-count">{selected.size} selected</strong>
+                  {none ? (
+                    <div className="ws-toolbar" aria-live="polite">
+                      {visible.length ? (
+                        <button className="admin-button is-secondary" onClick={selectAllVisible} type="button">Select All</button>
+                      ) : null}
+                      {visible.length !== photos.length ? (
+                        <span className="ce-filtered-hint">{visible.length} of {photos.length} shown</span>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="ws-selection-toolbar" aria-live="polite">
+                      <div className="ws-selection-summary">
+                        <strong>{selected.size}</strong>
+                        <span>{selected.size === 1 ? "photo selected" : "photos selected"}</span>
+                      </div>
+                      <div className="ws-selection-actions">
                         {allVisibleSelected ? (
                           <button className="admin-button is-secondary" onClick={deselectAllVisible} type="button">Deselect All</button>
                         ) : (
@@ -476,20 +524,36 @@ export function CollectionEditor({
                         <button aria-label="Clear selection" className="icon-button" onClick={clear} type="button">
                           <X size={16} />
                         </button>
-                      </>
-                    )}
-                  </div>
+                      </div>
+                    </div>
+                  )}
 
                   {visible.length ? (
                     <div className="ws-photo-grid ce-photo-grid">
                       {visible.map(photo => (
-                        <label className={`ws-photo${selected.has(photo.id) ? " is-selected" : ""}`} key={photo.id}>
-                          {/* Signed admin-only URL; next/image is a poor fit for short-lived tokens. */}
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img alt="" loading="lazy" src={photo.src} />
-                          <input checked={selected.has(photo.id)} onChange={() => toggle(photo.id)} type="checkbox" />
-                          <span className="ws-photo-check"><Check size={13} strokeWidth={3} /></span>
-                        </label>
+                        <div className={`ws-photo${selected.has(photo.id) ? " is-selected" : ""}`} key={photo.id}>
+                          <button
+                            aria-label={`Preview ${photo.filename}`}
+                            className="ws-photo-preview"
+                            onClick={() => setPreviewIndex(visible.findIndex(item => item.id === photo.id))}
+                            type="button"
+                          >
+                            {/* Signed admin-only URL; next/image is a poor fit for short-lived tokens. */}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img alt={photo.filename} loading="lazy" src={photo.src} />
+                          </button>
+                          <button
+                            aria-label={selected.has(photo.id) ? `Deselect ${photo.filename}` : `Select ${photo.filename}`}
+                            aria-pressed={selected.has(photo.id)}
+                            className="ws-photo-select"
+                            onClick={event => toggle(photo.id, event.shiftKey, event.metaKey || event.ctrlKey)}
+                            type="button"
+                          >
+                            <span className="ws-photo-check" aria-hidden="true">
+                              {selected.has(photo.id) ? <Check size={13} strokeWidth={3} /> : null}
+                            </span>
+                          </button>
+                        </div>
                       ))}
                     </div>
                   ) : (
@@ -528,6 +592,14 @@ export function CollectionEditor({
         </div>
       </div>
 
+      {previewIndex >= 0 ? (
+        <AdminPhotoPreview
+          index={previewIndex}
+          onChange={setPreviewIndex}
+          onClose={() => setPreviewIndex(-1)}
+          photos={visible}
+        />
+      ) : null}
       {renameFor ? (
         <dialog className="admin-dialog" onCancel={() => setRenameFor(null)} ref={renameRef}>
           <form action={renameFolder} onSubmit={() => setRenameFor(null)}>

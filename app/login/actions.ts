@@ -42,7 +42,7 @@ export async function signIn(_: LoginState, formData: FormData): Promise<LoginSt
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    path: "/admin",
+    path: "/",
     maxAge: ADMIN_SESSION_MAX_AGE,
   });
 

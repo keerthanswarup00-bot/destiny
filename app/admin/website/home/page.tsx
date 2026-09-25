@@ -9,8 +9,8 @@ function SavedNote({ saved }: { saved?: string }) {
   return <span className="saved-note">Saved.</span>;
 }
 
-export default async function WebsiteHomePage({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
-  const { saved } = await searchParams;
+export default async function WebsiteHomePage({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string }> }) {
+  const { saved, error } = await searchParams;
   const home = await getSiteHome();
   const assetUrls = await resolveSiteAssetPaths([home.hero.image_path, home.approach.image_path]);
   const db = await adminDb();
@@ -29,6 +29,7 @@ export default async function WebsiteHomePage({ searchParams }: { searchParams: 
         </div>
       </div>
       <WebsiteTabs />
+      {error ? <p className="error-note" style={{ marginBottom: 14 }}>That image could not be saved — use JPEG, PNG, WebP or GIF under 15MB.</p> : null}
       <div className="website-editor-sections">
         <section className="admin-panel">
           <div className="panel-heading"><h2>Hero</h2></div>

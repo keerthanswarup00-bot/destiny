@@ -2,7 +2,7 @@ import "server-only";
 import { galleryDb } from "@/lib/gallery-db";
 import { GALLERY_ASSET_BUCKET } from "@/lib/admin-validation";
 import { CLIENT_SIGNED_URL_SECONDS, DOWNLOAD_SIGNED_URL_SECONDS } from "@/lib/client-media";
-import { downloadObjectBytes, deleteObject, objectBytes, objectExists, uploadObject, createSignedGetUrl, headObject, listObjects } from "@/lib/r2";
+import { downloadObjectBytes, deleteObject, objectBytes, objectExists, uploadObject, createSignedGetUrl, createSignedPutUrl, headObject, listObjects } from "@/lib/r2";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 
 const R2_DELETE_CONCURRENCY = 8;
@@ -72,6 +72,7 @@ export type PhotoStore = {
   removePhotos(keys: string[]): Promise<void>;
   signedGetUrls(keys: string[], seconds?: number): Promise<Map<string, string>>;
   signedDownloadUrl(key: string, filename: string, seconds?: number): Promise<string | null>;
+  signedPutUrl(key: string, contentType: string): Promise<string | null>;
   downloadBytes(key: string): Promise<Buffer | null>;
   objectBytes(key: string): Promise<number | null>;
   objectExists(key: string): Promise<boolean>;
@@ -80,7 +81,7 @@ export type PhotoStore = {
 };
 
 function activeProvider(): "supabase" | "r2" {
-  const value = process.env.PHOTO_STORAGE_PROVIDER?.toLowerCase();
+  const value = process.env.PHOTO_STORAGE_PROVIDER?.trim().toLowerCase();
   return value === "r2" ? "r2" : "supabase";
 }
 
@@ -110,6 +111,9 @@ const supabasePhotoStore: PhotoStore = {
     const supabase = await galleryDb();
     const { data } = await supabase.storage.from(GALLERY_ASSET_BUCKET).createSignedUrl(key, seconds, { download: filename });
     return data?.signedUrl ?? null;
+  },
+  async signedPutUrl() {
+    return null;
   },
   async downloadBytes(key) {
     const supabase = await galleryDb();
@@ -263,6 +267,9 @@ const r2PhotoStore: PhotoStore = {
       }
     }
     return supabasePhotoStore.signedDownloadUrl(key, filename, seconds);
+  },
+  async signedPutUrl(key, contentType) {
+    return createSignedPutUrl(key, contentType);
   },
   async downloadBytes(key) {
     return (await downloadObjectBytes(key)) ?? (await supabasePhotoStore.downloadBytes(key));

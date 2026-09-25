@@ -48,7 +48,7 @@ export function setAdminSessionCookie(response: NextResponse, username: string) 
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    path: "/admin",
+    path: "/",
     maxAge: ADMIN_SESSION_MAX_AGE,
   });
 }
@@ -58,7 +58,7 @@ export function clearAdminSessionCookie(response: NextResponse) {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    path: "/admin",
+    path: "/",
     maxAge: 0,
   });
 }

@@ -55,26 +55,32 @@ export function WebsiteGalleryUploader() {
       preparation.set("category", category);
       const prepared = await prepareWebsiteGalleryUpload(preparation);
       if (!prepared.ok) return prepared;
-      let response: Response;
+      const completeDirect = async () => {
+        const completion = new FormData();
+        completion.set("id", prepared.id);
+        completion.set("key", prepared.key);
+        completion.set("filename", file.name);
+        completion.set("mime_type", file.type);
+        completion.set("bytes", String(file.size));
+        completion.set("category", category);
+        return completeWebsiteGalleryUpload(completion);
+      };
+      let directCompleted = false;
+      let directMessage: string | undefined;
       try {
-        response = await fetch(prepared.uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+        await fetch(prepared.uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+        const completed = await completeDirect();
+        directCompleted = completed.ok;
+        directMessage = completed.message;
       } catch {
-        // Browser → R2 upload is blocked when the bucket has no CORS rule for
-        // this origin (the browser aborts with "Failed to fetch"). Fall back to
-        // the existing server-upload action, which PUTs to the same R2 bucket
-        // without needing CORS. Files committed before this one stay untouched.
-        return { ok: false, message: "Direct upload to storage is blocked (bucket CORS). Falling back to server upload.", fallback: true, remaining: selectedFiles.slice(index) };
+        try {
+          const completed = await completeDirect();
+          directCompleted = completed.ok;
+          directMessage = completed.message;
+        } catch {}
       }
-      if (!response.ok) return { ok: false, message: "Direct upload to storage failed. Falling back to server upload.", fallback: true, remaining: selectedFiles.slice(index) };
-      const completion = new FormData();
-      completion.set("id", prepared.id);
-      completion.set("key", prepared.key);
-      completion.set("filename", file.name);
-      completion.set("mime_type", file.type);
-      completion.set("bytes", String(file.size));
-      completion.set("category", category);
-      const completed = await completeWebsiteGalleryUpload(completion);
-      if (!completed.ok) return completed;
+      if (directCompleted) continue;
+      return { ok: false, message: directMessage ?? "Direct upload to storage failed. Falling back to server upload.", fallback: true, remaining: selectedFiles.slice(index) };
     }
     return { ok: true, fallback: false };
   }

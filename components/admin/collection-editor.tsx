@@ -216,7 +216,7 @@ export function CollectionEditor({
   };
 
   function stageFiles(files: FileList | null | File[]) {
-    if (!files || files.length === 0 || !activeFolder) return;
+    if (!files || files.length === 0 || !activeFolder || uploading > 0) return;
     setUploadError(null);
     queueRef.current?.addFiles(files);
   }
@@ -304,7 +304,7 @@ export function CollectionEditor({
               </div>
             ) : null}
           </div>
-          <button className="admin-button ce-primary-upload" onClick={() => fileInput.current?.click()} type="button">
+          <button className="admin-button ce-primary-upload" disabled={uploading > 0} onClick={() => fileInput.current?.click()} type="button">
             <Upload size={15} strokeWidth={1.8} /> Upload Photos
           </button>
           <CopyButton label="Share" text={shareUrl} />
@@ -461,7 +461,7 @@ export function CollectionEditor({
               {uploading ? (
                 <div className="upload-progress" role="status">
                   <span className="upload-spinner" />
-                  Uploading {uploading} {uploading === 1 ? "photo" : "photos"}…
+                  Uploading and processing {uploading} {uploading === 1 ? "photo" : "photos"}…
                 </div>
               ) : null}
               {uploadError ? <p className="form-error" role="alert">{uploadError}</p> : null}

@@ -984,10 +984,21 @@
 .upload-queue-head span{color:var(--muted);font-size:12px}
 .upload-queue-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;padding:14px}
 .upload-queue-card{position:relative;min-width:0;border:1px solid #e7e7e3;background:#fafaf8;overflow:hidden}
+.upload-queue-card.is-ready{border-style:dashed;background:#fbfbf9}
+.upload-queue-card.is-ready>img{opacity:.72;filter:grayscale(.12)}
+.upload-queue-card.is-uploading{border-color:#111}
+.upload-queue-card.is-processing{border-color:#8f8f89;background:#f7f7f4}
+.upload-queue-card.is-done{border-color:#a7bda9;background:#f8fbf8}
+.upload-queue-card.is-failed{border-color:#d0a4a8}
 .upload-queue-card>img{display:block;width:100%;aspect-ratio:1;object-fit:cover;background:#f0f0ed}
 .upload-queue-card-meta{display:flex;flex-direction:column;gap:3px;padding:9px 10px 10px}
-.upload-queue-card-meta span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.upload-queue-card-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
 .upload-queue-card-meta small{font-size:11px;color:var(--muted)}
+.upload-queue-card-state.is-processing{color:#555}
+.upload-queue-card-state.is-done{color:#00561b}
+.upload-queue-card-state.is-failed{color:#8b1728}
+.upload-processing-label{display:inline-flex;align-items:center;gap:6px}
+.upload-processing-indicator{width:12px;height:12px;border:1.5px solid #b8b8b1;border-top-color:#111;border-radius:50%;animation:upload-processing-spin .8s linear infinite;flex:none}
 .upload-queue-remove{position:absolute;top:8px;right:8px;width:28px;height:28px;border:1px solid rgba(255,255,255,.7);border-radius:50%;display:grid;place-items:center;background:rgba(0,0,0,.62);color:#fff;cursor:pointer}
 .upload-queue-remove:disabled{opacity:.45;cursor:default}
 .upload-queue-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:13px 16px;border-top:1px solid #ededeb}
@@ -1011,16 +1022,15 @@
 .upload-queue-card{position:relative}
 .upload-queue-card.is-uploading img,.upload-queue-card.is-processing img{opacity:.68}
 .upload-queue-card-meta{min-width:0}
-.upload-queue-card-meta span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.upload-queue-card-name{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .upload-queue-card-meta small{display:block;color:#777;margin-top:3px}
 .upload-queue-card-progress{position:absolute;left:8px;right:8px;bottom:8px;height:3px;background:rgba(255,255,255,.65);border-radius:999px;overflow:hidden}
 .upload-queue-card-progress span{display:block;height:100%;background:#111;border-radius:inherit;transition:width .15s ease}
-.upload-queue-card-status{position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#111;color:#fff;font-size:13px;font-weight:600}
+.upload-queue-card-status{position:absolute;top:8px;left:8px;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#111;color:#fff;font-size:13px;font-weight:600}
 .upload-queue-card-status.is-failed{background:#fff;color:#111;border:1px solid #111}
 .upload-queue-card.is-failed{outline:1px solid #b7b7b2;outline-offset:-1px}
-.upload-queue-card.is-processing .upload-queue-card-progress span{width:100%!important;animation:upload-processing 1.2s ease-in-out infinite alternate}
-@keyframes upload-processing{from{opacity:.35}to{opacity:1}}
+@keyframes upload-processing-spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){
   .upload-progress-overall span,.upload-queue-card-progress span{transition:none}
-  .upload-queue-card.is-processing .upload-queue-card-progress span{animation:none}
+  .upload-processing-indicator,.upload-spinner{animation:none}
 }

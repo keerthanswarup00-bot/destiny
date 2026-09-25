@@ -44,7 +44,7 @@ import {
   setGalleryStatus,
   setFolderDownloadPassword,
 } from "@/app/admin/set-actions";
-import { uploadClientGalleryFiles } from "@/components/admin/client-gallery-upload";
+import { uploadClientGalleryFiles, type GalleryUploadProgress } from "@/components/admin/client-gallery-upload";
 import { StagedUploadQueue, type StagedUploadQueueHandle } from "@/components/admin/upload-queue";
 
 type EditorFolder = {
@@ -221,19 +221,25 @@ export function CollectionEditor({
     queueRef.current?.addFiles(files);
   }
 
-  async function commitPending(files: File[]) {
-    if (!files.length || !activeFolder) return;
+  async function commitPending(files: File[], onProgress: (event: GalleryUploadProgress) => void) {
+    if (!files.length || !activeFolder) return { ok: false };
     setUploading(files.length);
     setUploadError(null);
     try {
-      const result = await uploadClientGalleryFiles(files, { galleryId: gallery.id, folderId: activeFolder.id });
+      const result = await uploadClientGalleryFiles(
+        files,
+        { galleryId: gallery.id, folderId: activeFolder.id },
+        onProgress,
+      );
       if (!result.ok) setUploadError(result.message);
+      if (result.ok) router.refresh();
+      return { ok: result.ok };
     } catch (uploadError) {
-      setUploadError(uploadError instanceof Error && uploadError.message ? uploadError.message : "Upload failed. Please try again.");
+      const message = uploadError instanceof Error && uploadError.message ? uploadError.message : "Upload failed. Please try again.";
+      setUploadError(message);
+      return { ok: false };
     } finally {
       setUploading(0);
-      queueRef.current?.clear();
-      router.refresh();
     }
   }
 

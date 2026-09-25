@@ -5,7 +5,7 @@ import { requireAdmin } from "@/lib/auth";
 import { adminDb } from "@/lib/admin-data";
 import { ensureWebsiteGallery, HIGHLIGHT_MAX_ZOOM, normalizeHighlightCrop, normalizeWebsiteGalleryCategory, websiteGalleryId, websiteImageKey } from "@/lib/site/website-gallery";
 import { photoStore } from "@/lib/storage-provider";
-import { validatePhotoContent } from "@/lib/photo-content-validation";
+import { validatePhotoContent, type PhotoContentResult } from "@/lib/photo-content-validation";
 import { ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES, photoExtensionForMime, validatePhotoMetadata, type PhotoMetadataResult } from "@/lib/photo-validation";
 
 const value = (form: FormData, key: string) => String(form.get(key) ?? "");
@@ -181,7 +181,8 @@ async function receiveAsset(form: FormData, field: string, previous: Record<stri
       obsolete.push(old);
     }
     patch = { image_path: null, image_mime: null, image_bytes: null, [`${field}_path`]: null, [`${field}_mime`]: null, [`${field}_bytes`]: null };
-  } else if (file instanceof File && file.size > 0) {
+  } else if (file instanceof File) {
+    if (file.size <= 0) throw new Error("invalid-asset");
     const mimeType = file.type.trim().toLowerCase();
     const extension = photoExtensionForMime(mimeType);
     if (!extension) throw new Error("invalid-asset");
@@ -365,6 +366,21 @@ export async function uploadWebsiteGalleryImages(form: FormData): Promise<{ ok: 
   const category = normalizeWebsiteGalleryCategory(value(form, "category"));
   if (value(form, "category") && !category) return { ok: false, message: "Choose a valid website gallery category." };
   const supabase = await db();
+  const validated: Array<{
+    file: File;
+    validation: Extract<PhotoMetadataResult, { ok: true }>;
+    content: Extract<PhotoContentResult, { ok: true }>;
+  }> = [];
+  for (const file of files) {
+    const validation = validatePhotoMetadataWithPolicy({ filename: file.name, mimeType: file.type, bytes: file.size });
+    if (!validation.ok) return { ok: false, message: validation.message };
+    const body = Buffer.from(await file.arrayBuffer());
+    const content = await validatePhotoContent(body, validation);
+    if (!content.ok) return { ok: false, message: content.message };
+    const extension = photoExtensionForMime(validation.mimeType);
+    if (!extension) return { ok: false, message: "Upload failed: the image type is not supported." };
+    validated.push({ file, validation, content, extension });
+  }
   const target = await ensureWebsiteGallery(supabase);
   if (!target) return { ok: false, message: "Could not prepare the website gallery." };
   const { count, error: countError } = await supabase.from("photos").select("id", { count: "exact", head: true }).eq("gallery_id", target.galleryId);
@@ -372,14 +388,9 @@ export async function uploadWebsiteGalleryImages(form: FormData): Promise<{ ok: 
   let inserted = 0;
   let currentKey: string | null = null;
   try {
-    for (const file of files) {
-      const validation = validatePhotoMetadataWithPolicy({ filename: file.name, mimeType: file.type, bytes: file.size });
-      if (!validation.ok) return { ok: false, message: validation.message };
+    for (const { file, validation, content, extension } of validated) {
       const body = Buffer.from(await file.arrayBuffer());
-      const content = await validatePhotoContent(body, validation);
-      if (!content.ok) return { ok: false, message: content.message };
-      const extension = photoExtensionForMime(validation.mimeType);
-      if (!extension) return { ok: false, message: "Upload failed: the image type is not supported." };
+      if (body.byteLength !== content.bytes) return { ok: false, message: "Upload failed: the uploaded file size did not match." };
       const id = crypto.randomUUID();
       currentKey = websiteImageKey(id, extension);
       await photoStore().uploadPhoto({ key: currentKey, body, contentType: content.mimeType });
@@ -607,7 +618,8 @@ export async function saveBranding(form: FormData) {
       if (previous) obsolete.push(previous);
       patch[`${field}_path`] = null;
       patch[`${field}_mime`] = null;
-    } else if (file instanceof File && file.size > 0) {
+    } else if (file instanceof File) {
+      if (file.size <= 0) return redirect("/admin/website/branding?error=invalid-asset");
       const mimeType = file.type.trim().toLowerCase();
       const extension = photoExtensionForMime(mimeType);
       if (!extension) return redirect("/admin/website/branding?error=invalid-asset");

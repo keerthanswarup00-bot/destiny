@@ -58,7 +58,7 @@ export function clearAdminSessionCookie(response: NextResponse) {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    path: "/admin",
+    path: "/",
     maxAge: 0,
   });
 }

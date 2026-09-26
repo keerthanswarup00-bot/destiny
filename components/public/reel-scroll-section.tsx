@@ -59,6 +59,7 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
   const [isTrackInView, setIsTrackInView] = useState(false);
 
   const activeIndex = chosenIndex ?? (isDesktop ? Math.min(1, total - 1) : 0);
+  const activeSource = sources[activeIndex] ?? "";
 
   /** Only the active Reel fetches video; the next one is warmed with metadata only. */
   const shouldLoad = useCallback(
@@ -125,7 +126,7 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
       setAutoplayBlocked(false);
       // isTrackInView keeps a scroll-away pause from becoming permanent: coming
       // back flips it, which re-runs this effect and restarts the Reel.
-      if (!target || reducedMotion || !isTrackInView) {
+      if (!target || !activeSource || reducedMotion || !isTrackInView) {
         setIsPlaying(false);
         return;
       }
@@ -145,7 +146,7 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
     return () => window.cancelAnimationFrame(frame);
     // isMuted is applied imperatively on user toggle, so it is not a dependency here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeIndex, isTrackInView, mounted, reducedMotion]);
+  }, [activeIndex, activeSource, isTrackInView, mounted, reducedMotion]);
 
   // Pause when the section leaves the viewport so nothing plays off-screen.
   useEffect(() => {
@@ -168,7 +169,7 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
         const video = videoRefs.current[activeRef.current];
         if (video && !video.paused) video.pause();
       },
-      { rootMargin: "120px 0px" },
+      { rootMargin: "0px", threshold: 0.2 },
     );
     observer.observe(track);
     return () => observer.disconnect();

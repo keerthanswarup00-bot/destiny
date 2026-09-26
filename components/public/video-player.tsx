@@ -89,13 +89,15 @@ export function VideoPlayer({ autoPlay = true, className, poster, renditions, sr
     }
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setIsInView(entry.isIntersecting);
-        if (entry.isIntersecting) setShouldLoad(true);
+        const visible = entry.isIntersecting;
+        const active = entry.intersectionRatio >= 0.5;
+        setIsInView(active);
+        if (visible) setShouldLoad(true);
         const video = videoRef.current;
         if (!entry.isIntersecting && !manuallyPlayedRef.current) autoplayAttemptedRef.current = false;
         if (!entry.isIntersecting && video && !manuallyPlayedRef.current && !video.paused) video.pause();
       },
-      { rootMargin: "240px 0px" },
+      { rootMargin: "0px", threshold: [0, 0.5] },
     );
     observer.observe(player);
     return () => observer.disconnect();

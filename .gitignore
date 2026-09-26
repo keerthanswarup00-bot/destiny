@@ -12,3 +12,6 @@ tsconfig.tsbuildinfo
 supabase/.temp/
 
 *.bak
+
+# Site films. Too large for git (GitHub rejects files over 100MB); serve from R2.
+public/videos/

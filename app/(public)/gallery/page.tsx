@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { GalleryFeed } from "@/components/public/gallery-feed";
 import { GalleryHighlight } from "@/components/public/gallery-highlight";
+import { GalleryVideos } from "@/components/public/gallery-videos";
 import { PhotoGrid } from "@/components/public/photo-grid";
 import { Reveal } from "@/components/public/reveal";
+import { WeddingHeroVideo } from "@/components/public/wedding-hero-video";
 import { mixGalleryImages, staticGalleryImages, STATIC_GALLERY_CATEGORIES, type GalleryImage } from "@/lib/site/gallery-feed";
 import { getPortfolioGalleries, getSiteWebsiteGalleryByCategory, getSiteWebsiteGalleryHighlight, hasSiteWebsiteGallery } from "@/lib/site/site-content";
 
@@ -100,6 +102,8 @@ export default async function Gallery({ searchParams }: { searchParams: Promise<
         </Reveal>
         {highlight ? <GalleryHighlight crop={highlight.crop} height={highlight.height} url={highlight.url} width={highlight.width} /> : null}
         <GalleryFilters active={category} />
+        <GalleryVideos />
+        {isWedding ? <WeddingHeroVideo /> : null}
         {images.length ? <GalleryFeed images={images} label={isWedding ? "Wedding photography" : "Photography"} /> : <p className="empty">No photographs are available in this category yet.</p>}
       </section>
     );
@@ -116,6 +120,7 @@ export default async function Gallery({ searchParams }: { searchParams: Promise<
         <Reveal delay={90}><h1>Moments, held<br /><em>in their truest light.</em></h1></Reveal>
         <Reveal delay={170}><p className="intro">A collection of celebrations, connections, and quiet in-between moments.</p></Reveal>
         <GalleryFilters active={category} />
+        <GalleryVideos />
         <PhotoGrid expanded />
       </section>
     );
@@ -126,6 +131,7 @@ export default async function Gallery({ searchParams }: { searchParams: Promise<
       <Reveal delay={90}><h1>Moments, held<br /><em>in their truest light.</em></h1></Reveal>
       <Reveal delay={170}><p className="intro">A collection of celebrations, connections, and quiet in-between moments.</p></Reveal>
       <GalleryFilters active={category} />
+      <GalleryVideos />
       <div className="portfolio-grid">
         {filteredGalleries.map((gallery, index) => (
           <Reveal as="div" className="portfolio-card" delay={(index % 3) * 90} key={gallery.id}>

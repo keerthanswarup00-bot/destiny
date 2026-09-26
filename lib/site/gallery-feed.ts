@@ -48,6 +48,21 @@ const wedding: GalleryImage[] = [
   { id: "wedding-24", src: "/images/wedding/24.webp", width: 2400, height: 1600, alt: "Wedding photograph 24" },
   { id: "wedding-25", src: "/images/wedding/25.webp", width: 2400, height: 3600, alt: "Wedding photograph 25" },
   { id: "wedding-26", src: "/images/wedding/26.webp", width: 2400, height: 1600, alt: "Wedding photograph 26" },
+  { id: "wedding-27", src: "/images/wedding/27.webp", width: 2195, height: 3293, alt: "Wedding photograph 27" },
+  { id: "wedding-28", src: "/images/wedding/28.webp", width: 2400, height: 3525, alt: "Wedding photograph 28" },
+  { id: "wedding-29", src: "/images/wedding/29.webp", width: 2400, height: 3600, alt: "Wedding photograph 29" },
+  { id: "wedding-30", src: "/images/wedding/30.webp", width: 2400, height: 1600, alt: "Wedding photograph 30" },
+  { id: "wedding-31", src: "/images/wedding/31.webp", width: 2400, height: 3600, alt: "Wedding photograph 31" },
+  { id: "wedding-32", src: "/images/wedding/32.webp", width: 2400, height: 3600, alt: "Wedding photograph 32" },
+  { id: "wedding-33", src: "/images/wedding/33.webp", width: 2349, height: 3600, alt: "Wedding photograph 33" },
+  { id: "wedding-34", src: "/images/wedding/34.webp", width: 2400, height: 2955, alt: "Wedding photograph 34" },
+  { id: "wedding-35", src: "/images/wedding/35.webp", width: 2400, height: 3600, alt: "Wedding photograph 35" },
+  { id: "wedding-36", src: "/images/wedding/36.webp", width: 2400, height: 3336, alt: "Wedding photograph 36" },
+  { id: "wedding-37", src: "/images/wedding/37.webp", width: 2400, height: 3600, alt: "Wedding photograph 37" },
+  { id: "wedding-38", src: "/images/wedding/38.webp", width: 2400, height: 3600, alt: "Wedding photograph 38" },
+  { id: "wedding-39", src: "/images/wedding/39.webp", width: 2400, height: 3600, alt: "Wedding photograph 39" },
+  { id: "wedding-40", src: "/images/wedding/40.webp", width: 853, height: 1280, alt: "Wedding photograph 40" },
+  { id: "wedding-41", src: "/images/wedding/41.webp", width: 2400, height: 3044, alt: "Wedding photograph 41" },
 ];
 
 const portraits: GalleryImage[] = [

@@ -56,6 +56,7 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
   const [paintedReels, setPaintedReels] = useState<Record<number, boolean>>({});
   const [sources, setSources] = useState<string[]>(() => reels.map(() => ""));
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isTrackInView, setIsTrackInView] = useState(false);
 
   const activeIndex = chosenIndex ?? (isDesktop ? Math.min(1, total - 1) : 0);
 
@@ -122,7 +123,9 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
     const frame = window.requestAnimationFrame(() => {
       const target = videoRefs.current[activeIndex];
       setAutoplayBlocked(false);
-      if (!target || reducedMotion) {
+      // isTrackInView keeps a scroll-away pause from becoming permanent: coming
+      // back flips it, which re-runs this effect and restarts the Reel.
+      if (!target || reducedMotion || !isTrackInView) {
         setIsPlaying(false);
         return;
       }
@@ -142,15 +145,26 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
     return () => window.cancelAnimationFrame(frame);
     // isMuted is applied imperatively on user toggle, so it is not a dependency here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeIndex, mounted, reducedMotion]);
+  }, [activeIndex, isTrackInView, mounted, reducedMotion]);
 
   // Pause when the section leaves the viewport so nothing plays off-screen.
   useEffect(() => {
     const track = trackRef.current;
     if (!track || typeof IntersectionObserver === "undefined") return;
+    // The observer's first callback reports where the track was at mount, which is
+    // off-screen on a page this long. It arrives after the autoplay above has
+    // already started, so acting on it would abort the play() and leave the Reel
+    // stuck behind a Play prompt. Only pause once the track has been seen.
+    let hasBeenVisible = false;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) return;
+        if (entry.isIntersecting) {
+          hasBeenVisible = true;
+          setIsTrackInView(true);
+          return;
+        }
+        if (!hasBeenVisible) return;
+        setIsTrackInView(false);
         const video = videoRefs.current[activeRef.current];
         if (video && !video.paused) video.pause();
       },

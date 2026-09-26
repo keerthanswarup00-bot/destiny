@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import { ReceptionFilm } from "@/components/public/reception-film";
+import { ReelScrollSection } from "@/components/public/reel-scroll-section";
 import { Reveal } from "@/components/public/reveal";
 import { getSiteContact, getSiteHome, getSiteStories, resolveSiteAssetPaths } from "@/lib/site/site-content";
 import { INSTAGRAM_HANDLE, INSTAGRAM_URL } from "@/lib/site/social-links";
@@ -116,6 +117,8 @@ export default async function Home() {
           </div>
         </section>
       ) : null}
+
+      <ReelScrollSection />
 
       {home.approach.enabled ? (
         <section className="section approach">

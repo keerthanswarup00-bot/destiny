@@ -1270,11 +1270,12 @@ img {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 44px;
+  width: 42px;
+  height: 42px;
+  min-height: 42px;
   border: 1px solid rgba(255, 255, 255, 0.42);
   border-radius: 999px;
-  padding: 9px 14px;
+  padding: 0;
   background: rgba(12, 12, 12, 0.48);
   color: #fff;
   font-size: 10px;
@@ -1305,8 +1306,8 @@ img {
 
 .video-player__button svg,
 .video-player__center-play svg {
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
   flex: 0 0 auto;
 }
 
@@ -1315,8 +1316,10 @@ img {
   z-index: 2;
   top: 50%;
   left: 50%;
-  min-height: 64px;
-  padding: 14px 18px;
+  width: 58px;
+  height: 58px;
+  min-height: 58px;
+  padding: 0;
   transform: translate(-50%, -50%);
 }
 

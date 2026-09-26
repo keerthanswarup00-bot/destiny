@@ -324,7 +324,6 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
                       type="button"
                     >
                       {isPlaying ? <PauseIcon /> : <PlayIcon />}
-                      <span>{isPlaying ? "Pause" : "Play"}</span>
                     </button>
                     <button
                       aria-label={isMuted ? `Unmute ${reel.title}` : `Mute ${reel.title}`}
@@ -334,7 +333,6 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
                       type="button"
                     >
                       {isMuted ? <MutedIcon /> : <SoundIcon />}
-                      <span>{isMuted ? "Sound off" : "Sound on"}</span>
                     </button>
                     {canFullscreen ? (
                       <button
@@ -344,7 +342,6 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
                         type="button"
                       >
                         <FullscreenIcon />
-                        <span>{isFullscreen ? "Exit" : "Full"}</span>
                       </button>
                     ) : null}
                   </div>
@@ -353,7 +350,6 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
                 {isActive && showPrompt ? (
                   <button aria-label={`Play ${reel.title}`} className="video-player__center-play" onClick={togglePlay} type="button">
                     <PlayIcon />
-                    <span>Play film</span>
                   </button>
                 ) : null}
 
@@ -366,7 +362,6 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
                     type="button"
                   >
                     <PlayIcon />
-                    <span>Play</span>
                   </button>
                 ) : null}
 

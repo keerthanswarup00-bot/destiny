@@ -1339,6 +1339,7 @@ img {
 .reception-film {
   padding-top: var(--space-section);
   padding-bottom: var(--space-section);
+  padding-inline: 0;
 }
 
 .reception-film__slate {
@@ -1346,18 +1347,21 @@ img {
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px clamp(1rem, 3vw, 2.5rem);
-  padding-bottom: clamp(1.1rem, 2.4vw, 1.9rem);
+  gap: 14px clamp(1.3rem, 3.9vw, 3.25rem);
+  margin-inline: var(--gutter);
+  padding-bottom: clamp(1.4rem, 3.1vw, 2.5rem);
   border-bottom: 1px solid var(--site-line);
 }
 
 .reception-film__slate .eyebrow {
   margin: 0;
+  font-size: 14px;
+  letter-spacing: 0.24em;
 }
 
 .reception-film__runtime {
   color: var(--site-muted);
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.16em;
   line-height: 1;
@@ -1367,16 +1371,16 @@ img {
 
 .reception-film__hed {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.52fr);
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.52fr);
   align-items: end;
-  gap: clamp(1.5rem, 5vw, 5rem);
-  margin: clamp(2rem, 4.5vw, 3.5rem) 0 clamp(1.75rem, 4vw, 3rem);
+  gap: clamp(1.95rem, 6.5vw, 6.5rem);
+  margin: clamp(2.6rem, 5.85vw, 4.55rem) var(--gutter) clamp(2.275rem, 5.2vw, 3.9rem);
 }
 
 .reception-film__hed h2 {
   max-width: 16ch;
   margin: 0;
-  font-size: clamp(36px, 5.2vw, 74px);
+  font-size: clamp(42px, 6.76vw, 96px);
   line-height: 0.98;
 }
 
@@ -1386,22 +1390,22 @@ img {
 }
 
 .reception-film__intro {
-  max-width: 38ch;
+  max-width: 46ch;
   margin: 0;
   color: var(--site-muted);
-  font-size: 15px;
+  font-size: clamp(16px, 1.35vw, 19.5px);
   line-height: 1.7;
 }
 
 .reception-film__caption {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px clamp(14px, 2vw, 22px);
-  margin: clamp(1.1rem, 2.4vw, 1.75rem) 0 0;
-  padding-top: clamp(1rem, 2vw, 1.4rem);
+  gap: 13px clamp(18px, 2.6vw, 28.6px);
+  margin: clamp(1.4rem, 3.1vw, 2.3rem) var(--gutter) 0;
+  padding-top: clamp(1.3rem, 2.6vw, 1.82rem);
   border-top: 1px solid var(--site-line);
   color: var(--site-muted);
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.16em;
   line-height: 1.5;
@@ -1410,7 +1414,7 @@ img {
 
 .reception-film__caption span + span {
   position: relative;
-  padding-left: clamp(14px, 2vw, 22px);
+  padding-left: clamp(18px, 2.6vw, 28.6px);
 }
 
 .reception-film__caption span + span::before {
@@ -1558,23 +1562,26 @@ img {
   }
 
   .home-video__intro,
-  .reception-film__intro,
   .gallery-videos__intro,
   .wedding-hero-video__intro {
     max-width: 42ch;
   }
 
+  .reception-film__intro {
+    max-width: 46ch;
+  }
+
   .reception-film__hed {
-    margin-bottom: clamp(1.5rem, 6vw, 2rem);
+    margin-bottom: clamp(1.95rem, 7.8vw, 2.6rem);
   }
 
   .reception-film__caption {
-    gap: 8px 18px;
+    gap: 10px 23px;
     letter-spacing: 0.13em;
   }
 
   .reception-film__caption span + span {
-    padding-left: 18px;
+    padding-left: 23px;
   }
 
   .gallery-videos__grid {

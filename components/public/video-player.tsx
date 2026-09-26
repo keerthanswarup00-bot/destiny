@@ -92,6 +92,7 @@ export function VideoPlayer({ autoPlay = true, className, poster, renditions, sr
         setIsInView(entry.isIntersecting);
         if (entry.isIntersecting) setShouldLoad(true);
         const video = videoRef.current;
+        if (!entry.isIntersecting && !manuallyPlayedRef.current) autoplayAttemptedRef.current = false;
         if (!entry.isIntersecting && video && !manuallyPlayedRef.current && !video.paused) video.pause();
       },
       { rootMargin: "240px 0px" },

@@ -162,6 +162,17 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
         if (entry.isIntersecting) {
           hasBeenVisible = true;
           setIsTrackInView(true);
+
+          // Start the selected Reel immediately when the section itself enters
+          // the viewport. The video is always muted for autoplay compatibility.
+          const video = videoRefs.current[activeIndex];
+          if (video && activeSource && !reducedMotion) {
+            video.muted = muteTouchedRef.current ? isMuted : true;
+            void video.play().then(
+              () => setIsPlaying(true),
+              () => setAutoplayBlocked(true),
+            );
+          }
           return;
         }
         if (!hasBeenVisible) return;
@@ -169,11 +180,11 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
         const video = videoRefs.current[activeRef.current];
         if (video && !video.paused) video.pause();
       },
-      { rootMargin: "0px", threshold: 0.2 },
+      { rootMargin: "0px", threshold: 0.15 },
     );
     observer.observe(track);
     return () => observer.disconnect();
-  }, []);
+  }, [activeIndex, activeSource, isMuted, reducedMotion]);
 
   useEffect(() => {
     const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement));

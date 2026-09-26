@@ -13,5 +13,8 @@ supabase/.temp/
 
 *.bak
 
-# Site films. Too large for git (GitHub rejects files over 100MB); serve from R2.
-public/videos/
+# Long-form films. GitHub rejects any file over 100MB, so the two big masters stay
+# out of git and are meant to be served from R2. The vertical Reels are all well
+# under the limit and ship with the site.
+public/videos/*
+!public/videos/reel-*.mp4

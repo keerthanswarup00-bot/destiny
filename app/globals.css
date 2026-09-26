@@ -1270,11 +1270,12 @@ img {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 42px;
-  min-height: 42px;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
   border: 1px solid rgba(255, 255, 255, 0.42);
   border-radius: 999px;
+  gap: 0;
   padding: 0;
   background: rgba(12, 12, 12, 0.48);
   color: #fff;
@@ -1316,9 +1317,9 @@ img {
   z-index: 2;
   top: 50%;
   left: 50%;
-  width: 58px;
-  height: 58px;
-  min-height: 58px;
+  width: 64px;
+  height: 64px;
+  min-height: 64px;
   padding: 0;
   transform: translate(-50%, -50%);
 }
@@ -1689,6 +1690,11 @@ img {
   transform: scale(1);
   opacity: 1;
   box-shadow: 0 34px 74px -40px rgba(0, 0, 0, 0.62);
+}
+
+/* The shared hover lift drops the centring transform, so restate it here. */
+.reels .video-player__center-play:hover {
+  transform: translate(-50%, calc(-50% - 1px));
 }
 
 /* Softer than the film player prompt so a row of three stays quiet. */

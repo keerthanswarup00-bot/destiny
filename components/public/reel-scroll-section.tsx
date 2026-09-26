@@ -57,14 +57,29 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
   const [sources, setSources] = useState<string[]>(() => reels.map(() => ""));
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isTrackInView, setIsTrackInView] = useState(false);
+  /** Reels whose source failed to load, so the UI can stop offering to play them. */
+  const [failedReels, setFailedReels] = useState<Record<string, boolean>>({});
 
   const activeIndex = chosenIndex ?? (isDesktop ? Math.min(1, total - 1) : 0);
   const activeSource = sources[activeIndex] ?? "";
 
-  /** Only the active Reel fetches video; the next one is warmed with metadata only. */
+  const handleMediaError = useCallback((reel: SiteReel, url: string, stage: "load" | "playback") => {
+    // Always logged: a dead Reel must never fail silently, and a console message
+    // is invisible to visitors unless they open devtools.
+    console.error(`[Reel] Failed to ${stage} ${reel.id}\nURL: ${url}`);
+    setFailedReels(current => (current[reel.id] ? current : { ...current, [reel.id]: true }));
+    if (stage === "playback") setIsPlaying(false);
+  }, []);
+
+  /**
+   * Only the active Reel fetches video; the next one is warmed with metadata only.
+   * Gated on the section being near the viewport so a long page does not pull
+   * tens of megabytes of Reels the visitor has not scrolled to yet.
+   */
   const shouldLoad = useCallback(
-    (index: number) => index === activeIndex || (!isDesktop && index === activeIndex + 1),
-    [activeIndex, isDesktop],
+    (index: number) =>
+      isTrackInView && (index === activeIndex || (!isDesktop && index === activeIndex + 1)),
+    [activeIndex, isDesktop, isTrackInView],
   );
 
   // Pick the cheapest rendition that suits the viewport, re-evaluated on resize.
@@ -139,6 +154,12 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
         () => setIsPlaying(true),
         () => {
           setIsPlaying(false);
+          // A dead source surfaces as a media error, not a policy refusal. Only
+          // the latter should offer the visitor a Play button to retry with.
+          if (target.error) {
+            handleMediaError(reels[activeIndex], sources[activeIndex] || reels[activeIndex].src, "playback");
+            return;
+          }
           setAutoplayBlocked(true);
         },
       );
@@ -162,17 +183,6 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
         if (entry.isIntersecting) {
           hasBeenVisible = true;
           setIsTrackInView(true);
-
-          // Start the selected Reel immediately when the section itself enters
-          // the viewport. The video is always muted for autoplay compatibility.
-          const video = videoRefs.current[activeIndex];
-          if (video && activeSource && !reducedMotion) {
-            video.muted = muteTouchedRef.current ? isMuted : true;
-            void video.play().then(
-              () => setIsPlaying(true),
-              () => setAutoplayBlocked(true),
-            );
-          }
           return;
         }
         if (!hasBeenVisible) return;
@@ -180,11 +190,11 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
         const video = videoRefs.current[activeRef.current];
         if (video && !video.paused) video.pause();
       },
-      { rootMargin: "0px", threshold: 0.15 },
+      { rootMargin: "400px 0px" },
     );
     observer.observe(track);
     return () => observer.disconnect();
-  }, [activeIndex, activeSource, isMuted, reducedMotion]);
+  }, []);
 
   useEffect(() => {
     const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
@@ -290,6 +300,7 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
         {reels.map((reel, index) => {
           const isActive = index === activeIndex;
           const src = shouldLoad(index) ? sources[index] : "";
+          const hasFailed = Boolean(failedReels[reel.id]);
           return (
             <article
               aria-label={`${reel.title} of ${total}`}
@@ -306,6 +317,7 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
                   loop
                   muted={isMuted}
                   onCanPlay={() => setPaintedReels(current => (current[index] ? current : { ...current, [index]: true }))}
+                  onError={() => handleMediaError(reel, src || reel.src, "load")}
                   onPause={() => {
                     if (activeRef.current === index) setIsPlaying(false);
                   }}
@@ -325,7 +337,7 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
                 />
                 <div aria-hidden="true" className="video-player__shade" />
 
-                {isActive ? (
+                {isActive && !hasFailed ? (
                   <div aria-label={`${reel.title} controls`} className="video-player__controls" role="group">
                     <button
                       aria-label={isPlaying ? `Pause ${reel.title}` : `Play ${reel.title}`}
@@ -358,13 +370,13 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
                   </div>
                 ) : null}
 
-                {isActive && showPrompt ? (
+                {isActive && showPrompt && !hasFailed ? (
                   <button aria-label={`Play ${reel.title}`} className="video-player__center-play" onClick={togglePlay} type="button">
                     <PlayIcon />
                   </button>
                 ) : null}
 
-                {!isActive ? (
+                {!isActive && !hasFailed ? (
                   <button
                     aria-label={`Play ${reel.title}, reel ${index + 1} of ${total}`}
                     className="video-player__center-play reel__activate"

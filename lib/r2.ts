@@ -96,6 +96,20 @@ export async function headObject(key: string): Promise<boolean> {
   }
 }
 
+/**
+ * Fetch an object, optionally honouring a caller-supplied `Range` header so a
+ * <video> element can seek. R2/S3 answers a ranged GET with 206 plus its own
+ * Content-Range; the caller passes both through to the browser untouched.
+ */
+export async function getObjectStream(key: string, range?: string) {
+  const command = new GetObjectCommand({
+    Bucket: R2_BUCKET(),
+    Key: key,
+    ...(range ? { Range: range } : {}),
+  });
+  return r2().send(command);
+}
+
 export async function objectBytes(key: string): Promise<number | null> {
   try {
     const head = await r2().send(new HeadObjectCommand({ Bucket: R2_BUCKET(), Key: key }));

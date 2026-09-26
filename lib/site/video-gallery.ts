@@ -13,13 +13,18 @@ export type VideoRendition = {
   src: string;
 };
 
-const RECEPTION_FILM_720 = "/videos/gallery-reception-film.mp4";
-const RECEPTION_FILM_1080 = "/videos/reception-film-1080.mp4";
+// The long-form films are served from R2, not from public/: the reception film
+// is ~150MB, well past GitHub's 100MB ceiling, so it cannot ship in the repo.
+// Reels are small enough to live in public/ and are referenced directly.
+const FILM = (name: string) => `/media/videos/${name}`;
+
+const RECEPTION_FILM_720 = FILM("gallery-reception-film.mp4");
+const RECEPTION_FILM_1080 = FILM("reception-film-1080.mp4");
 const RECEPTION_FILM_POSTER = "/images/video/reception-film.jpg";
 
 export const HOME_VIDEO: SiteVideo = {
   id: "ss-home",
-  src: "/videos/ss-home.mp4",
+  src: FILM("ss-home.mp4"),
   poster: "/images/video/ss-home.jpg",
   title: "S&S",
   description: "A moving portrait of the celebration.",
@@ -50,7 +55,7 @@ export const GALLERY_VIDEOS: SiteVideo[] = [
   },
   {
     id: "sh-teaser",
-    src: "/videos/gallery-sh-teaser.mp4",
+    src: FILM("gallery-sh-teaser.mp4"),
     poster: "/images/video/gallery-sh-teaser.jpg",
     title: "S+H Teaser",
     description: "A short film teaser from S+H.",

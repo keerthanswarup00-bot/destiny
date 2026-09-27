@@ -1,14 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
-import { FullscreenIcon, MutedIcon, PauseIcon, PlayIcon, SoundIcon } from "@/components/public/video-icons";
-import { SITE_REELS, type ReelRendition, type SiteReel } from "@/lib/site/reels";
+import { ReelPlayer } from "@/components/public/reel-player";
+import { SITE_REELS, type SiteReel } from "@/lib/site/reels";
 
 /** Above this width the section is an editorial 3-up; below it is a Reel stack. */
 const DESKTOP_QUERY = "(min-width: 900px)";
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
-/** Share of a Reel that must be visible before it counts as active. */
-const ACTIVE_RATIO = 0.55;
 
 function subscribeTo(query: string) {
   return (callback: () => void) => {
@@ -25,182 +23,58 @@ const isDesktopServerSnapshot = () => false;
 const reducedMotionSnapshot = () => window.matchMedia(REDUCED_MOTION_QUERY).matches;
 const reducedMotionServerSnapshot = () => false;
 
-function pickRendition(renditions: ReelRendition[], width: number): string {
-  for (const rendition of renditions) {
-    if (width >= rendition.minWidth) return rendition.src;
-  }
-  return renditions[renditions.length - 1].src;
-}
-
 type ReelScrollSectionProps = {
   reels?: SiteReel[];
 };
 
+/**
+ * "Stories in motion".
+ *
+ * From 900px the Reels are an editorial three-up with the middle one active, and
+ * this component owns that choice. Below 900px each Reel is a full-width section
+ * in the page's own scroll, so the section hands down no choice at all and
+ * ReelPlayer decides on its own. Either way the same components, the same
+ * sources and the same controls are used.
+ */
 export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps) {
   const total = reels.length;
   const trackRef = useRef<HTMLDivElement>(null);
-  const videoRefs = useRef<Array<HTMLVideoElement | null>>([]);
-  const activeRef = useRef(-1);
-  const muteTouchedRef = useRef(false);
 
   const isDesktop = useSyncExternalStore(subscribeTo(DESKTOP_QUERY), isDesktopSnapshot, isDesktopServerSnapshot);
   const reducedMotion = useSyncExternalStore(subscribeTo(REDUCED_MOTION_QUERY), reducedMotionSnapshot, reducedMotionServerSnapshot);
   const mounted = useSyncExternalStore(noopSubscribe, () => true, () => false);
 
-  // Nothing is chosen until the visitor picks a Reel; until then the layout decides
-  // the opening Reel - the middle one on desktop, the first on mobile.
+  // Nothing is chosen until the visitor picks a Reel; until then the layout
+  // decides the opening Reel - the middle one on desktop, the first on mobile.
   const [chosenIndex, setChosenIndex] = useState<number | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
-  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
-  const [paintedReels, setPaintedReels] = useState<Record<number, boolean>>({});
-  const [sources, setSources] = useState<string[]>(() => reels.map(() => ""));
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isTrackInView, setIsTrackInView] = useState(false);
-  /** Reels whose source failed to load, so the UI can stop offering to play them. */
-  const [failedReels, setFailedReels] = useState<Record<string, boolean>>({});
+  const [isSectionNear, setIsSectionNear] = useState(false);
 
   const activeIndex = chosenIndex ?? (isDesktop ? Math.min(1, total - 1) : 0);
-  const activeSource = sources[activeIndex] ?? "";
 
-  const handleMediaError = useCallback((reel: SiteReel, url: string, stage: "load" | "playback") => {
-    // Always logged: a dead Reel must never fail silently, and a console message
-    // is invisible to visitors unless they open devtools.
-    console.error(`[Reel] Failed to ${stage} ${reel.id}\nURL: ${url}`);
-    setFailedReels(current => (current[reel.id] ? current : { ...current, [reel.id]: true }));
-    if (stage === "playback") setIsPlaying(false);
-  }, []);
-
-  /**
-   * Only the active Reel fetches video; the next one is warmed with metadata only.
-   * Gated on the section being near the viewport so a long page does not pull
-   * tens of megabytes of Reels the visitor has not scrolled to yet.
-   */
-  const shouldLoad = useCallback(
-    (index: number) =>
-      isTrackInView && (index === activeIndex || (!isDesktop && index === activeIndex + 1)),
-    [activeIndex, isDesktop, isTrackInView],
-  );
-
-  // Pick the cheapest rendition that suits the viewport, re-evaluated on resize.
-  useEffect(() => {
-    const sync = () => setSources(reels.map((reel) => pickRendition(reel.renditions, window.innerWidth)));
-    sync();
-    window.addEventListener("resize", sync);
-    window.addEventListener("orientationchange", sync);
-    return () => {
-      window.removeEventListener("resize", sync);
-      window.removeEventListener("orientationchange", sync);
-    };
-  }, [reels]);
-
-  // Mobile: visibility decides which Reel is active, never scroll position.
+  // Hold the three-up back until the visitor has scrolled to it, so a long page
+  // never pulls tens of megabytes of films nobody has reached.
   useEffect(() => {
     const track = trackRef.current;
-    if (!track || isDesktop || typeof IntersectionObserver === "undefined") return;
-    const nodes = Array.from(track.querySelectorAll<HTMLElement>("[data-reel-index]"));
-    if (!nodes.length) return;
-    const ratios = new Map<Element, number>();
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) ratios.set(entry.target, entry.isIntersecting ? entry.intersectionRatio : 0);
-        let best: Element | null = null;
-        let bestRatio = 0;
-        for (const [node, ratio] of ratios) {
-          if (ratio > bestRatio) {
-            best = node;
-            bestRatio = ratio;
-          }
-        }
-        if (!best || bestRatio < ACTIVE_RATIO) return;
-        const index = Number((best as HTMLElement).dataset.reelIndex);
-        if (Number.isFinite(index)) setChosenIndex(index);
-      },
-      { root: track, threshold: [0, 0.25, 0.55, 0.8, 1] },
-    );
-    nodes.forEach((node) => observer.observe(node));
-    return () => observer.disconnect();
-  }, [isDesktop]);
-
-  // One Reel at a time: park every other Reel, then start the active one from the top.
-  useEffect(() => {
-    videoRefs.current.forEach((video, index) => {
-      if (video && index !== activeIndex && !video.paused) {
-        video.pause();
-        video.currentTime = 0;
-      }
-    });
-    if (!mounted) return;
-    const video = videoRefs.current[activeIndex];
-    if (!video) return;
-    activeRef.current = activeIndex;
-    video.muted = muteTouchedRef.current ? isMuted : true;
-    // State updates live in the frame callback so activation never cascades renders.
-    const frame = window.requestAnimationFrame(() => {
-      const target = videoRefs.current[activeIndex];
-      setAutoplayBlocked(false);
-      // isTrackInView keeps a scroll-away pause from becoming permanent: coming
-      // back flips it, which re-runs this effect and restarts the Reel.
-      if (!target || !activeSource || reducedMotion || !isTrackInView) {
-        setIsPlaying(false);
-        return;
-      }
-      try {
-        target.currentTime = 0;
-      } catch {
-        /* metadata not ready yet; the seek is not critical */
-      }
-      void target.play().then(
-        () => setIsPlaying(true),
-        () => {
-          setIsPlaying(false);
-          // A dead source surfaces as a media error, not a policy refusal. Only
-          // the latter should offer the visitor a Play button to retry with.
-          if (target.error) {
-            handleMediaError(reels[activeIndex], sources[activeIndex] || reels[activeIndex].src, "playback");
-            return;
-          }
-          setAutoplayBlocked(true);
-        },
-      );
-    });
-    return () => window.cancelAnimationFrame(frame);
-    // isMuted is applied imperatively on user toggle, so it is not a dependency here.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeIndex, activeSource, isTrackInView, mounted, reducedMotion]);
-
-  // Pause when the section leaves the viewport so nothing plays off-screen.
-  useEffect(() => {
-    const track = trackRef.current;
-    if (!track || typeof IntersectionObserver === "undefined") return;
-    // The observer's first callback reports where the track was at mount, which is
-    // off-screen on a page this long. It arrives after the autoplay above has
-    // already started, so acting on it would abort the play() and leave the Reel
-    // stuck behind a Play prompt. Only pause once the track has been seen.
+    if (!track || !isDesktop || typeof IntersectionObserver === "undefined") return;
+    // The observer's first callback reports where the track was at mount, which
+    // is off-screen on a page this long, so it must not be read as the visitor
+    // having scrolled away. Only pause once the track has been seen.
     let hasBeenVisible = false;
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
           hasBeenVisible = true;
-          setIsTrackInView(true);
+          setIsSectionNear(true);
           return;
         }
         if (!hasBeenVisible) return;
-        setIsTrackInView(false);
-        const video = videoRefs.current[activeRef.current];
-        if (video && !video.paused) video.pause();
+        setIsSectionNear(false);
       },
       { rootMargin: "400px 0px" },
     );
     observer.observe(track);
     return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
-    document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
-  }, []);
+  }, [isDesktop]);
 
   const activate = useCallback((index: number) => {
     setChosenIndex(index);
@@ -221,54 +95,6 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
       ?.focus();
   }, [activeIndex]);
 
-  const togglePlay = useCallback(() => {
-    const video = videoRefs.current[activeIndex];
-    if (!video) return;
-    if (video.paused) {
-      video.muted = muteTouchedRef.current ? isMuted : true;
-      void video.play().then(
-        () => setIsPlaying(true),
-        () => setAutoplayBlocked(true),
-      );
-    } else {
-      video.pause();
-    }
-  }, [activeIndex, isMuted]);
-
-  const toggleMute = useCallback(() => {
-    const video = videoRefs.current[activeIndex];
-    if (!video) return;
-    const next = !video.muted;
-    video.muted = next;
-    muteTouchedRef.current = true;
-    setIsMuted(next);
-  }, [activeIndex]);
-
-  const toggleFullscreen = useCallback(() => {
-    const video = videoRefs.current[activeIndex];
-    if (!video) return;
-    // Fullscreen the stage, not the <video>: the controls are its siblings, so
-    // promoting the video alone would hide play/mute/exit in fullscreen. The
-    // stage is the same live element the visitor was just watching, so playback
-    // position, play state and mute carry straight through, and the fullscreen
-    // rules in globals.css letterbox the frame whole instead of showing the
-    // card's 9/16 cover crop.
-    const stage = video.closest<HTMLElement>(".reel__stage") ?? video.parentElement;
-    if (!stage) return;
-    if (document.fullscreenElement) {
-      void document.exitFullscreen().catch(() => undefined);
-      return;
-    }
-    const legacy = video as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null;
-    if (typeof stage.requestFullscreen === "function") {
-      void stage.requestFullscreen().catch(() => legacy?.webkitEnterFullscreen?.());
-      return;
-    }
-    // iOS Safari on iPhone has no Element.requestFullscreen; it only exposes
-    // native fullscreen on the video itself, which already plays the full frame.
-    legacy?.webkitEnterFullscreen?.();
-  }, [activeIndex]);
-
   const onKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       if (!isDesktop || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return;
@@ -287,13 +113,6 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
     [activate, activeIndex, isDesktop, total],
   );
 
-  const activeReel = reels[activeIndex];
-  // Gated on `mounted` so the server and the hydration pass agree on the markup.
-  const canFullscreen = mounted && typeof document !== "undefined" && typeof document.documentElement.requestFullscreen === "function";
-  const showPrompt = mounted && !isPlaying && (autoplayBlocked || reducedMotion);
-  const status = activeReel
-    ? `${activeReel.title} is ${isPlaying ? `playing${isMuted ? " muted" : " with sound"}` : `paused${isMuted ? " and muted" : ""}`}`
-    : "";
   const counter = useMemo(() => String(activeIndex + 1).padStart(2, "0"), [activeIndex]);
 
   return (
@@ -306,105 +125,22 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
       </div>
 
       <div aria-label="Wedding films" className="reels__track" onKeyDown={onKeyDown} ref={trackRef} role="group">
-        {reels.map((reel, index) => {
-          const isActive = index === activeIndex;
-          const src = shouldLoad(index) ? sources[index] : "";
-          const hasFailed = Boolean(failedReels[reel.id]);
-          return (
-            <article
-              aria-label={`${reel.title} of ${total}`}
-              className="reel"
-              data-active={isActive ? "true" : "false"}
-              data-painted={paintedReels[index] ? "true" : "false"}
-              data-reel-index={index}
-              key={reel.id}
-            >
-              <div className="reel__stage">
-                <video
-                  aria-label={reel.title}
-                  controls={false}
-                  loop
-                  muted={isMuted}
-                  onCanPlay={() => setPaintedReels(current => (current[index] ? current : { ...current, [index]: true }))}
-                  onError={() => handleMediaError(reel, src || reel.src, "load")}
-                  onPause={() => {
-                    if (activeRef.current === index) setIsPlaying(false);
-                  }}
-                  onPlay={() => {
-                    if (activeRef.current === index) {
-                      setIsPlaying(true);
-                      setAutoplayBlocked(false);
-                    }
-                  }}
-                  playsInline
-                  poster={reel.poster}
-                  preload={isActive ? "auto" : "metadata"}
-                  ref={node => {
-                    videoRefs.current[index] = node;
-                  }}
-                  src={src || undefined}
-                />
-                <div aria-hidden="true" className="video-player__shade" />
-
-                {isActive && !hasFailed ? (
-                  <div aria-label={`${reel.title} controls`} className="video-player__controls" role="group">
-                    <button
-                      aria-label={isPlaying ? `Pause ${reel.title}` : `Play ${reel.title}`}
-                      aria-pressed={isPlaying}
-                      className="video-player__button"
-                      onClick={togglePlay}
-                      type="button"
-                    >
-                      {isPlaying ? <PauseIcon /> : <PlayIcon />}
-                    </button>
-                    <button
-                      aria-label={isMuted ? `Unmute ${reel.title}` : `Mute ${reel.title}`}
-                      aria-pressed={!isMuted}
-                      className="video-player__button"
-                      onClick={toggleMute}
-                      type="button"
-                    >
-                      {isMuted ? <MutedIcon /> : <SoundIcon />}
-                    </button>
-                    {canFullscreen ? (
-                      <button
-                        aria-label={`${isFullscreen ? "Exit" : "Enter"} fullscreen for ${reel.title}`}
-                        className="video-player__button"
-                        onClick={toggleFullscreen}
-                        type="button"
-                      >
-                        <FullscreenIcon />
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                {isActive && showPrompt && !hasFailed ? (
-                  <button aria-label={`Play ${reel.title}`} className="video-player__center-play" onClick={togglePlay} type="button">
-                    <PlayIcon />
-                  </button>
-                ) : null}
-
-                {!isActive && !hasFailed ? (
-                  <button
-                    aria-label={`Play ${reel.title}, reel ${index + 1} of ${total}`}
-                    className="video-player__center-play reel__activate"
-                    data-reel-activate
-                    onClick={() => activate(index)}
-                    type="button"
-                  >
-                    <PlayIcon />
-                  </button>
-                ) : null}
-
-                <span aria-hidden="true" className="reel__index">
-                  {String(index + 1).padStart(2, "0")}
-                </span>
-                <span aria-live="polite" className="video-player__status">{isActive ? status : ""}</span>
-              </div>
-            </article>
-          );
-        })}
+        {/* isActive only drives the three-up's chosen Reel; below 900px each
+            ReelPlayer decides for itself and the flag is ignored by the CSS. */}
+        {reels.map((reel, index) => (
+          <ReelPlayer
+            index={index}
+            isActive={index === activeIndex}
+            isDesktop={isDesktop}
+            isSectionNear={isSectionNear}
+            key={reel.id}
+            mounted={mounted}
+            onActivate={() => activate(index)}
+            reducedMotion={reducedMotion}
+            reel={reel}
+            total={total}
+          />
+        ))}
       </div>
 
       <p aria-hidden="true" className="reels__counter">

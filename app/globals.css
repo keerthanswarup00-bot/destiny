@@ -1608,8 +1608,10 @@ img {
 
 /* ===========================================================================
    Stories in Motion (homepage reels)
-   Mobile-first: a vertical Reel stack that scrolls like the page. From 900px
-   it becomes an editorial three-up with the middle Reel active.
+   Below 900px: three full-width sections, one per Reel, stacked in the page's
+   own scroll. From 900px: an editorial three-up with the middle Reel active.
+   The breakpoint is shared with DESKTOP_QUERY in reel-scroll-section.tsx and
+   with the rendition split in lib/site/reels.ts.
 =========================================================================== */
 
 .reels {
@@ -1765,50 +1767,63 @@ img {
 }
 
 @media (max-width: 899px) {
+  /* The Reels go full bleed, so the section drops its own gutters and hands them
+     back to the heading. The films run edge to edge; the type keeps its margin. */
   .reels {
     padding-top: clamp(3rem, 9vw, 5rem);
+    padding-inline: 0;
   }
 
   .reels__head {
     grid-template-columns: 1fr;
     align-items: start;
     gap: 0.85rem;
+    padding-inline: var(--gutter);
   }
 
   .reels__intro {
     max-width: 44ch;
   }
 
-  /* One Reel per view, full bleed. Scrolling stays on the page: this is a
-     plain overflow container with gentle proximity snapping, and it chains
-     back to the document at both ends. */
+  /* Three separate full-width sections, one per Reel, stacked in the document's
+     own scroll. Deliberately not a carousel and not a nested scroller: there is
+     no overflow, no snapping and no fixed height here, so the page scrolls
+     through the sections and only one film is ever on screen. */
   .reels__track {
-    --reel-h: min(84svh, calc(100vw * 16 / 9));
     display: block;
-    height: var(--reel-h);
     max-width: none;
-    margin-inline: calc(var(--gutter) * -1);
-    overflow-y: auto;
-    overscroll-behavior-y: auto;
-    scroll-snap-type: y proximity;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-
-  .reels__track::-webkit-scrollbar {
-    display: none;
+    margin-inline: 0;
   }
 
   .reel {
-    height: var(--reel-h);
-    scroll-snap-align: center;
-    scroll-snap-stop: normal;
+    width: 100%;
   }
 
-  /* Full-viewport Reels read better edge to edge and unscaled. A single card is
+  /* The films are natively 9/16, so a full-bleed stage is already the whole
+     frame with nothing cropped. max-height is the guard for the viewports too
+     short to hold a 9/16 frame at full width: it caps the stage just under the
+     header so the film and its controls stay on screen together, and the
+     letterboxing below fills the sides rather than cutting the picture. */
+  .reel__stage {
+    max-height: calc(100svh - var(--header-h));
+  }
+
+  .reel__stage video {
+    object-fit: contain;
+  }
+
+  /* A hairline, not a gap: each Reel reads as a section of its own, and an inset
+     shadow keeps the 1px out of the box model so the sections stay flush.
+     White at low alpha, matching the index badge, because the line sits on the
+     film rather than on the page. */
+  .reel + .reel {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  }
+
+  /* Full-width Reels read better edge to edge and unscaled. A single section is
      already the full width of the viewport here, so any scale-up would push it
-     past the edge and open a horizontal scrollbar; mobile keeps the 3-up
-     desktop scale for the desktop breakpoint only. */
+     past the edge and open a horizontal scrollbar; the scale stays with the
+     three-up from 900px. */
   .reel[data-active="false"] .reel__stage,
   .reel[data-active="true"] .reel__stage {
     transform: none;

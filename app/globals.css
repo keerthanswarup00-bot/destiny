@@ -1647,7 +1647,7 @@ img {
 }
 
 .reels__track {
-  --reel-gap: clamp(0.9rem, 2vw, 2rem);
+  --reel-gap: clamp(1.5rem, 3vw, 3rem);
   --reel-h: min(76svh, 690px);
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1797,6 +1797,12 @@ img {
 
   .reel {
     width: 100%;
+  }
+
+  /* Give each film its own breathing room so the three stories read as
+     separate premium editorial moments rather than one continuous stack. */
+  .reel + .reel {
+    margin-top: clamp(3rem, 8vw, 5rem);
   }
 
   /* The films are natively 9/16, so a full-bleed stage is already the whole

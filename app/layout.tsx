@@ -17,15 +17,34 @@ export async function generateMetadata(): Promise<Metadata> {
   const branding = await getSiteBranding();
   const title = branding.brand_name || FALLBACK_TITLE;
   const mentioned = branding.short_name ? `${branding.short_name} ${branding.tagline ? `· ${branding.tagline}` : ""}` : null;
+
   return {
-    title: { default: mentioned ? `${title} — ${mentioned}` : title, template: `%s | ${title}` },
+    metadataBase: new URL("https://destinyeventsandphotography.com"),
+    title: {
+      default: mentioned ? `${title} — ${mentioned}` : title,
+      template: `%s | ${title}`,
+    },
     description: branding.tagline || FALLBACK_DESCRIPTION,
     openGraph: {
-      title: title,
+      title,
       description: mentioned || FALLBACK_DESCRIPTION,
       siteName: title,
       type: "website",
-      images: branding.socialImageUrl ? [{ url: branding.socialImageUrl, width: 1200, height: 630, alt: title }] : undefined,
+      url: "https://destinyeventsandphotography.com",
+      images: [
+        {
+          url: "/og-image",
+          width: 1200,
+          height: 630,
+          alt: title,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description: mentioned || FALLBACK_DESCRIPTION,
+      images: ["/og-image"],
     },
   };
 }

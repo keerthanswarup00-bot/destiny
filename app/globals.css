@@ -1645,8 +1645,8 @@ img {
 }
 
 .reels__track {
-  --reel-gap: clamp(0.75rem, 1.8vw, 1.75rem);
-  --reel-h: min(70svh, 620px);
+  --reel-gap: clamp(0.9rem, 2vw, 2rem);
+  --reel-h: min(76svh, 690px);
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--reel-gap);
@@ -1669,7 +1669,7 @@ img {
   isolation: isolate;
   background: #0d0d0d;
   box-shadow: 0 24px 60px -44px rgba(0, 0, 0, 0.6);
-  transition: transform 0.55s var(--ease-out), opacity 0.55s var(--ease-out), box-shadow 0.55s var(--ease-out);
+  transition: transform 0.5s var(--ease-out), opacity 0.5s var(--ease-out), box-shadow 0.5s var(--ease-out);
 }
 
 .reel__stage video {
@@ -1681,15 +1681,58 @@ img {
   transition: opacity 0.5s var(--ease-out);
 }
 
+/* The playing Reel is the focal point. These are transform-only, so the grid
+   keeps its track sizes and nothing reflows when the active Reel changes. */
 .reel[data-active="false"] .reel__stage {
-  transform: scale(0.955);
+  transform: scale(0.94);
   opacity: 0.72;
 }
 
 .reel[data-active="true"] .reel__stage {
-  transform: scale(1);
+  transform: scale(1.06);
   opacity: 1;
   box-shadow: 0 34px 74px -40px rgba(0, 0, 0, 0.62);
+}
+
+/* Fullscreen shows the film, not the card crop.
+   The stage is the fullscreen element so the controls stay reachable, and that
+   stage is still a 9/16 box with a cover-fitted video. Left alone, the frame is
+   scaled to cover the viewport and clipped, which shows only the middle ~35% of
+   a vertical film. Inside fullscreen the card's aspect ratio and crop are undone
+   so the native frame is letterboxed whole: bars stay black, nothing is stretched
+   and the horizontal films get the same treatment. These selectors match the
+   active/inactive rules above on specificity and win by coming later, so the
+   scale and dimming cannot leak into fullscreen.
+   The video is pinned with inset rather than sized by the stage's box model: as a
+   grid or flex item its height:100% resolves against a track that has already
+   grown to the video's intrinsic 9/16 height, which re-introduces the overflow. */
+.reel .reel__stage:fullscreen,
+.reel .reel__stage:-webkit-full-screen {
+  aspect-ratio: auto;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  overflow: hidden;
+  transform: none;
+  opacity: 1;
+  background: #000;
+  box-shadow: none;
+  transition: none;
+}
+
+.reel .reel__stage:fullscreen video,
+.reel .reel__stage:-webkit-full-screen video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.reel__stage:fullscreen::backdrop,
+.reel__stage:-webkit-full-screen::backdrop {
+  background: #000;
 }
 
 /* The shared hover lift drops the centring transform, so restate it here. */
@@ -1762,8 +1805,12 @@ img {
     scroll-snap-stop: normal;
   }
 
-  /* Full-viewport Reels read better edge to edge and unscaled. */
-  .reel[data-active="false"] .reel__stage {
+  /* Full-viewport Reels read better edge to edge and unscaled. A single card is
+     already the full width of the viewport here, so any scale-up would push it
+     past the edge and open a horizontal scrollbar; mobile keeps the 3-up
+     desktop scale for the desktop breakpoint only. */
+  .reel[data-active="false"] .reel__stage,
+  .reel[data-active="true"] .reel__stage {
     transform: none;
     opacity: 1;
     box-shadow: none;

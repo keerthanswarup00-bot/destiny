@@ -246,7 +246,14 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
 
   const toggleFullscreen = useCallback(() => {
     const video = videoRefs.current[activeIndex];
-    const stage = video?.parentElement;
+    if (!video) return;
+    // Fullscreen the stage, not the <video>: the controls are its siblings, so
+    // promoting the video alone would hide play/mute/exit in fullscreen. The
+    // stage is the same live element the visitor was just watching, so playback
+    // position, play state and mute carry straight through, and the fullscreen
+    // rules in globals.css letterbox the frame whole instead of showing the
+    // card's 9/16 cover crop.
+    const stage = video.closest<HTMLElement>(".reel__stage") ?? video.parentElement;
     if (!stage) return;
     if (document.fullscreenElement) {
       void document.exitFullscreen().catch(() => undefined);
@@ -257,6 +264,8 @@ export function ReelScrollSection({ reels = SITE_REELS }: ReelScrollSectionProps
       void stage.requestFullscreen().catch(() => legacy?.webkitEnterFullscreen?.());
       return;
     }
+    // iOS Safari on iPhone has no Element.requestFullscreen; it only exposes
+    // native fullscreen on the video itself, which already plays the full frame.
     legacy?.webkitEnterFullscreen?.();
   }, [activeIndex]);
 

@@ -33,7 +33,7 @@ export async function generateMetadata(): Promise<Metadata> {
       url: "https://destinyeventsandphotography.com",
       images: [
         {
-          url: "/og-image",
+          url: "/og-image.png",
           width: 1200,
           height: 630,
           alt: title,
@@ -44,7 +44,7 @@ export async function generateMetadata(): Promise<Metadata> {
       card: "summary_large_image",
       title,
       description: mentioned || FALLBACK_DESCRIPTION,
-      images: ["/og-image"],
+      images: ["/og-image.png"],
     },
   };
 }

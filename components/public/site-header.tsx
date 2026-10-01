@@ -8,6 +8,34 @@ function isActive(pathname: string, prefix: string) {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
 
+/** Routes this app owns and can navigate to client-side.
+ *
+ * `/gallery` is a real route in this app, so `next/link` is correct for it. The public
+ * marketing routes are a different Next.js build proxied through the same origin (see the
+ * `beforeFiles` rewrites in next.config.ts). A client-side transition into another build
+ * cannot work: this app's router receives that build's RSC payload and then rebuilds the
+ * chunk URLs against its own `/_next/` prefix, producing requests like
+ * `/_next/_next/static/chunks/...` that 404, then falls back to a full page load anyway.
+ *
+ * So cross-build links are plain anchors. The full document request is the only navigation
+ * that reliably crosses the build boundary. This also means no prefetch RSC requests for
+ * routes this app does not own.
+ */
+const OWNED_ROUTE = /^\/gallery(\/|$)/;
+
+function NavLink({ href, active, children, className, ...rest }: {
+  href: string;
+  active?: boolean;
+  children: React.ReactNode;
+  className?: string;
+  "aria-label"?: string;
+}) {
+  if (!OWNED_ROUTE.test(href)) {
+    return <a href={href} className={className} data-active={active || undefined} {...rest}>{children}</a>;
+  }
+  return <Link href={href} className={className} data-active={active || undefined}>{children}</Link>;
+}
+
 export function SiteHeader({ brandName, shortName, tagline, logoUrl }: { brandName: string; shortName: string; tagline: string; logoUrl: string | null }) {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
@@ -31,7 +59,7 @@ export function SiteHeader({ brandName, shortName, tagline, logoUrl }: { brandNa
 
   return (
     <header className={`site-header${scrolled ? " is-scrolled" : ""}`}>
-      <Link href="/" className="brand" aria-label={`${brandName} home`}>
+      <NavLink href="/" className="brand" aria-label={`${brandName} home`}>
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img alt="" className="brand-logo" src={logoUrl} />
@@ -41,11 +69,11 @@ export function SiteHeader({ brandName, shortName, tagline, logoUrl }: { brandNa
             <span>{tagline}</span>
           </>
         )}
-      </Link>
+      </NavLink>
       <nav className="site-nav" aria-label="Primary navigation">
-        <Link href="/" data-active={isActive(pathname, "/")}>Home</Link>
-        <Link href="/gallery" data-active={isActive(pathname, "/gallery")}>Gallery</Link>
-        <Link href="/contact" data-active={isActive(pathname, "/contact")}>Contact</Link>
+        <NavLink href="/" active={isActive(pathname, "/")}>Home</NavLink>
+        <NavLink href="/gallery" active={isActive(pathname, "/gallery")}>Gallery</NavLink>
+        <NavLink href="/contact" active={isActive(pathname, "/contact")}>Contact</NavLink>
       </nav>
     </header>
   );

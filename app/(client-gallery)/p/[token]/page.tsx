@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SharedPhoto } from "@/components/client-gallery/shared-photo";
 import { clientFacingObjectPath } from "@/lib/client-media";
@@ -33,7 +32,10 @@ export default async function SharedPhotoPage({ params }: { params: Promise<{ to
           Shared from <strong>{shared.galleryTitle}</strong>. This link opens exactly one photograph.
         </p>
         <p className="shared-photo-home">
-          <Link href="/">destinyphotography</Link>
+          {/* Plain anchor, not next/link: `/` belongs to the public site's build, not this one.
+              See components/public/site-header.tsx for the full explanation. */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+          <a href="/">destinyphotography</a>
         </p>
       </div>
     </main>

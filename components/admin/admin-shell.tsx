@@ -48,9 +48,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         {!isEditor ? (
           <header className="admin-header">
             <span>STUDIO MANAGEMENT</span>
-            <Link href="/" target="_blank">
+            <a href="/" target="_blank" rel="noopener noreferrer">
               View site <ExternalLink size={13} strokeWidth={1.8} />
-            </Link>
+            </a>
           </header>
         ) : null}
         {children}

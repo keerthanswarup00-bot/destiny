@@ -25,6 +25,9 @@ const nextConfig: NextConfig = {
         { source: "/about/:path*", destination: "https://destiny-site-omega.vercel.app/about/:path*" },
         { source: "/contact", destination: "https://destiny-site-omega.vercel.app/contact" },
         { source: "/contact/:path*", destination: "https://destiny-site-omega.vercel.app/contact/:path*" },
+        // NFC contact profile and downloadable contact card live in the public-site project.
+        { source: "/connect", destination: "https://destiny-site-omega.vercel.app/connect" },
+        { source: "/destiny-contact.vcf", destination: "https://destiny-site-omega.vercel.app/destiny-contact.vcf" },
         { source: "/media/:path*", destination: "https://destiny-site-omega.vercel.app/media/:path*" },
         { source: "/robots.txt", destination: "https://destiny-site-omega.vercel.app/robots.txt" },
         { source: "/sitemap.xml", destination: "https://destiny-site-omega.vercel.app/sitemap.xml" },
